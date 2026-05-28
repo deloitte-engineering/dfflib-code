@@ -1,0 +1,23 @@
+{
+  "packageDirectories": [
+    {
+      "versionName": "D'fflib",
+      "versionNumber": "0.0.0.NEXT",
+      "path": "force-app",
+      "default": true,
+      "unpackagedMetadata": {
+        "path": "dependencies"
+      },
+      "package": "dfflib",
+      "versionDescription": ""
+    },
+    {
+      "path": "dependencies",
+      "default": false
+    }
+  ],
+  "namespace": "",
+  "sfdcLoginUrl": "https://login.salesforce.com",
+  "sourceApiVersion": "66.0",
+  "packageAliases": {}
+}
