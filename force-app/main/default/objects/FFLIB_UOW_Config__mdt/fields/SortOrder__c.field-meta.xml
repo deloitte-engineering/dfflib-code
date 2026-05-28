@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SortOrder__c</fullName>
+    <description>Made non-unique to prevent deployment issues when swapping.</description>
+    <externalId>false</externalId>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <inlineHelpText>Specifying at which sequence/order this SObjectType should have the DML actions performed. Mostly to specify which SObjectTypes come before and which after. Admin is responsible of guaranteeing unique SortOrder.</inlineHelpText>
+    <label>SortOrder</label>
+    <precision>3</precision>
+    <required>true</required>
+    <scale>0</scale>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

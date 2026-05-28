@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SObjectType__c</fullName>
+    <caseSensitive>true</caseSensitive>
+    <description>Characterised as ExternalId to allow test coverage in standard SF implementation.</description>
+    <externalId>false</externalId>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <inlineHelpText>Specifying the SObjectType of the object which is allowed to be registered and committed in UOW.</inlineHelpText>
+    <label>SObjectType</label>
+    <length>255</length>
+    <required>true</required>
+    <type>Text</type>
+    <unique>true</unique>
+</CustomField>

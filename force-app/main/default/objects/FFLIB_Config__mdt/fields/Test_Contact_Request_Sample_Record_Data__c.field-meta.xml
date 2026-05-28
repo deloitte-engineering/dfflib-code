@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Test_Contact_Request_Sample_Record_Data__c</fullName>
+    <description>Opt. attribute to define sample ContactRequest record data to be used in Unit Tests. It allows to add required fields or other business logic as projects see fit, ensuring validation rules and other triggered checks on record insert to be respected.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Opt. attribute to define sample ContactRequest record data to be used in Unit Tests. It allows to add required fields or other business logic as projects see fit, ensuring validation rules and other triggered checks on record insert to be respected.</inlineHelpText>
+    <label>Test Contact Request Sample Record Data</label>
+    <length>32768</length>
+    <type>LongTextArea</type>
+    <visibleLines>3</visibleLines>
+</CustomField>
