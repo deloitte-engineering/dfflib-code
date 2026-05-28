@@ -1,0 +1,78 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ WORKFLOW: auto-delete-branch                                                  ║
+# ║ PURPOSE: Automatically deletes merged feature branches after PR merge,        ║
+# ║          while protecting main/master/develop branches from deletion.         ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║ TRIGGERS:                                                                     ║
+# ║   - pull_request (closed): Runs when a PR is closed                          ║
+# ║   - Conditional: Only executes if the PR was merged (not just closed)        ║
+# ║                                                                              ║
+# ║ PROTECTED BRANCHES: main, master, develop (never deleted)                    ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: Auto Delete Merged Branch
+
+on:
+  pull_request:
+    types: [ closed ]
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ JOB PIPELINE                                                                  ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║ delete-branch ─── Deletes the source branch after successful merge           ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+jobs:
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ JOB: delete-branch                                                           │
+  # ├──────────────────────────────────────────────────────────────────────────────┤
+  # │ PURPOSE:                                                                     │
+  # │   Cleans up feature branches after they are merged to keep the repository   │
+  # │   tidy. Prevents accumulation of stale branches.                            │
+  # │                                                                              │
+  # │ DEPENDENCIES: None                                                           │
+  # │                                                                              │
+  # │ CONDITIONAL: Only runs if github.event.pull_request.merged == true          │
+  # │                                                                              │
+  # │ OUTPUTS: None                                                                │
+  # │                                                                              │
+  # │ FAILURE BEHAVIOR:                                                            │
+  # │   Non-critical — branch deletion failure is logged but doesn't block.       │
+  # │   The branch can be manually deleted later if needed.                        │
+  # │                                                                              │
+  # │ TECHNICAL NOTES:                                                             │
+  # │   - Protected branches (main, master, develop) are never deleted            │
+  # │   - Uses GitHub API to delete the branch reference                          │
+  # │   - Handles 404 errors gracefully (branch may already be deleted)           │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  delete-branch:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Delete merged branch
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const branchName = context.payload.pull_request.head.ref;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Don't delete main/master/develop branches
+            const protectedBranches = ['main', 'master', 'develop'];
+            if (protectedBranches.includes(branchName)) {
+              console.log(`Skipping deletion of protected branch: ${branchName}`);
+              return;
+            }
+
+            try {
+              await github.rest.git.deleteRef({
+                owner,
+                repo,
+                ref: `heads/${branchName}`
+              });
+              console.log(`Successfully deleted branch: ${branchName}`);
+            } catch (error) {
+              console.log(`Could not delete branch ${branchName}: ${error.message}`);
+            }

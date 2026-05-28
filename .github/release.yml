@@ -1,0 +1,40 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ CONFIGURATION: release.yml                                                    ║
+# ║ PURPOSE: Defines changelog categories for GitHub Release notes generation.   ║
+# ║          Maps PR labels to release note sections with emoji prefixes.        ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║ USED BY: .github/workflows/unlocked-package.yml (publish-release job)        ║
+# ║                                                                              ║
+# ║ CATEGORY MAPPING:                                                            ║
+# ║   - Breaking: breaking                                                       ║
+# ║   - Features: enhancement, feat, features                                    ║
+# ║   - Bugs: bug, fix, bugfix                                                   ║
+# ║   - Misc: style, refactor, perf, chore, ci, * (catch-all)                    ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+changelog:
+  categories:
+    - title: 🛠 Breaking Changes
+      labels:
+        - breaking
+
+    - title: 🎉 New features
+      labels:
+        - enhancement
+        - feat
+        - features
+
+    - title: 🐛 Bug fixes
+      labels:
+        - bug
+        - fix
+        - bugfix
+
+    - title: 📚 Miscellaneous updates
+      labels:
+        - style
+        - refactor
+        - perf
+        - chore
+        - ci
+        - "*"

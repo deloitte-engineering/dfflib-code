@@ -1,0 +1,70 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ WORKFLOW: pr-labeler                                                          ║
+# ║ PURPOSE: Automatically labels PRs based on which files were changed.          ║
+# ║          Uses patterns defined in .github/labeler.yml configuration file.     ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║ TRIGGERS:                                                                     ║
+# ║   - pull_request_target (opened, edited, synchronize)                        ║
+# ║                                                                              ║
+# ║ CONFIGURATION: .github/labeler.yml                                           ║
+# ║   Defines file path patterns and their corresponding labels:                 ║
+# ║   - framework: force-app/**, manifest/**                                     ║
+# ║   - documentation: documentation/**, **/*.md                                 ║
+# ║   - dependencies: dependencies/**                                            ║
+# ║   - ci: .github/**                                                           ║
+# ║   - tests: force-app/classes/*Test.cls                                       ║
+# ║                                                                              ║
+# ║ SECURITY NOTE:                                                               ║
+# ║   Uses pull_request_target (not pull_request) for write access to add        ║
+# ║   labels on PRs from forks. This workflow does NOT checkout or execute       ║
+# ║   untrusted PR code — it only reads file paths and applies labels.           ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+name: Pull Request Labeler (based on file changes)
+
+on:
+  pull_request_target:
+    # NOTE: pull_request_target is required to have write permissions to add labels on PRs from forks.
+    #  This workflow must not be modified to check out or execute untrusted PR code, as it runs with base repo permissions.
+    types: [ opened, edited, synchronize ]
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ JOB PIPELINE                                                                  ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║ labeler ─── Applies labels based on file change patterns                     ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+jobs:
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ JOB: labeler                                                                 │
+  # ├──────────────────────────────────────────────────────────────────────────────┤
+  # │ PURPOSE:                                                                     │
+  # │   Automatically categorizes PRs by applying labels based on which files     │
+  # │   were modified. Helps maintainers quickly identify PR scope and impact.    │
+  # │                                                                              │
+  # │ DEPENDENCIES: None                                                           │
+  # │                                                                              │
+  # │ CONDITIONAL: Skips bot PRs to avoid unnecessary labeling                    │
+  # │                                                                              │
+  # │ OUTPUTS: None (labels are applied directly to the PR)                       │
+  # │                                                                              │
+  # │ FAILURE BEHAVIOR:                                                            │
+  # │   Non-critical — labeling failure doesn't block PR workflow.                │
+  # │   Labels can be manually applied if automation fails.                        │
+  # │                                                                              │
+  # │ TECHNICAL NOTES:                                                             │
+  # │   - Uses actions/labeler@v6.0.1 with .github/labeler.yml config             │
+  # │   - Requires contents:read to analyze file changes                          │
+  # │   - Requires pull-requests:write to apply labels                            │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  labeler:
+    name: add-files-changed-labelling
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.user.type != 'Bot'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b # v6.0.1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

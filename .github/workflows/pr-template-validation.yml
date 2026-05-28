@@ -1,0 +1,207 @@
+# =============================================================================
+# pr-template-validation.yml - Validate PR Template Required Fields
+# =============================================================================
+# Purpose:  Validates that PR authors have filled in required template fields.
+#           This is a BLOCKING check - PRs cannot be merged without passing.
+#
+# Triggers: pull_request_target (opened, edited, synchronize, reopened)
+#
+# Validations:
+#   1. Description must be at least 10 characters (not placeholder text)
+#   2. PR title prefix (conventional commit format):
+#      - Title must match: <type>: <description> or <type>(<scope>): <description>
+#      - Valid types: feat, fix, docs, style, refactor, perf, test, chore, build, ci
+#      - Missing or invalid prefix = ERROR (blocks merge)
+#   3. At least one checklist item must be checked (warning only)
+#
+# Title-Driven Type Detection:
+#   The PR type is derived automatically from the title prefix using the
+#   conventional commits format (e.g., "feat: Add login page" → type: feat).
+#   No manual checkbox selection is required.
+#
+# Branch Protection:
+#   To enforce this check, add "Validate PR Template" as a required
+#   status check in your branch protection rules for main/master.
+#
+# Status Reporting:
+#   - Always reports a status (even for bot PRs) to prevent "pending" state
+#   - Bot PRs are auto-approved without validation
+#   - Human PRs are validated against template requirements
+# =============================================================================
+
+name: PR Template Validation
+
+on:
+  pull_request_target:
+    types: [ opened, edited, synchronize, reopened ]
+
+# Concurrency control - cancel in-progress runs for the same PR
+concurrency:
+  group: pr-template-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  statuses: write
+jobs:
+  validate-template:
+    name: Validate PR Template
+    runs-on: ubuntu-latest
+    # NOTE: No 'if' condition here - job always runs to report status
+    # Bot detection is handled inside the script to ensure status is always reported
+    
+    steps:
+      - name: Validate Required Fields
+        id: validate
+        uses: actions/github-script@v7
+        timeout-minutes: 5
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const actor = context.actor;
+            
+            // Check for bot PRs first - auto-approve without validation
+            const isBot = actor.includes('[bot]') || actor.toLowerCase().includes('dependabot');
+            if (isBot) {
+              console.log(`✅ Bot PR detected (actor: ${actor}), auto-approving`);
+              core.setOutput('valid', 'true');
+              core.setOutput('skipped', 'true');
+              core.setOutput('selected_type', '');
+              return;
+            }
+            
+            core.setOutput('skipped', 'false');
+            
+            const body = pr.body || '';
+            const errors = [];
+            const warnings = [];
+            
+            // VALIDATION 1: Description (minimum 10 characters, not placeholder)
+            const descriptionSection = body.match(/## Description\s*([\s\S]*?)(?=##|$)/i);
+            const description = descriptionSection ? descriptionSection[1].trim() : '';
+            const cleanDescription = description.replace(/<!--[\s\S]*?-->/g, '').trim();
+            
+            const placeholderPatterns = [
+              /^n\/a$/i, /^na$/i, /^none$/i, /^no description$/i,
+              /^todo$/i, /^tbd$/i, /^wip$/i, /^-+$/, /^\.+$/
+            ];
+            
+            const isPlaceholder = placeholderPatterns.some(p => p.test(cleanDescription));
+            
+            if (cleanDescription.length < 10) {
+              errors.push('❌ **Description**: Must be at least 10 characters. Please provide a meaningful description of your changes.');
+            } else if (isPlaceholder) {
+              errors.push('❌ **Description**: Placeholder text detected. Please provide a real description of your changes.');
+            }
+            
+            // VALIDATION 2: PR Title Prefix (conventional commit format)
+            const prTitle = pr.title || '';
+            const prefixRegex = /^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\([^)]+\))?:\s+.+/i;
+            const titleMatch = prTitle.match(/^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\([^)]+\))?:/i);
+            const detectedType = titleMatch ? titleMatch[1].toLowerCase() : null;
+            
+            if (!prefixRegex.test(prTitle)) {
+              errors.push(
+                '❌ **PR Title**: Must follow conventional commit format: `<type>: <description>` or `<type>(<scope>): <description>`.\n' +
+                '   Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `build`.\n' +
+                `   Current title: \`${prTitle || '(empty)'}\``
+              );
+              core.info(`❌ PR title does not match conventional commit format: "${prTitle}"`);
+            } else {
+              core.info(`✅ PR title valid — detected type: ${detectedType}`);
+            }
+            
+            // VALIDATION 3: Checklist (at least one item checked - warning only)
+            const checklistSection = body.match(/## Checklist\s*([\s\S]*?)(?=##|$)/i);
+            const checklist = checklistSection ? checklistSection[1] : '';
+            const checkedItems = (checklist.match(/-\s*\[x\]/gi) || []).length;
+            
+            if (checkedItems === 0) {
+              warnings.push('⚠️ **Checklist**: No items checked. Please review and check applicable items.');
+            }
+            
+            // OUTPUT RESULTS
+            const hasErrors = errors.length > 0;
+            const hasWarnings = warnings.length > 0;
+            let commentBody = '';
+            
+            if (hasErrors) {
+              commentBody = `## ❌ PR Template Validation Failed\n\nPlease fix the following issues before this PR can be merged:\n\n${errors.join('\n\n')}`;
+              if (hasWarnings) {
+                commentBody += `\n\n### Warnings\n\n${warnings.join('\n\n')}`;
+              }
+              commentBody += '\n\n---\n*Edit your PR title and/or description to fix these issues. This check will re-run automatically.*';
+            } else {
+              // Validation passed (may have warnings)
+              commentBody = `## ✅ PR Template Validation Passed\n\n`;
+              if (detectedType) {
+                commentBody += `- **Type**: \`${detectedType}\` *(detected from title)*\n`;
+              } else {
+                commentBody += `- **Type**: ⚠️ Not detected from title\n`;
+              }
+              commentBody += `- **Description**: Valid (${cleanDescription.length} characters)\n`;
+              commentBody += `- **Checklist**: ${checkedItems} item(s) checked`;
+              if (hasWarnings) {
+                commentBody += `\n\n### Warnings\n\n${warnings.join('\n\n')}`;
+              }
+            }
+            
+            // Find existing bot comment to update (avoid spam)
+            try {
+              const comments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number
+              });
+            
+              const botComment = comments.data.find(c => 
+                c.user.type === 'Bot' && 
+                c.body.includes('PR Template Validation')
+              );
+            
+              if (botComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body: commentBody
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: commentBody
+                });
+              }
+            } catch (error) {
+              console.log(`Warning: Could not post/update comment: ${error.message}`);
+              // Continue - comment failure should not block validation result
+            }
+            
+            core.setOutput('valid', String(!hasErrors));
+            core.setOutput('selected_type', detectedType || '');
+            
+            if (hasErrors) {
+              core.setFailed('PR template validation failed. See comment for details.');
+            }
+
+      - name: Report Status
+        if: always()
+        run: |
+          VALID="${{ steps.validate.outputs.valid }}"
+          SKIPPED="${{ steps.validate.outputs.skipped }}"
+          TYPE="${{ steps.validate.outputs.selected_type }}"
+          
+          if [ "$SKIPPED" == "true" ]; then
+            echo "✅ PR template validation skipped (bot PR)"
+            exit 0
+          elif [ "$VALID" == "true" ]; then
+            echo "✅ PR template validation passed"
+            echo "Selected type: $TYPE"
+            exit 0
+          else
+            echo "❌ PR template validation failed"
+            exit 1
+          fi

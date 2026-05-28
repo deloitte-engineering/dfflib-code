@@ -1,0 +1,153 @@
+# =============================================================================
+# pr-labelling-automation.yml - Conventional Labels from PR Title
+# =============================================================================
+# Applies labels based on conventional commit prefix in PR title.
+# Uses three-job architecture to handle stale webhook payloads.
+#
+# Label Mapping: feat→enhancement, fix→bug, chore→chore, ci→ci,
+#                style→style, refactor→refactor, perf→performance
+#
+# Concurrency: cancel-in-progress ensures only the final edit is processed.
+# When a run is cancelled, the NEWER run that caused the cancellation will
+# complete - GitHub Actions guarantees the newest run always finishes.
+# =============================================================================
+
+name: PR Labelling Automation
+
+on:
+  pull_request_target:
+    types: [ opened, edited, synchronize, reopened ]
+
+concurrency:
+  group: pr-labelling-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  cleanup-stale-labels:
+    name: Cleanup Stale Labels
+    runs-on: ubuntu-latest
+    if: ${{ !contains(github.actor, '[bot]') && !contains(github.actor, 'dependabot') }}
+    permissions:
+      pull-requests: write
+    outputs:
+      expected_label: ${{ steps.fetch.outputs.label }}
+    steps:
+      - name: Fetch Fresh PR Title and Cleanup
+        id: fetch
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+
+            const labelMap = {
+              'feat': 'enhancement',
+              'fix': 'bug',
+              'chore': 'chore',
+              'ci': 'ci',
+              'style': 'style',
+              'refactor': 'refactor',
+              'perf': 'performance'
+            };
+            const allLabels = Object.values(labelMap);
+
+            const match = pr.title.match(/^(feat|fix|chore|ci|style|refactor|perf)(\([^)]+\))?:/i);
+            const expectedLabel = match ? labelMap[match[1].toLowerCase()] : '';
+            core.setOutput('label', expectedLabel);
+
+            // Log summary
+            if (expectedLabel) {
+              console.log(`"${pr.title}" → ${expectedLabel}`);
+            } else {
+              console.log('⚠ No conventional prefix in title');
+            }
+
+            // Silently remove existing conventional labels
+            const currentLabels = pr.labels.map(l => l.name);
+            for (const label of allLabels) {
+              if (currentLabels.includes(label)) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    name: label
+                  });
+                } catch (e) { /* ignore */ }
+              }
+            }
+
+  apply-label-bcoe:
+    name: Apply Label (bcoe)
+    needs: cleanup-stale-labels
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: bcoe/conventional-release-labels@886f696738527c7be444262c327c89436dfb95a8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          type_labels: '{
+            "feat": "enhancement",
+            "fix": "bug",
+            "chore": "chore",
+            "ci": "ci",
+            "style": "style",
+            "refactor": "refactor",
+            "perf": "performance"
+          }'
+          ignored_types: '[]'
+
+  verify-and-correct:
+    name: Verify Label
+    needs: [ cleanup-stale-labels, apply-label-bcoe ]
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Verify and Correct if Needed
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const expectedLabel = '${{ needs.cleanup-stale-labels.outputs.expected_label }}';
+            if (!expectedLabel) return;
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+
+            const currentLabels = pr.labels.map(l => l.name);
+            if (currentLabels.includes(expectedLabel)) return; // bcoe got it right
+
+            // bcoe applied wrong label - correct it
+            const allLabels = ['enhancement', 'bug', 'chore', 'ci', 'style', 'refactor', 'performance'];
+            const wrongLabel = currentLabels.find(l => allLabels.includes(l));
+            
+            for (const label of allLabels) {
+              if (currentLabels.includes(label)) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    name: label
+                  });
+                } catch (e) { /* ignore */ }
+              }
+            }
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: [expectedLabel]
+            });
+
+            console.log(`Corrected: ${wrongLabel || 'none'} → ${expectedLabel}`);
