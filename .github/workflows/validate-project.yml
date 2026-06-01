@@ -107,9 +107,6 @@ jobs:
             --set-default \
             -a dfflib-buildcheck
           echo "Authentication complete."
-          echo ""
-          echo "=== Auth Result ==="
-          sf org display --target-org dfflib-buildcheck
 
       # Validate deployment including test factory (lives under force-app/test-factory)
       - name: Validate Deployment
