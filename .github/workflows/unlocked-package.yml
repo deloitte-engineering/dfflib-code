@@ -432,7 +432,7 @@ jobs:
 
           # Query existing package versions
           RESULT=$(sf package version list \
-            --packages faststart-fflib-packaging-sandbox \
+            --packages "D'fflib" \
             --target-dev-hub dfflib-packaging-prod \
             --json 2>&1)
 
@@ -508,25 +508,25 @@ jobs:
           echo "=== Create Package Version ==="
           echo "Version: $VERSION_NUMBER ($VERSION_NAME)"
           echo "Description: $VERSION_DESC"
-          echo "Package: faststart-fflib-packaging-sandbox"
+          echo "Package: D'fflib"
           echo "Target: dfflib-packaging-prod org"
           echo ""
 
           # Verify the package exists in the Dev Hub before attempting version creation
           echo "Checking if package exists in Dev Hub..."
           PKG_LIST=$(sf package list --target-dev-hub dfflib-packaging-prod --json 2>&1)
-          EXISTING_PKG=$(echo "$PKG_LIST" | jq -r '.result[] | select(.Name == "faststart-fflib-packaging-sandbox") | .Id' 2>/dev/null || echo "")
+          EXISTING_PKG=$(echo "$PKG_LIST" | jq -r '.result[] | select(.Name == "D'\''fflib") | .Id' 2>/dev/null || echo "")
 
           if [[ -z "$EXISTING_PKG" ]]; then
             echo ""
-            echo "::error::Package 'faststart-fflib-packaging-sandbox' not found in Dev Hub."
+            echo "::error::Package 'D'fflib' not found in Dev Hub."
             echo ""
             echo "The package does not exist yet. Before creating package versions, you must first create the package."
             echo ""
             echo "Run this command locally to create the package:"
             echo ""
             echo "  sf package create \\"
-            echo "    --name faststart-fflib-packaging-sandbox \\"
+            echo "    --name \"D'fflib\" \\"
             echo "    --package-type Unlocked \\"
             echo "    --path force-app \\"
             echo "    --target-dev-hub dfflib-packaging-prod"
@@ -542,7 +542,7 @@ jobs:
           if [[ -n "$INSTALLATION_KEY" ]]; then
             echo "Using provided installation key..."
             CMD=(sf package version create \
-              --package faststart-fflib-packaging-sandbox \
+              --package "D'fflib" \
               --code-coverage \
               --installation-key "$INSTALLATION_KEY" \
               --wait 60 \
@@ -554,7 +554,7 @@ jobs:
           else
             echo "No installation key — bypassing..."
             CMD=(sf package version create \
-              --package faststart-fflib-packaging-sandbox \
+              --package "D'fflib" \
               --code-coverage \
               --installation-key-bypass \
               --wait 60 \
@@ -744,7 +744,7 @@ jobs:
         run: |
           VERSION="${{ env.VERSION_NUMBER }}"
           PKG_VER_ID="${{ needs.package-build.outputs.package_version_id }}"
-          ALIAS_KEY="faststart-fflib-packaging-sandbox@${VERSION}"
+          ALIAS_KEY="D'fflib@${VERSION}"
 
           # Check if alias already exists (might have been added by a previous run)
           EXISTING_ID=$(jq -r ".packageAliases[\"$ALIAS_KEY\"] // empty" sfdx-project.json)
@@ -754,7 +754,7 @@ jobs:
             echo "Adding $ALIAS_KEY to packageAliases..."
             jq --arg pkgId "$PKG_VER_ID" \
                --arg version "$VERSION" \
-               '.packageAliases["faststart-fflib-packaging-sandbox@\($version)"] = $pkgId' \
+               '.packageAliases["D'\''fflib@\($version)"] = $pkgId' \
                sfdx-project.json > sfdx-project.tmp.json \
             && mv sfdx-project.tmp.json sfdx-project.json
 
