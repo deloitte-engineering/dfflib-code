@@ -12,8 +12,10 @@
 #             (when force-app/** changes)
 #
 # Concurrency:
-#   Branch-scoped concurrency — concurrent runs on the same branch are cancelled.
-#   Different branches (e.g., feature/a and feature/b) run in parallel.
+#   PR-scoped concurrency — both push and pull_request triggers for the same PR
+#   share a concurrency group (keyed on PR number), so the second run cancels the first.
+#   Pushes to branches without an open PR are keyed on branch name.
+#   Different branches/PRs run in parallel.
 #
 # Secrets:  - SF_BUILDCHECK_CLIENT_ID     Consumer Key from Connected App (buildcheck org)
 #            - SF_BUILDCHECK_USERNAME      Salesforce username to authenticate as (buildcheck org)
@@ -25,7 +27,7 @@
 
 # Allow parallel runs across different branches, but cancel concurrent runs on the same branch
 concurrency:
-  group: validate-project-${{ github.ref_name }}
+  group: validate-project-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
 
 name: Validate Project Build
