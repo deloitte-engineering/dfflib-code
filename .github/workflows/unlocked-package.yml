@@ -22,13 +22,6 @@
 #   run_preflight        Optional  Run deployment validation before creating package (default: false)
 #   mode                  Optional  "validate" (dry-run) or "release" (default)
 #
-# Secrets Required:
-#   SF_CLIENT_ID       Consumer Key from Connected App
-#   SF_USERNAME        Salesforce username to authenticate as
-#   SF_PRIVATE_KEY    Private key (RSA) for JWT signing
-#   SF_INSTANCE_URL   Instance URL (e.g. https://deloitte-nl.my.salesforce.com)
-#   INSTALLATION_KEY  Package installation key (if protected)
-#
 # Job Pipeline (runs in order):
 #   1. preflight-checks    Validates version format, branch, and generates changelog
 #   2. validation-mode     If mode=validate: outputs summary and stops

@@ -17,11 +17,6 @@
 #   Pushes to branches without an open PR are keyed on branch name.
 #   Different branches/PRs run in parallel.
 #
-# Secrets:  - SF_BUILDCHECK_CLIENT_ID     Consumer Key from Connected App (buildcheck org)
-#            - SF_BUILDCHECK_USERNAME      Salesforce username to authenticate as (buildcheck org)
-#            - SF_BUILDCHECK_PRIVATE_KEY   Private key (RSA) for JWT signing (buildcheck org)
-#            - SF_BUILDCHECK_INSTANCE_URL  Instance URL of the buildcheck org
-#
 # Setup:    See .github/SETUP_SALESFORCE_CICD.md for full setup instructions
 # =============================================================================
 
