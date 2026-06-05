@@ -4,12 +4,8 @@
 #
 ##############################################################
 #
-# Get in touch with us via the Keptn Community
+# Get in touch with us via the published Community
 #  https://github.com/deloitte-engineering/dfflib
-#
-#
-# Learn about CODEOWNERS file format:
-#  https://help.github.com/en/articles/about-code-owners
 #
 
 # These owners will be the default owners for everything in the repo.
@@ -19,7 +15,7 @@
 force-app/main/default/classes/*.cls @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
 
 # UT Test Factory classes
-test-factory/main/default/classes/*.cls @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+force-app/test-factory/classes/*.cls @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
 
 # Documentation
 *.md @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
