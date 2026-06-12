@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c) 2026, Deloitte Consultative Services B.V.
+ * Copyright (c) 2025, Deloitte NL
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification,
@@ -11,7 +11,7 @@
  * - Redistributions in binary form must reproduce the above copyright notice,
  *      this list of conditions and the following disclaimer in the documentation
  *      and/or other materials provided with the distribution.
- * - Neither the name of the FinancialForce.com inc, nor Deloitte Consultative Services B.V., nor the names of its contributors
+ * - Neither the name of the FinancialForce.com, inc nor the names of its contributors
  *      may be used to endorse or promote products derived from this software without
  *      specific prior written permission.
  *
@@ -20,8 +20,8 @@
  *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
  *  THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  *  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- *  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- *  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ *  OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /**
@@ -852,6 +852,80 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
     }
 
     /**
+     * Method to verify whether getCursor() was called with a query and no bindVariablesMap
+     *
+     * @param mocks     fflib_ApexMocks to which the mock was registered
+     * @return          Instance of SelectorVerificationResults providing query string and QueryFactory
+     */
+    @TestVisible
+    private SelectorVerificationResults verifyCursor( fflib_ApexMocks mocks ){
+        fflib_ArgumentCaptor argumentCaptor = new fflib_ArgumentCaptor();
+        try{
+            ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).getCursor( ( String ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
+        } catch( Exception ex ){
+            throw new fflib.InvalidImplementationException( 'No getCursor() was called without bindVariablesMap. If you provided a Map, please use verifyCursorAndBindVariableKeys()' );
+        }
+        return this.processVerifyQueryResults( argumentCaptor, 1 );
+    }
+
+    /**
+     * Method to verify whether getCursor() was called with a query and a valid bindVariablesMap (having matching variables)
+     * Validating:
+     * - The correct QueryFactory was provided
+     * - The query has the same (number of) bind-variables in string as provided in the Map
+     *
+     * @param mocks     fflib_ApexMocks to which the mock was registered
+     * @return          Instance of SelectorVerificationResults providing query string, bind map and QueryFactory
+     */
+    @TestVisible
+    private SelectorVerificationResults verifyCursorAndBindVariableKeys( fflib_ApexMocks mocks ){
+        fflib_ArgumentCaptor argumentCaptor = new fflib_ArgumentCaptor();
+        try{
+            ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).getCursor( ( String ) argumentCaptor.capture(), ( Map<String, Object> ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
+        } catch( Exception ex ){
+            throw new fflib.InvalidImplementationException( 'No getCursor() was called with bindVariablesMap. If you didn\'t provide a Map, please use verifyCursor()' );
+        }
+        return this.processVerifyQueryResults( argumentCaptor, 2 );
+    }
+
+    /**
+     * Method to verify whether getPaginationCursor() was called with a query and no bindVariablesMap
+     *
+     * @param mocks     fflib_ApexMocks to which the mock was registered
+     * @return          Instance of SelectorVerificationResults providing query string and QueryFactory
+     */
+    @TestVisible
+    private SelectorVerificationResults verifyPaginationCursor( fflib_ApexMocks mocks ){
+        fflib_ArgumentCaptor argumentCaptor = new fflib_ArgumentCaptor();
+        try{
+            ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).getPaginationCursor( ( String ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
+        } catch( Exception ex ){
+            throw new fflib.InvalidImplementationException( 'No getPaginationCursor() was called without bindVariablesMap. If you provided a Map, please use verifyPaginationCursorAndBindVariableKeys()' );
+        }
+        return this.processVerifyQueryResults( argumentCaptor, 1 );
+    }
+
+    /**
+     * Method to verify whether getPaginationCursor() was called with a query and a valid bindVariablesMap (having matching variables)
+     * Validating:
+     * - The correct QueryFactory was provided
+     * - The query has the same (number of) bind-variables in string as provided in the Map
+     *
+     * @param mocks     fflib_ApexMocks to which the mock was registered
+     * @return          Instance of SelectorVerificationResults providing query string, bind map and QueryFactory
+     */
+    @TestVisible
+    private SelectorVerificationResults verifyPaginationCursorAndBindVariableKeys( fflib_ApexMocks mocks ){
+        fflib_ArgumentCaptor argumentCaptor = new fflib_ArgumentCaptor();
+        try{
+            ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).getPaginationCursor( ( String ) argumentCaptor.capture(), ( Map<String, Object> ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
+        } catch( Exception ex ){
+            throw new fflib.InvalidImplementationException( 'No getPaginationCursor() was called with bindVariablesMap. If you didn\'t provide a Map, please use verifyPaginationCursor()' );
+        }
+        return this.processVerifyQueryResults( argumentCaptor, 2 );
+    }
+
+    /**
      * Centralised method to allow re-use in argumentCaptor validation
      * @param argumentCaptor        The ArgumentCaptor of the queryProxy.query() methods
      * @param numExpectedArguments  Whether we expect (1) only a query, or also (2) a bindVariablesMap
@@ -1036,5 +1110,154 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
         return this.getQueryLocator( qf.toSOQL(), bindVariablesMap );
     }
 
+    // Database.getCursor() specifications
+    /**
+     * Returns a {@link Database.Cursor} for the given raw SOQL string, enabling incremental processing of large result sets (up to 50M rows) across chained Queueable jobs.
+     *
+     * @deprecated  Prefer {@link #getCursor(fflib_QueryFactory)} — raw SOQL strings bypass QueryFactory's
+     *              field-level safety, FLS enforcement, and compile-time field validation.
+     *              Use this overload only when a QueryFactory cannot be constructed
+     *
+     * @param   query   A raw SOQL string
+     * @return  Database.Cursor for incremental processing of large result sets
+     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     */
+    public Database.Cursor getCursor( String query ){
+        this.checkCursorQueryCompatibility( query );
+        return m_queryProxy.getCursor( query, fflib_Database.getAccessLevel( getContext() ) );
+    }
+
+    /**
+     * Returns a {@link Database.Cursor} for the given QueryFactory, enabling incremental processing of large result sets (up to 50M rows) across chained Queueable jobs.
+     * Prefer this overload over {@link #getCursor(String)} — QueryFactory enforces field-level safety, FLS, and compile-time field validation.
+     *
+     * @param   qf  The QueryFactory instance to execute as a cursor
+     * @return  Database.Cursor for incremental processing of large result sets
+     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     */
+    public Database.Cursor getCursor( fflib_QueryFactory qf ){
+        return this.getCursor( qf.toSOQL() );
+    }
+
+    /**
+     * Returns a {@link Database.Cursor} for the given raw SOQL string with bind variables, enabling incremental processing of large result sets (up to 50M rows) across chained Queueable jobs.
+     *
+     * @deprecated  Prefer {@link #getCursor(fflib_QueryFactory, Map)} — raw SOQL strings bypass QueryFactory's
+     *              field-level safety, FLS enforcement, and compile-time field validation.
+     *              Use this overload only when a QueryFactory cannot be constructed
+     *
+     * @param   query               A raw SOQL string
+     * @param   bindVariablesMap    Map of bind variable names to their values
+     * @return  Database.Cursor for incremental processing of large result sets
+     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     */
+    public Database.Cursor getCursor( String query, Map<String, Object> bindVariablesMap ){
+        this.checkCursorQueryCompatibility( query );
+        return m_queryProxy.getCursor( query, bindVariablesMap, fflib_Database.getAccessLevel( getContext() ) );
+    }
+
+    /**
+     * Returns a {@link Database.Cursor} for the given QueryFactory with bind variables, enabling incremental processing of large result sets (up to 50M rows) across chained Queueable jobs.
+     * Prefer this overload over {@link #getCursor(String, Map)} — QueryFactory enforces field-level safety, FLS, and compile-time field validation.
+     *
+     * @param   qf                  The QueryFactory instance to execute as a cursor
+     * @param   bindVariablesMap    Map of bind variable names to their values
+     * @return  Database.Cursor for incremental processing of large result sets
+     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     */
+    public Database.Cursor getCursor( fflib_QueryFactory qf, Map<String, Object> bindVariablesMap ){
+        return this.getCursor( qf.toSOQL(), bindVariablesMap );
+    }
+
+    // Database.getPaginationCursor() specifications
+    /**
+     * Returns a {@link Database.PaginationCursor} for the given raw SOQL string, designed for UI-based pagination (up to 100K rows).
+     * Unlike standard cursors, {@code fetchPage()} skips deleted records to ensure consistent page sizes.
+     *
+     * @deprecated  Prefer {@link #getPaginationCursor(fflib_QueryFactory)} — raw SOQL strings bypass QueryFactory's
+     *              field-level safety, FLS enforcement, and compile-time field validation.
+     *              Use this overload only when a QueryFactory cannot be constructed
+     *
+     * @param   query   A raw SOQL string
+     * @return  Database.PaginationCursor for UI-based pagination
+     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     */
+    public Database.PaginationCursor getPaginationCursor( String query ){
+        this.checkCursorQueryCompatibility( query );
+        return m_queryProxy.getPaginationCursor( query, fflib_Database.getAccessLevel( getContext() ) );
+    }
+
+    /**
+     * Returns a {@link Database.PaginationCursor} for the given QueryFactory, designed for UI-based pagination (up to 100K rows).
+     * Unlike standard cursors, {@code fetchPage()} skips deleted records to ensure consistent page sizes.
+     * Prefer this overload over {@link #getPaginationCursor(String)} — QueryFactory enforces field-level safety, FLS, and compile-time field validation.
+     *
+     * @param   qf  The QueryFactory instance to execute as a pagination cursor
+     * @return  Database.PaginationCursor for UI-based pagination
+     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     */
+    public Database.PaginationCursor getPaginationCursor( fflib_QueryFactory qf ){
+        return this.getPaginationCursor( qf.toSOQL() );
+    }
+
+    /**
+     * Returns a {@link Database.PaginationCursor} for the given raw SOQL string with bind variables, designed for UI-based pagination (up to 100K rows).
+     * Unlike standard cursors, {@code fetchPage()} skips deleted records to ensure consistent page sizes.
+     *
+     * @deprecated  Prefer {@link #getPaginationCursor(fflib_QueryFactory, Map)} — raw SOQL strings bypass QueryFactory's
+     *              field-level safety, FLS enforcement, and compile-time field validation.
+     *              Use this overload only when a QueryFactory cannot be constructed
+     *
+     * @param   query               A raw SOQL string
+     * @param   bindVariablesMap    Map of bind variable names to their values
+     * @return  Database.PaginationCursor for UI-based pagination
+     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     */
+    public Database.PaginationCursor getPaginationCursor( String query, Map<String, Object> bindVariablesMap ){
+        this.checkCursorQueryCompatibility( query );
+        return m_queryProxy.getPaginationCursor( query, bindVariablesMap, fflib_Database.getAccessLevel( getContext() ) );
+    }
+
+    /**
+     * Returns a {@link Database.PaginationCursor} for the given QueryFactory with bind variables, designed for UI-based pagination (up to 100K rows).
+     * Unlike standard cursors, {@code fetchPage()} skips deleted records to ensure consistent page sizes.
+     * Prefer this overload over {@link #getPaginationCursor(String, Map)} — QueryFactory enforces field-level safety, FLS, and compile-time field validation.
+     *
+     * @param   qf                  The QueryFactory instance to execute as a pagination cursor
+     * @param   bindVariablesMap    Map of bind variable names to their values
+     * @return  Database.PaginationCursor for UI-based pagination
+     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     */
+    public Database.PaginationCursor getPaginationCursor( fflib_QueryFactory qf, Map<String, Object> bindVariablesMap ){
+        return this.getPaginationCursor( qf.toSOQL(), bindVariablesMap );
+    }
+
+    /**
+     * Validates a raw SOQL query string for compatibility with {@link Database#getCursor()} and {@link Database#getPaginationCursor()}
+     * before dispatching to the proxy layer.
+     *
+     * FOR UPDATE and GROUP BY are rejected by the platform (throw {@code System.QueryException}) — empirically verified.
+     * This guard provides an early, descriptive failure via {@link InvalidCursorQueryException} before the query reaches the proxy.
+     *
+     * Called internally by all {@code getCursor()} and {@code getPaginationCursor()} overloads via their String delegation path.
+     *
+     * @param   query   The SOQL query string to validate
+     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     */
+    @TestVisible
+    private void checkCursorQueryCompatibility( String query ){
+        if( String.isBlank( query ) ){
+            return;
+        }
+        String upperQuery = query.toUpperCase();
+        if( upperQuery.contains( ' FOR UPDATE' ) ){
+            throw new InvalidCursorQueryException( 'FOR UPDATE is not supported by Database.getCursor() or Database.getPaginationCursor(). Row locking is incompatible with stateless cursor fetching.' );
+        }
+        if( upperQuery.contains( ' GROUP BY' ) ){
+            throw new InvalidCursorQueryException( 'Aggregate queries (GROUP BY) are not supported by Database.getCursor() or Database.getPaginationCursor(). Use executeAggregateQuery() instead.' );
+        }
+    }
+
     public class InvalidContextAssignmentException extends Exception{}
+    public class InvalidCursorQueryException extends Exception{}
 }

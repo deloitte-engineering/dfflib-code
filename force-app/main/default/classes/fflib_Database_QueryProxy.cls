@@ -1,30 +1,4 @@
 /**
- * Copyright (c), FinancialForce.com, inc
- * Copyright (c) 2026, Deloitte Consultative Services B.V.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- *   are permitted provided that the following conditions are met:
- *
- * - Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- * - Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- * - Neither the name of the FinancialForce.com inc, nor Deloitte Consultative Services B.V., nor the names of its contributors
- *      may be used to endorse or promote products derived from this software without
- *      specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- *  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- *  THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- *  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- *  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- *  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-/**
  * Centralised class to group all Database query operations:
  * 1) Allowing to easily apply different database security models, through sharing modes and access levels (AccessLevel)
  * 2) Allowing optimal separation of concerns where QueryFactory focuses on construction and fflib_Database_QueryProxy on database retrieval
@@ -71,9 +45,20 @@ public abstract class fflib_Database_QueryProxy{
         public Database.QueryLocator getQueryLocator( String query, AccessLevel accessLevel ){
             return Database.getQueryLocator( query, accessLevel );
         }
-
         public Database.QueryLocator getQueryLocator( String query, Map<String, Object> bindVariablesMap, AccessLevel accessLevel ){
             return Database.getQueryLocatorWithBinds( query, bindVariablesMap, accessLevel );
+        }
+        public Database.Cursor getCursor( String query, AccessLevel accessLevel ){
+            return Database.getCursor( query, accessLevel );
+        }
+        public Database.Cursor getCursor( String query, Map<String, Object> bindVariablesMap, AccessLevel accessLevel ){
+            return Database.getCursorWithBinds( query, bindVariablesMap, accessLevel );
+        }
+        public Database.PaginationCursor getPaginationCursor( String query, AccessLevel accessLevel ){
+            return Database.getPaginationCursor( query, accessLevel );
+        }
+        public Database.PaginationCursor getPaginationCursor( String query, Map<String, Object> bindVariablesMap, AccessLevel accessLevel ){
+            return Database.getPaginationCursorWithBinds( query, bindVariablesMap, accessLevel );
         }
     }
 
@@ -92,9 +77,20 @@ public abstract class fflib_Database_QueryProxy{
         public Database.QueryLocator getQueryLocator( String query, AccessLevel accessLevel ){
             return Database.getQueryLocator( query, accessLevel );
         }
-
         public Database.QueryLocator getQueryLocator( String query, Map<String, Object> bindVariablesMap, AccessLevel accessLevel ){
             return Database.getQueryLocatorWithBinds( query, bindVariablesMap, accessLevel );
+        }
+        public Database.Cursor getCursor( String query, AccessLevel accessLevel ){
+            return Database.getCursor( query, accessLevel );
+        }
+        public Database.Cursor getCursor( String query, Map<String, Object> bindVariablesMap, AccessLevel accessLevel ){
+            return Database.getCursorWithBinds( query, bindVariablesMap, accessLevel );
+        }
+        public Database.PaginationCursor getPaginationCursor( String query, AccessLevel accessLevel ){
+            return Database.getPaginationCursor( query, accessLevel );
+        }
+        public Database.PaginationCursor getPaginationCursor( String query, Map<String, Object> bindVariablesMap, AccessLevel accessLevel ){
+            return Database.getPaginationCursorWithBinds( query, bindVariablesMap, accessLevel );
         }
     }
 
@@ -113,9 +109,20 @@ public abstract class fflib_Database_QueryProxy{
         public Database.QueryLocator getQueryLocator( String query, AccessLevel accessLevel ){
             return Database.getQueryLocator( query, accessLevel );
         }
-
         public Database.QueryLocator getQueryLocator( String query, Map<String, Object> bindVariablesMap, AccessLevel accessLevel ){
             return Database.getQueryLocatorWithBinds( query, bindVariablesMap, accessLevel );
+        }
+        public Database.Cursor getCursor( String query, AccessLevel accessLevel ){
+            return Database.getCursor( query, accessLevel );
+        }
+        public Database.Cursor getCursor( String query, Map<String, Object> bindVariablesMap, AccessLevel accessLevel ){
+            return Database.getCursorWithBinds( query, bindVariablesMap, accessLevel );
+        }
+        public Database.PaginationCursor getPaginationCursor( String query, AccessLevel accessLevel ){
+            return Database.getPaginationCursor( query, accessLevel );
+        }
+        public Database.PaginationCursor getPaginationCursor( String query, Map<String, Object> bindVariablesMap, AccessLevel accessLevel ){
+            return Database.getPaginationCursorWithBinds( query, bindVariablesMap, accessLevel );
         }
     }
 }

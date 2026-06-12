@@ -1,27 +1,26 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c) 2026, Deloitte Consultative Services B.V.
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without modification,
+ * Redistribution and use in source and binary forms, with or without modification, 
  *   are permitted provided that the following conditions are met:
  *
- * - Redistributions of source code must retain the above copyright notice,
+ * - Redistributions of source code must retain the above copyright notice, 
  *      this list of conditions and the following disclaimer.
- * - Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
+ * - Redistributions in binary form must reproduce the above copyright notice, 
+ *      this list of conditions and the following disclaimer in the documentation 
  *      and/or other materials provided with the distribution.
- * - Neither the name of the FinancialForce.com inc, nor Deloitte Consultative Services B.V., nor the names of its contributors
- *      may be used to endorse or promote products derived from this software without
+ * - Neither the name of the FinancialForce.com, inc nor the names of its contributors 
+ *      may be used to endorse or promote products derived from this software without 
  *      specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- *  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- *  THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
+ *  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES 
+ *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL 
+ *  THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
  *  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- *  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- *  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ *  OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 @IsTest( IsParallel = true )
@@ -780,14 +779,205 @@ private with sharing class fflib_SObjectSelectorTest{
     }
 
     @IsTest
+    private static void getCursor(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_Database_IQuery queryProxyMock = ( fflib_Database_IQuery ) mocks.mock( fflib_Database_IQuery.class );
+
+        // Given - create data
+        Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
+        fflib_QueryFactory testQueryFactory = selector.newQueryFactory();
+        String testQueryFactoryExpression = testQueryFactory.toSOQL();
+        AccessLevel accessLevel = fflib_Database.getAccessLevel( selector.getContext() );
+
+        // Set mocks
+        mocks.startStubbing();
+        mocks.when( queryProxyMock.getCursor( testQueryFactoryExpression, accessLevel ) ).thenReturn( null );
+        mocks.stopStubbing();
+        // Injecting the query proxy mock
+        selector.m_queryProxy = queryProxyMock;
+
+        // When - perform test
+        selector.getCursor( testQueryFactory );
+
+        // Then - validate
+        fflib_ArgumentCaptor argumentCaptor = fflib_ArgumentCaptor.forClass( fflib_QueryFactory.class );
+        ( ( fflib_Database_IQuery ) mocks.verify( queryProxyMock, 1 ) ).getCursor( ( String ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.eq( accessLevel ) );
+        String capturedQueryFactory = ( String ) argumentCaptor.getValue();
+        System.Assert.areEqual( testQueryFactoryExpression, capturedQueryFactory );
+    }
+
+    @IsTest
+    private static void getCursorWithBindVariables(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_Database_IQuery queryProxyMock = ( fflib_Database_IQuery ) mocks.mock( fflib_Database_IQuery.class );
+
+        // Given - create data
+        Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
+        fflib_QueryFactory testQueryFactory = selector.newQueryFactory();
+        testQueryFactory.setCondition( 'Id in :mockedAccountIds' );
+        String testQueryFactoryExpression = testQueryFactory.toSOQL();
+        Set<Id> mockedAccountIds = new Set<Id>();
+        Map<String, Object> bindVariablesMap = new Map<String, Object>{ 'mockedAccountIds' => mockedAccountIds };
+        AccessLevel accessLevel = fflib_Database.getAccessLevel( selector.getContext() );
+
+        // Set mocks
+        mocks.startStubbing();
+        mocks.when( queryProxyMock.getCursor( testQueryFactoryExpression, bindVariablesMap, accessLevel ) ).thenReturn( null );
+        mocks.stopStubbing();
+        // Injecting the query proxy mock
+        selector.m_queryProxy = queryProxyMock;
+
+        // When - perform test
+        selector.getCursor( testQueryFactory, bindVariablesMap );
+
+        // Then - validate
+        fflib_ArgumentCaptor argumentCaptor = fflib_ArgumentCaptor.forClass( fflib_QueryFactory.class );
+        ( ( fflib_Database_IQuery ) mocks.verify( queryProxyMock, 1 ) )
+            .getCursor( ( String ) argumentCaptor.capture(), ( Map<String, Object> ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.eq( accessLevel ) );
+        List<Object> capturedArguments = argumentCaptor.getAllValues();
+        System.Assert.areEqual( testQueryFactoryExpression, ( String ) capturedArguments[ 0 ] );
+        System.Assert.areEqual( bindVariablesMap, ( Map<String, Object> ) capturedArguments[ 1 ] );
+    }
+
+    @IsTest
+    private static void getPaginationCursor(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_Database_IQuery queryProxyMock = ( fflib_Database_IQuery ) mocks.mock( fflib_Database_IQuery.class );
+
+        // Given - create data
+        Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
+        fflib_QueryFactory testQueryFactory = selector.newQueryFactory();
+        String testQueryFactoryExpression = testQueryFactory.toSOQL();
+        AccessLevel accessLevel = fflib_Database.getAccessLevel( selector.getContext() );
+
+        // Set mocks
+        mocks.startStubbing();
+        mocks.when( queryProxyMock.getPaginationCursor( testQueryFactoryExpression, accessLevel ) ).thenReturn( null );
+        mocks.stopStubbing();
+        // Injecting the query proxy mock
+        selector.m_queryProxy = queryProxyMock;
+
+        // When - perform test
+        selector.getPaginationCursor( testQueryFactory );
+
+        // Then - validate
+        fflib_ArgumentCaptor argumentCaptor = fflib_ArgumentCaptor.forClass( fflib_QueryFactory.class );
+        ( ( fflib_Database_IQuery ) mocks.verify( queryProxyMock, 1 ) ).getPaginationCursor( ( String ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.eq( accessLevel ) );
+        String capturedQueryFactory = ( String ) argumentCaptor.getValue();
+        System.Assert.areEqual( testQueryFactoryExpression, capturedQueryFactory );
+    }
+
+    @IsTest
+    private static void getPaginationCursorWithBindVariables(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_Database_IQuery queryProxyMock = ( fflib_Database_IQuery ) mocks.mock( fflib_Database_IQuery.class );
+
+        // Given - create data
+        Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
+        fflib_QueryFactory testQueryFactory = selector.newQueryFactory();
+        testQueryFactory.setCondition( 'Id in :mockedAccountIds' );
+        String testQueryFactoryExpression = testQueryFactory.toSOQL();
+        Set<Id> mockedAccountIds = new Set<Id>();
+        Map<String, Object> bindVariablesMap = new Map<String, Object>{ 'mockedAccountIds' => mockedAccountIds };
+        AccessLevel accessLevel = fflib_Database.getAccessLevel( selector.getContext() );
+
+        // Set mocks
+        mocks.startStubbing();
+        mocks.when( queryProxyMock.getPaginationCursor( testQueryFactoryExpression, bindVariablesMap, accessLevel ) ).thenReturn( null );
+        mocks.stopStubbing();
+        // Injecting the query proxy mock
+        selector.m_queryProxy = queryProxyMock;
+
+        // When - perform test
+        selector.getPaginationCursor( testQueryFactory, bindVariablesMap );
+
+        // Then - validate
+        fflib_ArgumentCaptor argumentCaptor = fflib_ArgumentCaptor.forClass( fflib_QueryFactory.class );
+        ( ( fflib_Database_IQuery ) mocks.verify( queryProxyMock, 1 ) )
+            .getPaginationCursor( ( String ) argumentCaptor.capture(), ( Map<String, Object> ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.eq( accessLevel ) );
+        List<Object> capturedArguments = argumentCaptor.getAllValues();
+        System.Assert.areEqual( testQueryFactoryExpression, ( String ) capturedArguments[ 0 ] );
+        System.Assert.areEqual( bindVariablesMap, ( Map<String, Object> ) capturedArguments[ 1 ] );
+    }
+
+    @IsTest
+    private static void getCursor_shouldThrowOnForUpdateQuery(){
+        // Given - create data
+        Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
+        fflib_QueryFactory qfWithForUpdate = selector.newQueryFactory().setForUpdate( true );
+
+        // When, Then - FOR UPDATE is not supported by cursors
+        try{
+            selector.getCursor( qfWithForUpdate );
+            System.Assert.fail( 'Expected InvalidCursorQueryException to be thrown for FOR UPDATE query' );
+        } catch( fflib_SObjectSelector.InvalidCursorQueryException ex ){
+            System.Assert.isTrue( ex.getMessage().contains( 'FOR UPDATE' ), 'Expected exception message to reference FOR UPDATE' );
+        }
+
+        // Also validate the raw String overload
+        try{
+            selector.getCursor( qfWithForUpdate.toSOQL() );
+            System.Assert.fail( 'Expected InvalidCursorQueryException to be thrown for FOR UPDATE query string' );
+        } catch( fflib_SObjectSelector.InvalidCursorQueryException ex ){
+            System.Assert.isTrue( ex.getMessage().contains( 'FOR UPDATE' ), 'Expected exception message to reference FOR UPDATE' );
+        }
+    }
+
+    @IsTest
+    private static void getCursor_shouldThrowOnGroupByQuery(){
+        // Given - create data
+        Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
+        fflib_QueryFactory qfWithGroupBy = selector.newQueryFactory().setGroupByFieldName( 'Name' );
+
+        // When, Then - GROUP BY via QueryFactory flag (caught before toSOQL())
+        try{
+            selector.getCursor( qfWithGroupBy );
+            System.Assert.fail( 'Expected InvalidCursorQueryException to be thrown for GROUP BY query' );
+        } catch( fflib_SObjectSelector.InvalidCursorQueryException ex ){
+            System.Assert.isTrue( ex.getMessage().contains( 'GROUP BY' ), 'Expected exception message to reference GROUP BY' );
+        }
+
+        // Also validate the raw String overload (caught at string level)
+        try{
+            selector.getCursor( qfWithGroupBy.toSOQL() );
+            System.Assert.fail( 'Expected InvalidCursorQueryException to be thrown for GROUP BY query string' );
+        } catch( fflib_SObjectSelector.InvalidCursorQueryException ex ){
+            System.Assert.isTrue( ex.getMessage().contains( 'GROUP BY' ), 'Expected exception message to reference GROUP BY' );
+        }
+    }
+
+    @IsTest
+    private static void getPaginationCursor_shouldThrowOnGroupByQuery(){
+        // Given - create data
+        Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
+        fflib_QueryFactory qfWithGroupBy = selector.newQueryFactory().setGroupByFieldName( 'Name' );
+
+        // When, Then - GROUP BY is not supported by pagination cursors
+        try{
+            selector.getPaginationCursor( qfWithGroupBy );
+            System.Assert.fail( 'Expected InvalidCursorQueryException to be thrown for GROUP BY query' );
+        } catch( fflib_SObjectSelector.InvalidCursorQueryException ex ){
+            System.Assert.isTrue( ex.getMessage().contains( 'GROUP BY' ), 'Expected exception message to reference GROUP BY' );
+        }
+    }
+
+    @IsTest
     private static void verifyQuery_Exception_BindVariableProvided(){
         // Create mocks
         Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
         fflib_ApexMocks mocks = selector.mockExecuteQuery();
+        String query = 'SELECT Id FROM Account';
+        Boolean param = true;
 
         // When - perform test
-        selector.executeQuery( 'SELECT Id FROM Account', new Map<String, Object>{ 'bool' => true } );
-        selector.getQueryLocator( 'SELECT Id FROM Account', new Map<String, Object>{ 'bool' => true } );
+        selector.executeQuery( query, new Map<String, Object>{ 'bool' => param } );
+        selector.getQueryLocator( query, new Map<String, Object>{ 'bool' => param } );
+        selector.getCursor( query, new Map<String, Object>{ 'bool' => param } );
+        selector.getPaginationCursor( query, new Map<String, Object>{ 'bool' => param } );
 
         // Then - validate, if calling wrong 'verify'-method, an Exception should be thrown
         try{
@@ -810,6 +1000,26 @@ private with sharing class fflib_SObjectSelectorTest{
                 'Expected different Exception message'
             );
         }
+        try{
+            selector.verifyCursor( mocks );
+            System.Assert.fail( 'Assert failure was expected since a bindVariableMap was provided to getCursor()' );
+        } catch( Exception ex ){
+            System.Assert.areEqual(
+                'No getCursor() was called without bindVariablesMap. If you provided a Map, please use verifyCursorAndBindVariableKeys()',
+                ex.getMessage(),
+                'Expected different Exception message'
+            );
+        }
+        try{
+            selector.verifyPaginationCursor( mocks );
+            System.Assert.fail( 'Assert failure was expected since a bindVariableMap was provided to getPaginationCursor()' );
+        } catch( Exception ex ){
+            System.Assert.areEqual(
+                'No getPaginationCursor() was called without bindVariablesMap. If you provided a Map, please use verifyPaginationCursorAndBindVariableKeys()',
+                ex.getMessage(),
+                'Expected different Exception message'
+            );
+        }
     }
 
     @IsTest
@@ -821,6 +1031,8 @@ private with sharing class fflib_SObjectSelectorTest{
         // When - perform test
         selector.executeQuery( 'SELECT Id FROM Account' );
         selector.getQueryLocator( 'SELECT Id FROM Account' );
+        selector.getCursor( 'SELECT Id FROM Account' );
+        selector.getPaginationCursor( 'SELECT Id FROM Account' );
 
         // Then - validate, if calling wrong 'verify'-method, an Exception should be thrown
         try{
@@ -839,6 +1051,26 @@ private with sharing class fflib_SObjectSelectorTest{
         } catch( Exception ex ){
             System.Assert.areEqual(
                 'No getQueryLocator() was called providing bind-variables, if you didn\'t provide a bindVariablesMap, please use verifyQueryLocator()',
+                ex.getMessage(),
+                'Expected different Exception message'
+            );
+        }
+        try{
+            selector.verifyCursorAndBindVariableKeys( mocks );
+            System.Assert.fail( 'Assert failure was expected since no bind variables were provided to getCursor()' );
+        } catch( Exception ex ){
+            System.Assert.areEqual(
+                'No getCursor() was called with bindVariablesMap. If you didn\'t provide a Map, please use verifyCursor()',
+                ex.getMessage(),
+                'Expected different Exception message'
+            );
+        }
+        try{
+            selector.verifyPaginationCursorAndBindVariableKeys( mocks );
+            System.Assert.fail( 'Assert failure was expected since no bind variables were provided to getPaginationCursor()' );
+        } catch( Exception ex ){
+            System.Assert.areEqual(
+                'No getPaginationCursor() was called with bindVariablesMap. If you didn\'t provide a Map, please use verifyPaginationCursor()',
                 ex.getMessage(),
                 'Expected different Exception message'
             );

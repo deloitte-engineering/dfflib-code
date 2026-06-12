@@ -1,30 +1,4 @@
 /**
- * Copyright (c), FinancialForce.com, inc
- * Copyright (c) 2026, Deloitte Consultative Services B.V.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- *   are permitted provided that the following conditions are met:
- *
- * - Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- * - Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- * - Neither the name of the FinancialForce.com inc, nor Deloitte Consultative Services B.V., nor the names of its contributors
- *      may be used to endorse or promote products derived from this software without
- *      specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- *  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- *  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
- *  THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- *  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- *  OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- *  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-/**
  * Unit test class for fflib_Database class
  * 
  * @author      Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
@@ -2010,6 +1984,340 @@ private with sharing class fflib_DatabaseTest{
 
             List<Object> nullResults = dmlProxy.performOperation( fflib_SObjectUnitOfWork.Operations.PROCESS_APPROVAL_PROCESS, null );
             System.Assert.isNull( nullResults );
+        }
+    }
+
+    /**
+     * Section focusing on testing Database.Cursor and Database.PaginationCursor support across all sharing contexts.
+     *
+     * Test strategy: Integration-style tests against the real Database API — same approach as the getQueryLocator tests.
+     * Database.Cursor and Database.PaginationCursor are system types and cannot be stubbed via fflib_ApexMocks
+     * (identical constraint to Database.QueryLocator). Tests verify getNumRecords() and fetch()/fetchPage() behaviour.
+     *
+     * Note: System.FatalCursorException and System.TransientCursorException cannot be reliably triggered in test context
+     * and are therefore not covered here.
+     */
+    @IsTest
+    private static void withSharing_getCursor_failureInvalidFieldQueried(){
+        // Given - create data
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{
+            Solution.IsPublished,
+            Solution.SolutionName
+        } );
+        queryFactory.setOrdering( Solution.CreatedDate, fflib_QueryFactory.SortOrder.DESCENDING );
+        queryFactory.setLimit( 2 );
+
+        // When, Then
+        System.runAs( testUser ){
+            fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.FULL );
+
+            // getCursor without binds
+            try{
+                queryProxy.getCursor( queryFactory.toSOQL(), withSharingAccessLevel );
+                System.Assert.fail( 'Expected System.QueryException to be thrown. This assertion should never be triggered' );
+            } catch( System.QueryException ex ){
+                System.Assert.areEqual(
+                    'No such column \'ispublished\' on entity \'Solution\'. If you are attempting to use a custom field, be sure to append the \'__c\' after the custom field name. Please reference your WSDL or the describe call for the appropriate names.',
+                    ex.getMessage()
+                );
+            }
+
+            // getCursor with binds
+            try{
+                queryProxy.getCursor( queryFactory.toSOQL(), new Map<String, Object>(), withSharingAccessLevel );
+                System.Assert.fail( 'Expected System.QueryException to be thrown. This assertion should never be triggered' );
+            } catch( System.QueryException ex ){
+                System.Assert.areEqual(
+                    'No such column \'ispublished\' on entity \'Solution\'. If you are attempting to use a custom field, be sure to append the \'__c\' after the custom field name. Please reference your WSDL or the describe call for the appropriate names.',
+                    ex.getMessage()
+                );
+            }
+        }
+    }
+
+    @IsTest
+    private static void withSharing_getCursor_returnsCorrectCursorWithoutBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.FULL );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setOrdering( Solution.CreatedDate, fflib_QueryFactory.SortOrder.DESCENDING );
+        queryFactory.setLimit( SAMPLE_SIZE_SOLUTION );
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.Cursor cursor = queryProxy.getCursor( queryFactory.toSOQL(), withSharingAccessLevel );
+
+            // Then - validate
+            Integer expectedCount = isPrivateSolutionInternalSharing ? 0 : SAMPLE_SIZE_SOLUTION;
+            System.Assert.areEqual( expectedCount, cursor.getNumRecords(), 'Expected cursor to report the correct total record count' );
+
+            List<Solution> fetchedRecords = cursor.fetch( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( expectedCount, fetchedRecords.size(), 'Expected fetch() to return the correct number of records' );
+        }
+    }
+
+    @IsTest
+    private static void withSharing_getCursor_returnsCorrectCursorWithBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.FULL );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setCondition( 'Id IN :solutionIds' );
+        Set<Id> solutionIds = new Map<Id, Solution>( sampleSolutionList ).keySet();
+        Map<String, Object> bindVariablesMap = new Map<String, Object>{ 'solutionIds' => solutionIds };
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.Cursor cursor = queryProxy.getCursor( queryFactory.toSOQL(), bindVariablesMap, withSharingAccessLevel );
+
+            // Then - validate
+            Integer expectedCount = isPrivateSolutionInternalSharing ? 0 : SAMPLE_SIZE_SOLUTION;
+            System.Assert.areEqual( expectedCount, cursor.getNumRecords(), 'Expected cursor to report the correct total record count' );
+
+            List<Solution> fetchedRecords = cursor.fetch( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( expectedCount, fetchedRecords.size(), 'Expected fetch() to return the correct number of records' );
+        }
+    }
+
+    @IsTest
+    private static void withSharing_getPaginationCursor_returnsCorrectPaginationCursorWithoutBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.FULL );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setOrdering( Solution.CreatedDate, fflib_QueryFactory.SortOrder.DESCENDING );
+        queryFactory.setLimit( SAMPLE_SIZE_SOLUTION );
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.PaginationCursor pagCursor = queryProxy.getPaginationCursor( queryFactory.toSOQL(), withSharingAccessLevel );
+
+            // Then - validate
+            Integer expectedCount = isPrivateSolutionInternalSharing ? 0 : SAMPLE_SIZE_SOLUTION;
+            System.Assert.areEqual( expectedCount, pagCursor.getNumRecords(), 'Expected pagination cursor to report the correct total record count' );
+
+            Database.CursorFetchResult result = pagCursor.fetchPage( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( expectedCount, result.getRecords().size(), 'Expected fetchPage() to return the correct number of records' );
+            System.Assert.isTrue( result.isDone(), 'Expected isDone() to be true when all records fit in one page' );
+        }
+    }
+
+    /**
+     * Section focusing on testing 'with sharing, skip permissions' context for cursors
+     */
+    @IsTest
+    private static void withSharingSkip_getCursor_returnsCorrectCursorWithoutBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.SHARING_SKIP_PERMISSIONS );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setOrdering( Solution.CreatedDate, fflib_QueryFactory.SortOrder.DESCENDING );
+        queryFactory.setLimit( SAMPLE_SIZE_SOLUTION );
+        List<Solution> sampleSolutions = sampleSolutionList;
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.Cursor cursor = queryProxy.getCursor( queryFactory.toSOQL(), sharingSkipAccessLevel );
+
+            // Then - validate
+            Integer expectedCount = isPrivateSolutionInternalSharing ? 0 : SAMPLE_SIZE_SOLUTION;
+            System.Assert.areEqual( expectedCount, cursor.getNumRecords(), 'Expected cursor to report the correct total record count' );
+
+            List<Solution> fetchedRecords = cursor.fetch( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( expectedCount, fetchedRecords.size(), 'Expected fetch() to return the correct number of records' );
+        }
+    }
+
+    @IsTest
+    private static void withSharingSkip_getCursor_returnsCorrectCursorWithBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.SHARING_SKIP_PERMISSIONS );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setCondition( 'Id IN :solutionIds' );
+        Set<Id> solutionIds = new Map<Id, Solution>( sampleSolutionList ).keySet();
+        Map<String, Object> bindVariablesMap = new Map<String, Object>{ 'solutionIds' => solutionIds };
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.Cursor cursor = queryProxy.getCursor( queryFactory.toSOQL(), bindVariablesMap, sharingSkipAccessLevel );
+
+            // Then - validate
+            Integer expectedCount = isPrivateSolutionInternalSharing ? 0 : SAMPLE_SIZE_SOLUTION;
+            System.Assert.areEqual( expectedCount, cursor.getNumRecords(), 'Expected cursor to report the correct total record count' );
+
+            List<Solution> fetchedRecords = cursor.fetch( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( expectedCount, fetchedRecords.size(), 'Expected fetch() to return the correct number of records' );
+        }
+    }
+
+    @IsTest
+    private static void withSharingSkip_getPaginationCursor_returnsCorrectPaginationCursorWithoutBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.SHARING_SKIP_PERMISSIONS );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setOrdering( Solution.CreatedDate, fflib_QueryFactory.SortOrder.DESCENDING );
+        queryFactory.setLimit( SAMPLE_SIZE_SOLUTION );
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.PaginationCursor pagCursor = queryProxy.getPaginationCursor( queryFactory.toSOQL(), sharingSkipAccessLevel );
+
+            // Then - validate
+            Integer expectedCount = isPrivateSolutionInternalSharing ? 0 : SAMPLE_SIZE_SOLUTION;
+            System.Assert.areEqual( expectedCount, pagCursor.getNumRecords(), 'Expected pagination cursor to report the correct total record count' );
+
+            Database.CursorFetchResult result = pagCursor.fetchPage( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( expectedCount, result.getRecords().size(), 'Expected fetchPage() to return the correct number of records' );
+            System.Assert.isTrue( result.isDone(), 'Expected isDone() to be true when all records fit in one page' );
+        }
+    }
+
+    /**
+     * Section focusing on testing 'without sharing' context for cursors
+     */
+    @IsTest
+    private static void withoutSharing_getCursor_returnsCorrectCursorWithoutBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.NONE );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setOrdering( Solution.CreatedDate, fflib_QueryFactory.SortOrder.DESCENDING );
+        queryFactory.setLimit( SAMPLE_SIZE_SOLUTION );
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.Cursor cursor = queryProxy.getCursor( queryFactory.toSOQL(), withoutSharingAccessLevel );
+
+            // Then - validate (without sharing bypasses OWD, so all records are always visible)
+            System.Assert.areEqual( SAMPLE_SIZE_SOLUTION, cursor.getNumRecords(), 'Expected cursor to report the correct total record count' );
+
+            List<Solution> fetchedRecords = cursor.fetch( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( SAMPLE_SIZE_SOLUTION, fetchedRecords.size(), 'Expected fetch() to return the correct number of records' );
+            // Verify record identity by Id — direct list equality is not used as cursor.fetch() returns only queried fields
+            for( Integer i = 0; i < fetchedRecords.size(); i++ ){
+                System.Assert.areEqual( sampleSolutionList[ i ].Id, fetchedRecords[ i ].Id, 'Expected fetched record Id to match sample data at index ' + i );
+            }
+        }
+    }
+
+    @IsTest
+    private static void withoutSharing_getCursor_returnsCorrectCursorWithBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.NONE );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setCondition( 'Id IN :solutionIds' );
+        Set<Id> solutionIds = new Map<Id, Solution>( sampleSolutionList ).keySet();
+        Map<String, Object> bindVariablesMap = new Map<String, Object>{ 'solutionIds' => solutionIds };
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.Cursor cursor = queryProxy.getCursor( queryFactory.toSOQL(), bindVariablesMap, withoutSharingAccessLevel );
+
+            // Then - validate
+            System.Assert.areEqual( SAMPLE_SIZE_SOLUTION, cursor.getNumRecords(), 'Expected cursor to report the correct total record count' );
+
+            List<Solution> fetchedRecords = cursor.fetch( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( SAMPLE_SIZE_SOLUTION, fetchedRecords.size(), 'Expected fetch() to return the correct number of records' );
+        }
+    }
+
+    @IsTest
+    private static void withoutSharing_getPaginationCursor_returnsCorrectPaginationCursorWithoutBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.NONE );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setOrdering( Solution.CreatedDate, fflib_QueryFactory.SortOrder.DESCENDING );
+        queryFactory.setLimit( SAMPLE_SIZE_SOLUTION );
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.PaginationCursor pagCursor = queryProxy.getPaginationCursor( queryFactory.toSOQL(), withoutSharingAccessLevel );
+
+            // Then - validate
+            System.Assert.areEqual( SAMPLE_SIZE_SOLUTION, pagCursor.getNumRecords(), 'Expected pagination cursor to report the correct total record count' );
+
+            Database.CursorFetchResult result = pagCursor.fetchPage( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( SAMPLE_SIZE_SOLUTION, result.getRecords().size(), 'Expected fetchPage() to return the correct number of records' );
+            System.Assert.isTrue( result.isDone(), 'Expected isDone() to be true when all records fit in one page' );
+        }
+    }
+
+    /**
+     * Section focusing on testing 'inherited sharing' context for cursors.
+     * Since this class respects sharing rules (aka "with sharing"), sharing settings should be enforced upon the test user context,
+     * presenting similar results to {@link fflib_Database.Context.SHARING_SKIP_PERMISSIONS}
+     */
+    @IsTest
+    private static void inheritedSharing_getCursor_returnsCorrectCursorWithoutBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.INHERIT );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setOrdering( Solution.CreatedDate, fflib_QueryFactory.SortOrder.DESCENDING );
+        queryFactory.setLimit( SAMPLE_SIZE_SOLUTION );
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.Cursor cursor = queryProxy.getCursor( queryFactory.toSOQL(), inheritedAccessLevel );
+
+            // Then - validate
+            Integer expectedCount = isPrivateSolutionInternalSharing ? 0 : SAMPLE_SIZE_SOLUTION;
+            System.Assert.areEqual( expectedCount, cursor.getNumRecords(), 'Expected cursor to report the correct total record count' );
+
+            List<Solution> fetchedRecords = cursor.fetch( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( expectedCount, fetchedRecords.size(), 'Expected fetch() to return the correct number of records' );
+        }
+    }
+
+    @IsTest
+    private static void inheritedSharing_getCursor_returnsCorrectCursorWithBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.INHERIT );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setCondition( 'Id IN :solutionIds' );
+        Set<Id> solutionIds = new Map<Id, Solution>( sampleSolutionList ).keySet();
+        Map<String, Object> bindVariablesMap = new Map<String, Object>{ 'solutionIds' => solutionIds };
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.Cursor cursor = queryProxy.getCursor( queryFactory.toSOQL(), bindVariablesMap, inheritedAccessLevel );
+
+            // Then - validate
+            Integer expectedCount = isPrivateSolutionInternalSharing ? 0 : SAMPLE_SIZE_SOLUTION;
+            System.Assert.areEqual( expectedCount, cursor.getNumRecords(), 'Expected cursor to report the correct total record count' );
+
+            List<Solution> fetchedRecords = cursor.fetch( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( expectedCount, fetchedRecords.size(), 'Expected fetch() to return the correct number of records' );
+        }
+    }
+
+    @IsTest
+    private static void inheritedSharing_getPaginationCursor_returnsCorrectPaginationCursorWithoutBinds(){
+        // Given - create data
+        fflib_Database_IQuery queryProxy = fflib_Database.getQueryProxy( fflib_Database.Context.INHERIT );
+        fflib_QueryFactory queryFactory = new fflib_QueryFactory( Solution.SObjectType );
+        queryFactory.selectFields( new List<SObjectField>{ Solution.SolutionName } );
+        queryFactory.setOrdering( Solution.CreatedDate, fflib_QueryFactory.SortOrder.DESCENDING );
+        queryFactory.setLimit( SAMPLE_SIZE_SOLUTION );
+
+        // When - perform test
+        System.runAs( testUser ){
+            Database.PaginationCursor pagCursor = queryProxy.getPaginationCursor( queryFactory.toSOQL(), inheritedAccessLevel );
+
+            // Then - validate
+            Integer expectedCount = isPrivateSolutionInternalSharing ? 0 : SAMPLE_SIZE_SOLUTION;
+            System.Assert.areEqual( expectedCount, pagCursor.getNumRecords(), 'Expected pagination cursor to report the correct total record count' );
+
+            Database.CursorFetchResult result = pagCursor.fetchPage( 0, SAMPLE_SIZE_SOLUTION );
+            System.Assert.areEqual( expectedCount, result.getRecords().size(), 'Expected fetchPage() to return the correct number of records' );
+            System.Assert.isTrue( result.isDone(), 'Expected isDone() to be true when all records fit in one page' );
         }
     }
 }
