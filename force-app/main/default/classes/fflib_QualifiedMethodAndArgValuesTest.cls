@@ -1,7 +1,6 @@
 /**
  * Unit test class for fflib_QualifiedMethodAndArgValues class.
  *
- * @author 		Rafael Santos (rfernandesdossantos@deloitte.nl)
  * @created 	January 2020
  */
 @IsTest( isParallel = true )

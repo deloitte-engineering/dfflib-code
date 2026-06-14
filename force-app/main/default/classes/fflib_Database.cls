@@ -27,7 +27,6 @@
  *  Class that serves as a hub providing access to DML- and QueryProxy interfaces.
  *  It centralises database security modes to be used for setting sharing context and enforcement of CRUD/FLS on the respective interface implementation.
  *
- *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
  *  @created    February 2023
  */
 public class fflib_Database{

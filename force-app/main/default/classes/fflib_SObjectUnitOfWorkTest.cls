@@ -31,7 +31,6 @@
  *
  * - Can't test PlatformEvents as this is project specific
  *
- * @author    Reinier van den Assum (rvandenassum@deloitte.nl)
  * @created   June 2023
  */
 @IsTest( isParallel = true )

@@ -87,7 +87,6 @@
  *
  *         Account record = ( Account ) factory.create( new Account( Rating = 'Cold' ) ).save();
  *
- * @author         Dirk van de Lindt (dvandelindt@deloitte.nl)
  * @created        December 2017
  */
 @IsTest

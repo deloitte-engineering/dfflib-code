@@ -28,7 +28,6 @@
  * Class provides inner classes implementing factories for the main components of the Apex Enterprise Patterns, Service, Unit Of Work, Selector and Domain.
  * It constructs the factory implementations using a custom metadata-driven approach, removing the need of supplying all compatible SObjectTypes and class implementation on compile time
  *
- * @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
  * @created    February 2022
  */
 public with sharing virtual class fflib_Application{

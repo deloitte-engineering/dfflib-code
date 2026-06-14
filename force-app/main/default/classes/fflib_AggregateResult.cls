@@ -26,7 +26,6 @@
 /**
  * Allows aggregate results to be used to mock when testing
  *
- * @author      Adam Marchbanks (amarchbanks@deloitte.nl)
  * @created     March 2019
  */
 public with sharing class fflib_AggregateResult {
