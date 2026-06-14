@@ -1,12 +1,6 @@
 /**
  * Copyright (c) 2017 FinancialForce.com, inc.  All rights reserved.
  */
-
-/**
- * Contains counterparts for helper methods in the native System class.
- * @group Core
- */
-
 public class fflib_System{
 
     /**

@@ -5,8 +5,6 @@
 /**
  * Interface for the answering framework.
  * This interface must be implemented inside the test class and implement the call back method answer.
- *
- * @group Core
  */
 public interface fflib_Answer{
 

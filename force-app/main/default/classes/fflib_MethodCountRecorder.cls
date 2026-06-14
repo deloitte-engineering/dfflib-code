@@ -4,7 +4,6 @@
 
 /**
  * Class defining a method count recorder. It maps a list of method arguments by the respective type name.
- * @group Core
  */
 public with sharing class fflib_MethodCountRecorder{
 

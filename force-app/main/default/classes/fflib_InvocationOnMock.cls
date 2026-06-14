@@ -5,7 +5,6 @@
 /**
  * An invocation on a mock.
  * A place holder for mock, the method that was called and the arguments that were passed.
- * @group Core
  */
 public with sharing class fflib_InvocationOnMock{
     private fflib_QualifiedMethod qm;

@@ -1,10 +1,6 @@
 /**
  * Copyright (c) 2016-2017 FinancialForce.com, inc.  All rights reserved.
  */
-
-/**
- * @group Core
- */
 public with sharing class fflib_QualifiedMethodAndArgValues{
     private final fflib_QualifiedMethod qm;
     private final fflib_MethodArgValues args;

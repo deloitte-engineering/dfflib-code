@@ -6,7 +6,6 @@
 /**
  * 'Classic' invocation verifier - checks that a method was called with the given arguments the expected number of times.
  * The order of method calls is not important.
- * @group Core
  */
 public class fflib_AnyOrder extends fflib_MethodVerifier{
 
