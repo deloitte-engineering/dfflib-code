@@ -1,0 +1,31 @@
+# Generic .gitignore file available across all clones of the repository. This means all clones will ignore the same kind of files based on the rules present in this file
+# The following command provides a git-status view of the files currently ignored: git status --ignored
+# Lines that start with '#' are comments.
+# To ignore files in local clones of the repository, check *.git/info/exclude. This file is your own .gitignore inside your local git folder, which means is not committed or shared with anyone else.
+
+# Generic IDE/Illuminated Cloud files
+*.iml
+.idea/
+.sfdx/
+.sf/*
+IlluminatedCloud/*
+
+.illuminatedCloud/
+**/*.ts
+**/tsconfig*.json
+**/*.tsbuildinfo
+**/eslint.config.mjs
+**/graphql.config.yml
+.localdev/
+out/
+target/
+.vscode/
+
+.forceignore
+
+# Salesforce old metadata format (/src)
+src/*
+
+# Miscellaneous
+node_modules
+/.cod*

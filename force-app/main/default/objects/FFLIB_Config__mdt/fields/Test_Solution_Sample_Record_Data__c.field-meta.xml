@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Test_Solution_Sample_Record_Data__c</fullName>
+    <description>Opt. attribute to provide JSON of Solution record including all custom required fields, validation rules and business logic to pass Unit Tests.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Opt. attribute to provide JSON of Solution record including all custom required fields, validation rules and business logic to pass Unit Tests.</inlineHelpText>
+    <label>Test Solution Sample Record Data</label>
+    <length>32768</length>
+    <type>LongTextArea</type>
+    <visibleLines>3</visibleLines>
+</CustomField>

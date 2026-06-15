@@ -1,0 +1,132 @@
+# =============================================================================
+# validate-project.yml - Salesforce Project Validation Workflow
+# =============================================================================
+# Purpose:  Validates the full Salesforce project (force-app/main/default and
+#           force-app/test-factory) against the packaging org on feature and
+#           release branches. Runs deployment validation with tests.
+#
+# Triggers: - workflow_dispatch  (manual trigger via GitHub Actions UI)
+#           - push to feature/* or release/* branches
+#             (when force-app/** changes)
+#           - pull_request opened/synchronize/reopened targeting main or master
+#             (when force-app/** changes)
+#
+# Concurrency:
+#   PR-scoped concurrency — both push and pull_request triggers for the same PR
+#   share a concurrency group (keyed on PR number), so the second run cancels the first.
+#   Pushes to branches without an open PR are keyed on branch name.
+#   Different branches/PRs run in parallel.
+#
+# Setup:    See .github/SETUP_SALESFORCE_CICD.md for full setup instructions
+# =============================================================================
+
+# Allow parallel runs across different branches, but cancel concurrent runs on the same branch
+concurrency:
+  group: validate-project-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+name: Validate Project Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feature/*'
+      - 'release/*'
+    paths:
+      - 'force-app/**'
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    branches:
+      - main
+      - master
+    paths:
+      - 'force-app/**'
+
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ JOB PIPELINE                                                                  ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║ validate ─── Validates deployment against packaging org with tests           ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+jobs:
+  # ┌──────────────────────────────────────────────────────────────────────────────┐
+  # │ JOB: validate                                                                │
+  # ├──────────────────────────────────────────────────────────────────────────────┤
+  # │ PURPOSE:                                                                     │
+  # │   Validates the full Salesforce project (force-app/main/default and         │
+  # │   force-app/test-factory) against the packaging org with RunLocalTests.     │
+  # │                                                                              │
+  # │ DEPENDENCIES: None (first and only job)                                      │
+  # │                                                                              │
+  # │ OUTPUTS: None                                                                │
+  # │                                                                              │
+  # │ FAILURE BEHAVIOR:                                                            │
+  # │   Blocks — validation failure indicates code issues that must be fixed.     │
+  # │                                                                              │
+  # │ TECHNICAL NOTES:                                                             │
+  # │   - Uses JWT Bearer flow for authentication                                  │
+  # │   - Validates force-app/main/default and force-app/test-factory             │
+  # │   - Test level: RunLocalTests (runs all local tests)                        │
+  # │   - CLI pinned to @salesforce/cli@2.137.6 for reproducible builds           │
+  # │   - Authenticates against the buildcheck org (not the packaging org)        │
+  # └──────────────────────────────────────────────────────────────────────────────┘
+  validate:
+    name: validate-deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Install Salesforce CLI (sf) - pinned to 2.137.6 for reproducible builds
+      - name: Install and Setup Salesforce CLI
+        run: |
+          export PATH="$PATH:$(npm root -g)"
+          npm install -g @salesforce/cli@2.137.6
+          export PATH="$PATH:$(npm root -g)"
+          echo "CLI installed: $(sf --version 2>&1)"
+
+      # Authenticate to Buildcheck Org using JWT Bearer flow
+      - name: Authenticate to Buildcheck Org
+        env:
+          SF_CLIENT_ID: ${{ secrets.SF_BUILDCHECK_CLIENT_ID }}
+          SF_USERNAME: ${{ secrets.SF_BUILDCHECK_USERNAME }}
+          SF_PRIVATE_KEY: ${{ secrets.SF_BUILDCHECK_PRIVATE_KEY }}
+          SF_INSTANCE_URL: ${{ secrets.SF_BUILDCHECK_INSTANCE_URL }}
+        run: |
+          export PATH="$PATH:$(npm root -g)"
+          echo "Authenticating to Buildcheck Org..."
+          sf org login jwt \
+            --instance-url "$SF_INSTANCE_URL" \
+            --client-id "$SF_CLIENT_ID" \
+            --jwt-key-file <(echo "$SF_PRIVATE_KEY") \
+            --username "$SF_USERNAME" \
+            --set-default \
+            -a dfflib-buildcheck
+          echo "Authentication complete."
+
+      # Validate deployment including test factory (lives under force-app/test-factory)
+      - name: Validate Deployment
+        run: |
+          export PATH="$PATH:$(npm root -g)"
+          echo "=== Deployment Validation ==="
+          echo "Source: force-app/main/default"
+          echo "Test factory: force-app/test-factory"
+          echo "Target org: dfflib-buildcheck"
+          echo "Test level: RunLocalTests"
+          echo ""
+          sf project deploy validate \
+            --source-dir force-app/main/default \
+            --source-dir force-app/test-factory \
+            --test-level RunLocalTests \
+            --target-org dfflib-buildcheck
+          echo ""
+          echo "✅ Deployment validation passed"
+
+      # Informational only — coverage is enforced by Salesforce's own 75% gate
+      # during sf project deploy validate above. This step does not block the pipeline.
+      - name: Coverage Note (Informational)
+        run: |
+          echo "ℹ️  Coverage enforcement: Salesforce requires minimum 75% org-wide coverage."
+          echo "    If the deployment validation above passed, the coverage threshold was met."
+          echo "    Full per-class coverage metrics are available in the Salesforce org."

@@ -1,0 +1,222 @@
+# ╔══════════════════════════════════════════════════════════════════════════════╗
+# ║ CONFIGURATION: labeler.yml                                                   ║
+# ║ PURPOSE: Defines file path patterns for automatic PR labeling based on       ║
+# ║          which files are changed in a pull request.                          ║
+# ╠══════════════════════════════════════════════════════════════════════════════╣
+# ║ USED BY: .github/workflows/pr-labeler.yml (file-based labels)                ║
+# ║                                                                              ║
+# ║ HOW IT WORKS:                                                                ║
+# ║   When a PR is opened/updated, the pr-labeler workflow reads this file       ║
+# ║   and applies labels based on which files were changed. Multiple labels      ║
+# ║   can be applied if changes span multiple categories.                        ║
+# ║                                                                              ║
+# ║ LABEL CATEGORIES:                                                            ║
+# ║   - framework: Salesforce source code and manifest changes                   ║
+# ║   - dependencies: Dependency/package changes                                 ║
+# ║   - ci: CI/CD workflow changes, Markdown files                               ║
+# ║   - ut-factory: Unit Test Factory files (UT_ prefix)                         ║
+# ║   - selector: Selector, Database, QueryFactory patterns                      ║
+# ║   - unit-of-work: UnitOfWork pattern files                                   ║
+# ║   - domain: Domain, Trigger, ActionHandler patterns                          ║
+# ║   - mocks: fflib-apex-mocks framework files                                  ║
+# ║   - core: Other force-app files (EXCLUSIVE - only if no specific match)      ║
+# ║   - code-examples: Changes under code-examples/ root folder                  ║
+# ╚══════════════════════════════════════════════════════════════════════════════╝
+
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ LABEL: framework                                                             │
+# │ Applied when: Changes to Salesforce source code or package manifest          │
+# └──────────────────────────────────────────────────────────────────────────────┘
+framework:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'force-app/**'
+          - 'manifest/**'
+
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ LABEL: dependencies                                                          │
+# │ Applied when: Changes to dependency/package files                            │
+# └──────────────────────────────────────────────────────────────────────────────┘
+dependencies:
+  - changed-files:
+        - any-glob-to-any-file:
+              - 'dependencies/**'
+
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ LABEL: ci                                                                    │
+# │ Applied when: Changes to CI/CD configuration, workflows, or markdown files   │
+# └──────────────────────────────────────────────────────────────────────────────┘
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - '**/*.md'
+
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ LABEL: ut-factory                                                            │
+# │ Applied when: Changes to Unit Test Factory files (UT_ prefix)                │
+# └──────────────────────────────────────────────────────────────────────────────┘
+ut-factory:
+    - changed-files:
+          - any-glob-to-any-file:
+                - 'force-app/**/UT_*'
+
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ LABEL: selector                                                              │
+# │ Applied when: Changes to Selector, Database, or QueryFactory files           │
+# └──────────────────────────────────────────────────────────────────────────────┘
+selector:
+    - changed-files:
+          - any-glob-to-any-file:
+                - 'force-app/**/*Selector*'
+                - 'force-app/**/*Database*'
+                - 'force-app/**/*QueryFactory*'
+
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ LABEL: unit-of-work                                                          │
+# │ Applied when: Changes to UnitOfWork pattern files                            │
+# └──────────────────────────────────────────────────────────────────────────────┘
+unit-of-work:
+    - changed-files:
+          - any-glob-to-any-file:
+                - 'force-app/**/*UnitOfWork*'
+
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ LABEL: domain                                                                │
+# │ Applied when: Changes to Domain, Trigger, or ActionHandler files             │
+# └──────────────────────────────────────────────────────────────────────────────┘
+domain:
+    - changed-files:
+          - any-glob-to-any-file:
+                - 'force-app/**/*Domain*'
+                - 'force-app/**/*Trigger*'
+                - 'force-app/**/*ActionHandler*'
+
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ LABEL: mocks                                                                 │
+# │ Applied when: Changes to fflib-apex-mocks framework files                    │
+# │ Source: https://github.com/apex-enterprise-patterns/fflib-apex-mocks         │
+# └──────────────────────────────────────────────────────────────────────────────┘
+mocks:
+    - changed-files:
+          - any-glob-to-any-file:
+                # Main classes from fflib-apex-mocks
+                - 'force-app/**/*fflib_Answer*'
+                - 'force-app/**/*fflib_AnyOrder*'
+                - 'force-app/**/*fflib_ApexMocks*'
+                - 'force-app/**/*fflib_ApexMocksConfig*'
+                - 'force-app/**/*fflib_ApexMocksUtils*'
+                - 'force-app/**/*fflib_ArgumentCaptor*'
+                - 'force-app/**/*fflib_IDGenerator*'
+                - 'force-app/**/*fflib_IMatcher*'
+                - 'force-app/**/*fflib_InOrder*'
+                - 'force-app/**/*fflib_Inheritor*'
+                - 'force-app/**/*fflib_InvocationOnMock*'
+                - 'force-app/**/*fflib_Match*'
+                - 'force-app/**/*fflib_MatcherDefinitions*'
+                - 'force-app/**/*fflib_MatchersReturnValue*'
+                - 'force-app/**/*fflib_MethodArgValues*'
+                - 'force-app/**/*fflib_MethodCountRecorder*'
+                - 'force-app/**/*fflib_MethodReturnValue*'
+                - 'force-app/**/*fflib_MethodReturnValueRecorder*'
+                - 'force-app/**/*fflib_MethodVerifier*'
+                - 'force-app/**/*fflib_QualifiedMethod*'
+                - 'force-app/**/*fflib_QualifiedMethodAndArgValues*'
+                - 'force-app/**/*fflib_System*'
+                - 'force-app/**/*fflib_VerificationMode*'
+                # Test classes from fflib-apex-mocks
+                - 'force-app/**/*fflib_AnswerTest*'
+                - 'force-app/**/*fflib_AnyOrderTest*'
+                - 'force-app/**/*fflib_ApexMocksTest*'
+                - 'force-app/**/*fflib_ApexMocksUtilsTest*'
+                - 'force-app/**/*fflib_ArgumentCaptorTest*'
+                - 'force-app/**/*fflib_IDGeneratorTest*'
+                - 'force-app/**/*fflib_InOrderTest*'
+                - 'force-app/**/*fflib_InheritorTest*'
+                - 'force-app/**/*fflib_MatchTest*'
+                - 'force-app/**/*fflib_MatcherDefinitionsTest*'
+                - 'force-app/**/*fflib_MethodArgValuesTest*'
+                - 'force-app/**/*fflib_MyList*'
+                - 'force-app/**/*fflib_QualifiedMethodAndArgValuesTest*'
+                - 'force-app/**/*fflib_QualifiedMethodTest*'
+                - 'force-app/**/*fflib_SystemTest*'
+                # Local mock files
+                - 'force-app/**/*fflib_Mocks*'
+                - 'force-app/**/*fflib_SObjectMocks*'
+
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ LABEL: core                                                                  │
+# │ Applied when: Changes to force-app files that DON'T match specific patterns  │
+# │ EXCLUSIVE: Uses negation to exclude ut-factory, selector, unit-of-work,      │
+# │            domain, and mocks patterns                                        │
+# └──────────────────────────────────────────────────────────────────────────────┘
+core:
+    - all:
+          - changed-files:
+                - any-glob-to-any-file:
+                      - 'force-app/**'
+                - all-globs-to-all-files:
+                      # Exclude UT-Factory patterns
+                      - '!force-app/**/UT_*'
+                      # Exclude Selector patterns
+                      - '!force-app/**/*Selector*'
+                      - '!force-app/**/*Database*'
+                      - '!force-app/**/*QueryFactory*'
+                      # Exclude Unit-of-Work patterns
+                      - '!force-app/**/*UnitOfWork*'
+                      # Exclude Domain patterns
+                      - '!force-app/**/*Domain*'
+                      - '!force-app/**/*Trigger*'
+                      - '!force-app/**/*ActionHandler*'
+                      # Exclude Mocks patterns (main classes)
+                      - '!force-app/**/*fflib_Answer*'
+                      - '!force-app/**/*fflib_AnyOrder*'
+                      - '!force-app/**/*fflib_ApexMocks*'
+                      - '!force-app/**/*fflib_ApexMocksConfig*'
+                      - '!force-app/**/*fflib_ApexMocksUtils*'
+                      - '!force-app/**/*fflib_ArgumentCaptor*'
+                      - '!force-app/**/*fflib_IDGenerator*'
+                      - '!force-app/**/*fflib_IMatcher*'
+                      - '!force-app/**/*fflib_InOrder*'
+                      - '!force-app/**/*fflib_Inheritor*'
+                      - '!force-app/**/*fflib_InvocationOnMock*'
+                      - '!force-app/**/*fflib_Match*'
+                      - '!force-app/**/*fflib_MatcherDefinitions*'
+                      - '!force-app/**/*fflib_MatchersReturnValue*'
+                      - '!force-app/**/*fflib_MethodArgValues*'
+                      - '!force-app/**/*fflib_MethodCountRecorder*'
+                      - '!force-app/**/*fflib_MethodReturnValue*'
+                      - '!force-app/**/*fflib_MethodReturnValueRecorder*'
+                      - '!force-app/**/*fflib_MethodVerifier*'
+                      - '!force-app/**/*fflib_QualifiedMethod*'
+                      - '!force-app/**/*fflib_QualifiedMethodAndArgValues*'
+                      - '!force-app/**/*fflib_System*'
+                      - '!force-app/**/*fflib_VerificationMode*'
+                      # Exclude Mocks patterns (test classes)
+                      - '!force-app/**/*fflib_AnswerTest*'
+                      - '!force-app/**/*fflib_AnyOrderTest*'
+                      - '!force-app/**/*fflib_ApexMocksTest*'
+                      - '!force-app/**/*fflib_ApexMocksUtilsTest*'
+                      - '!force-app/**/*fflib_ArgumentCaptorTest*'
+                      - '!force-app/**/*fflib_IDGeneratorTest*'
+                      - '!force-app/**/*fflib_InOrderTest*'
+                      - '!force-app/**/*fflib_InheritorTest*'
+                      - '!force-app/**/*fflib_MatchTest*'
+                      - '!force-app/**/*fflib_MatcherDefinitionsTest*'
+                      - '!force-app/**/*fflib_MethodArgValuesTest*'
+                      - '!force-app/**/*fflib_MyList*'
+                      - '!force-app/**/*fflib_QualifiedMethodAndArgValuesTest*'
+                      - '!force-app/**/*fflib_QualifiedMethodTest*'
+                      - '!force-app/**/*fflib_SystemTest*'
+                      # Exclude local mock files
+                      - '!force-app/**/*fflib_Mocks*'
+                      - '!force-app/**/*fflib_SObjectMocks*'
+                      -
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ LABEL: code-examples                                                         │
+# │ Applied when: Changes to any file under the code-examples/ root folder       │
+# └──────────────────────────────────────────────────────────────────────────────┘
+code-examples:
+      - changed-files:
+              - any-glob-to-any-file:
+                      - 'code-examples/**'

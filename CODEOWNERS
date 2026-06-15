@@ -1,0 +1,21 @@
+##############################################################
+#
+# List of approvers/reviewers for D'fflib project
+#
+##############################################################
+#
+# Get in touch with us via the published Community
+#  https://github.com/deloitte-engineering/dfflib
+#
+
+# These owners will be the default owners for everything in the repo.
+* @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+
+# fflib specific layer classes
+force-app/main/default/classes/*.cls @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+
+# UT Test Factory classes
+force-app/test-factory/classes/*.cls @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+
+# Documentation
+*.md @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
