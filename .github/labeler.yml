@@ -20,6 +20,7 @@
 # ║   - domain: Domain, Trigger, ActionHandler patterns                          ║
 # ║   - mocks: fflib-apex-mocks framework files                                  ║
 # ║   - core: Other force-app files (EXCLUSIVE - only if no specific match)      ║
+# ║   - code-examples: Changes under code-examples/ root folder                  ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 # ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -210,3 +211,12 @@ core:
                       # Exclude local mock files
                       - '!force-app/**/*fflib_Mocks*'
                       - '!force-app/**/*fflib_SObjectMocks*'
+                      -
+# ┌──────────────────────────────────────────────────────────────────────────────┐
+# │ LABEL: code-examples                                                         │
+# │ Applied when: Changes to any file under the code-examples/ root folder       │
+# └──────────────────────────────────────────────────────────────────────────────┘
+code-examples:
+      - changed-files:
+              - any-glob-to-any-file:
+                      - 'code-examples/**'
