@@ -34,6 +34,9 @@
 
 name: Create Unlocked Package
 
+permissions:
+  contents: write
+
 # Prevent concurrent runs — cancels in-progress workflow when a new one starts on the same branch
 concurrency:
   group: unlock-package-${{ github.ref_name }}
