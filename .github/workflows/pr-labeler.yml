@@ -10,7 +10,6 @@
 # ║   Defines file path patterns and their corresponding labels:                 ║
 # ║   - framework: force-app/**, manifest/**                                     ║
 # ║   - documentation: documentation/**, **/*.md                                 ║
-# ║   - dependencies: dependencies/**                                            ║
 # ║   - ci: .github/**                                                           ║
 # ║   - tests: force-app/classes/*Test.cls                                       ║
 # ║                                                                              ║
