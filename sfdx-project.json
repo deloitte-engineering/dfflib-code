@@ -5,15 +5,8 @@
       "versionNumber": "0.0.0.NEXT",
       "path": "force-app",
       "default": true,
-      "unpackagedMetadata": {
-        "path": "dependencies"
-      },
       "package": "D'fflib",
       "versionDescription": ""
-    },
-    {
-      "path": "dependencies",
-      "default": false
     }
   ],
   "namespace": "",
