@@ -248,9 +248,9 @@ jobs:
               echo "EOF" >> $GITHUB_OUTPUT
             else
               echo "has_changes=false" >> $GITHUB_OUTPUT
-              echo "full_changelog<<" >> $GITHUB_OUTPUT
+              echo "full_changelog<<EOF" >> $GITHUB_OUTPUT
               echo "EOF" >> $GITHUB_OUTPUT
-              echo "filtered_changelog<<" >> $GITHUB_OUTPUT
+              echo "filtered_changelog<<EOF" >> $GITHUB_OUTPUT
               echo "EOF" >> $GITHUB_OUTPUT
             fi
 
@@ -260,10 +260,10 @@ jobs:
             echo "previous_tag=" >> $GITHUB_OUTPUT
             echo "commit_count=0" >> $GITHUB_OUTPUT
             echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "full_changelog<<" >> $GITHUB_OUTPUT
+            echo "full_changelog<<EOF" >> $GITHUB_OUTPUT
             echo "Initial release" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
-            echo "filtered_changelog<<" >> $GITHUB_OUTPUT
+            echo "filtered_changelog<<EOF" >> $GITHUB_OUTPUT
             echo "Initial release" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
             echo "No previous tag found - this is the first release"
@@ -382,12 +382,12 @@ jobs:
 
       # ─────────────────────────────────────────────────────────────────────────────
       # Step 3: Install Salesforce CLI (ONCE for entire job)
-      # Pinned to 2.137.6 for reproducible builds
+      # Always installs latest to avoid update-warning noise in JSON output
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Install Salesforce CLI
         run: |
           export PATH="$PATH:$(npm root -g)"
-          npm install -g @salesforce/cli@2.137.6
+          npm install -g @salesforce/cli
           export PATH="$PATH:$(npm root -g)"
           echo "CLI installed: $(sf --version 2>&1)"
 
@@ -421,7 +421,7 @@ jobs:
         id: check-version
         run: |
           export PATH="$PATH:$(npm root -g)"
-          echo "=== Checking if version $VERSION_NUMBER already exists ==="
+          echo "🔍 Checking version $VERSION_NUMBER availability..."
 
           # Query existing package versions
           RESULT=$(sf package version list \
@@ -434,7 +434,7 @@ jobs:
             '.result[] | select(.Version == $ver) | .SubscriberPackageVersionId' 2>/dev/null || echo "")
 
           if [[ -n "$EXISTING" ]]; then
-            echo "::error::Version $VERSION_NUMBER already exists with ID: $EXISTING"
+            echo "::error::Version $VERSION_NUMBER already exists"
             echo "Use a different version number or delete the existing version first."
             exit 1
           fi
@@ -455,38 +455,22 @@ jobs:
           echo "Test level: RunLocalTests"
           echo ""
 
-          RESULT=$(sf project deploy validate \
+          # --wait 60 makes the CLI poll until the deployment completes before returning.
+          # With --json, exit code 0 = Succeeded, non-zero = Failed/error
+          sf project deploy validate \
             --source-dir force-app/main/default \
             --source-dir force-app/test-factory \
             --test-level RunLocalTests \
             --target-org dfflib-packaging-prod \
-            --json 2>&1)
+            --wait 60
           EXIT_CODE=$?
 
-          echo "Validation result:"
-          echo "$RESULT"
-          echo ""
-
-          # Check CLI-level exit code first (catches auth failures, network errors, etc.)
           if [[ $EXIT_CODE -ne 0 ]]; then
             echo "::error::Pre-flight validation failed with exit code $EXIT_CODE"
-            echo "$RESULT" | jq '.' 2>/dev/null || echo "$RESULT"
             exit $EXIT_CODE
           fi
 
-          # Extract status safely using jq -r (raw string, no quotes)
-          VALIDATION_STATUS=$(echo "$RESULT" | jq -r '.result.status // .status // "unknown"' 2>/dev/null)
-          echo "Validation status: $VALIDATION_STATUS"
-
-          # Check if validation passed
-          if [[ "$VALIDATION_STATUS" == "Succeeded" ]] || [[ "$VALIDATION_STATUS" == "Success" ]]; then
-            echo "✅ Pre-flight validation passed"
-          else
-            echo "::error::Pre-flight validation failed with status: $VALIDATION_STATUS"
-            echo "Full response:"
-            echo "$RESULT" | jq '.' 2>/dev/null || echo "$RESULT"
-            exit 1
-          fi
+          echo "✅ Pre-flight validation passed"
 
       # ─────────────────────────────────────────────────────────────────────────────
       # Step 7: Create package version
@@ -505,35 +489,38 @@ jobs:
           echo "Target: dfflib-packaging-prod org"
           echo ""
 
-          # Verify the package exists in the Dev Hub before attempting version creation
-          echo "Checking if package exists in Dev Hub..."
-          PKG_LIST=$(sf package list --target-dev-hub dfflib-packaging-prod --json 2>&1)
-          EXISTING_PKG=$(echo "$PKG_LIST" | jq -r '.result[] | select(.Name == "D'\''fflib") | .Id' 2>/dev/null || echo "")
+          # Verify the package exists in the Dev Hub.
+          # Read the 0Ho ID from sfdx-project.json, then confirm it exists in the Dev Hub by matching on Id.
+          PKG_ID=$(jq -r '.packageAliases["D'\''fflib"] // empty' sfdx-project.json)
 
-          if [[ -z "$EXISTING_PKG" ]]; then
-            echo ""
-            echo "::error::Package 'D'fflib' not found in Dev Hub."
-            echo ""
-            echo "The package does not exist yet. Before creating package versions, you must first create the package."
-            echo ""
-            echo "Run this command locally to create the package:"
-            echo ""
-            echo "  sf package create \\"
-            echo "    --name \"D'fflib\" \\"
-            echo "    --package-type Unlocked \\"
-            echo "    --path force-app \\"
-            echo "    --target-dev-hub dfflib-packaging-prod"
-            echo ""
-            echo "After creating the package, re-run this workflow."
+          if [[ -z "$PKG_ID" ]]; then
+            echo "::error::Package alias not found in sfdx-project.json."
+            echo "Run 'sf package create' locally and commit the updated sfdx-project.json."
             exit 1
           fi
 
-          echo "✅ Package found: $EXISTING_PKG"
+          PKG_LIST=$(sf package list --target-dev-hub dfflib-packaging-prod --json 2>&1)
+          PKG_LIST_EXIT=$?
+
+          if [[ $PKG_LIST_EXIT -ne 0 ]]; then
+            echo "::error::Failed to query Dev Hub package list. Check authentication."
+            exit 1
+          fi
+
+          EXISTING_PKG=$(echo "$PKG_LIST" | jq -r --arg id "$PKG_ID" '.result[] | select(.Id == $id) | .Id' 2>/dev/null || echo "")
+
+          if [[ -z "$EXISTING_PKG" ]]; then
+            echo "::error::Package not found in Dev Hub org dfflib-packaging-prod."
+            echo "The package may have been deleted, or sfdx-project.json may be pointing at a different org."
+            exit 1
+          fi
+
+          echo "✅ Package verified in Dev Hub"
           echo ""
 
           # Build CLI command conditionally based on whether INSTALLATION_KEY is set
+          echo "🔐 Using provided installation key..."
           if [[ -n "$INSTALLATION_KEY" ]]; then
-            echo "Using provided installation key..."
             CMD=(sf package version create \
               --package "D'fflib" \
               --code-coverage \
@@ -545,7 +532,6 @@ jobs:
               --version-name "$VERSION_NAME" \
               --json)
           else
-            echo "No installation key — bypassing..."
             CMD=(sf package version create \
               --package "D'fflib" \
               --code-coverage \
@@ -558,42 +544,21 @@ jobs:
               --json)
           fi
 
-          echo "Running package version create..."
-          echo ""
+          echo "⏳ Creating package version $VERSION_NUMBER — this may take several minutes..."
 
           # Run package version create and capture full output
           RESULT=$("${CMD[@]}" 2>&1)
           EXIT_CODE=$?
 
-          echo ""
-          echo "=== Package Version Create Output ==="
-          echo "$RESULT"
-          echo ""
-
           # Check for CLI-level errors (exit code non-zero)
           if [[ $EXIT_CODE -ne 0 ]]; then
             echo "::error::Package version creation failed with exit code $EXIT_CODE"
-            echo "Error output:"
-            echo "$RESULT" | jq '.'
             exit $EXIT_CODE
           fi
 
           # Parse the response status
           RESPONSE_STATUS=$(echo "$RESULT" | jq -r '.result.Status // .status // "unknown"' 2>/dev/null)
-          echo "Response status: $RESPONSE_STATUS"
-
-          # Show any status messages from the API
-          STATUS_MSG=$(echo "$RESULT" | jq -r '.result.StatusDetail // .result.Error[0] // ""' 2>/dev/null)
-          if [[ -n "$STATUS_MSG" ]] && [[ "$STATUS_MSG" != "null" ]]; then
-            echo "Status detail: $STATUS_MSG"
-          fi
-
-          # Check for JSON-level errors
-          if echo "$RESULT" | jq -e '.result.Status' 2>/dev/null | grep -qi "Error"; then
-            echo "::error::Package version creation returned an error status"
-            echo "$RESULT" | jq '.'
-            exit 1
-          fi
+          echo "🔍 Response status: $RESPONSE_STATUS"
 
           # Extract IDs from the response (Salesforce API uses PascalCase)
           # SubscriberPackageVersionId (04t) — used for installation URLs, aliases, and promotion
@@ -602,14 +567,10 @@ jobs:
 
           if [[ -z "$SUBSCRIBER_PKG_VERSION_ID" ]]; then
             echo "::error::Failed to extract subscriber package version ID from response"
-            echo "Full response:"
-            echo "$RESULT" | jq '.'
             exit 1
           fi
 
-          echo "✅ Package version created"
-          echo "   Subscriber Package Version ID (04t): $SUBSCRIBER_PKG_VERSION_ID"
-          echo "   Version: $CREATED_VERSION"
+          echo "✅ Package version $CREATED_VERSION created successfully"
           echo ""
 
           # Output the subscriber package version ID (04t prefix) — used for installation, aliases, and promotion
@@ -632,7 +593,6 @@ jobs:
           PKG_VER_ID="${{ steps.create-package.outputs.package_version_id }}"
 
           echo "=== Promote Package Version ==="
-          echo "Subscriber Package Version ID (04t): $PKG_VER_ID"
           echo "Version: $VERSION_NUMBER"
           echo ""
 
@@ -643,26 +603,20 @@ jobs:
             --json 2>&1)
           EXIT_CODE=$?
 
-          echo "Promotion result:"
-          echo "$RESULT"
-          echo ""
-
           if [[ $EXIT_CODE -ne 0 ]]; then
             echo "::error::Package promotion failed with exit code $EXIT_CODE"
-            echo "$RESULT" | jq '.'
             exit $EXIT_CODE
           fi
 
           PROMO_STATUS=$(echo "$RESULT" | jq -r '.status // .result?.Status // "unknown"' 2>/dev/null)
-          echo "Promotion status: $PROMO_STATUS"
+          echo "🔍 Promotion status: $PROMO_STATUS"
 
           if echo "$RESULT" | jq -e '.result?.Status' 2>/dev/null | grep -qi "Error"; then
             echo "::error::Package promotion returned an error"
-            echo "$RESULT" | jq '.'
             exit 1
           fi
 
-          echo "✅ Package version promoted to Released"
+          echo "✅ Package version $VERSION_NUMBER promoted to Released"
 
   # ╔══════════════════════════════════════════════════════════════════════════════╗
   # ║ STAGE 4: PUBLISH RELEASE                                                     ║
