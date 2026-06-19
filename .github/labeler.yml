@@ -12,7 +12,6 @@
 # ║                                                                              ║
 # ║ LABEL CATEGORIES:                                                            ║
 # ║   - framework: Salesforce source code and manifest changes                   ║
-# ║   - dependencies: Dependency/package changes                                 ║
 # ║   - ci: CI/CD workflow changes, Markdown files                               ║
 # ║   - ut-factory: Unit Test Factory files (UT_ prefix)                         ║
 # ║   - selector: Selector, Database, QueryFactory patterns                      ║
@@ -32,15 +31,6 @@ framework:
       - any-glob-to-any-file:
           - 'force-app/**'
           - 'manifest/**'
-
-# ┌──────────────────────────────────────────────────────────────────────────────┐
-# │ LABEL: dependencies                                                          │
-# │ Applied when: Changes to dependency/package files                            │
-# └──────────────────────────────────────────────────────────────────────────────┘
-dependencies:
-  - changed-files:
-        - any-glob-to-any-file:
-              - 'dependencies/**'
 
 # ┌──────────────────────────────────────────────────────────────────────────────┐
 # │ LABEL: ci                                                                    │
