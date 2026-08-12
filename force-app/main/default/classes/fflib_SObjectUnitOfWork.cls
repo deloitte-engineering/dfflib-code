@@ -33,7 +33,7 @@
  *
  * Please refer to the testMethod's in this class for example usage
  */
-public virtual class fflib_SObjectUnitOfWork implements fflib_ISObjectUnitOfWork{
+public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_ISObjectUnitOfWork{
     /**
      * DMLActions - this enum is used to easily share for what DML an SObjectType should be registered
      * Note, prefix of 'd' as NEW and INSERT are restricted values for enums
@@ -311,7 +311,18 @@ public virtual class fflib_SObjectUnitOfWork implements fflib_ISObjectUnitOfWork
     }
 
     /**
-     * Constructs a new Unit Of Work with the default Inherit database context and based on metadata-SObjectTypes
+     * Constructs a new Unit Of Work with the default Inherit database context and based on metadata-SObjectTypes.
+     *
+     * Default security context: fflib_Database.Context.INHERIT
+     *   - AccessLevel : SYSTEM_MODE (no FLS or object permission enforcement)
+     *   - Sharing     : Inherits the sharing declaration of the calling class chain
+     *   - Record visibility: Determined by the calling class's sharing keyword
+     *
+     * API v67.0 note: At API v67.0+, any class in the calling chain without an explicit sharing keyword
+     * defaults to 'with sharing', which narrows record visibility to the running user's records only.
+     * To guarantee all-records visibility regardless of the calling class's sharing declaration,
+     * use fflib_Database.Context.NONE explicitly:
+     *   new fflib_SObjectUnitOfWork( fflib_Database.Context.NONE )
      */
     public fflib_SObjectUnitOfWork(){
         this( null, fflib_Database.Context.INHERIT );

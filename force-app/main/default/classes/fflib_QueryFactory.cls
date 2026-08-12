@@ -31,7 +31,7 @@
  * There is a google doc providing additional guidance on the use of this class with field sets at
  * https://docs.google.com/a/financialforce.com/document/d/1I4cxN4xHT4UJj_3Oi0YBL_MJ5chm-KG8kMN1D1un8-g/edit?usp=sharing
  */
-public virtual class fflib_QueryFactory{ // No explicit sharing declaration - inherit from caller
+public virtual inherited sharing class fflib_QueryFactory{
     public enum DistanceUnit{ KILOMETERS, MILES }
     public enum FLSEnforcement{ NONE, LEGACY, USER_MODE, SYSTEM_MODE }
     public enum SortOrder{ ASCENDING, DESCENDING }

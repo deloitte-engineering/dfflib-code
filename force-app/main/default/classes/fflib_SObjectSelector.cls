@@ -5,13 +5,20 @@
  * See LICENSE in the repository root for the full license text.
  */
 /**
- * Class providing common database query support for abstracting and encapsulating query logic.
- * Inherits sharing, allowing extending-selectors to control whether SObjectDescribe runs in system (without) or user (with) mode.
- * Enabling to (opt.) bypass unavailable SObjectTypes like AccountTeamMembers for Community Licenses (do align with Project Salesforce Success Manager).
- * Note, SObjectSelector is an abstract class with no queries being performed, so no regression data vulnerability are expected.
- * To still run those queries with sharing enforced, one can construct the base selector with the desired security context ({@link fflib_Database.Context})
+ * Abstract base class providing common database query support for abstracting and encapsulating query logic.
+ *
+ * Sharing model: Declares 'inherited sharing' to explicitly propagate the calling class's sharing context.
+ * This ensures the framework is transparent - it adopts whatever sharing mode the client selector declares.
+ * Note, when upgrading to API v67.0+ and NOT having an explicit sharing annotation defined on the extended selector,
+ * this will cause Selectors to run in USER_MODE, thus enforcing user's record visibility.
+ *
+ * Security context: Queries are executed via fflib_Database_QueryProxy with an explicit AccessLevel parameter
+ * derived from the fflib_Database.Context set on this selector instance. The default context is INHERIT
+ * (AccessLevel.SYSTEM_MODE - no FLS enforcement, record visibility determined by the calling class's sharing).
+ * Use fflib_Database.Context.FULL for full user-mode enforcement (FLS + sharing).
+ * Use fflib_Database.Context.NONE to guarantee all-records visibility regardless of sharing declarations.
  */
-public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
+public abstract inherited sharing class fflib_SObjectSelector implements fflib_ISObjectSelector{
     public enum DataAccess{ LEGACY, USER_MODE, SYSTEM_MODE }
     private static final Map<DataAccess, fflib_Database.Context> ACCESS_TO_CONTEXT_MAP = new Map<DataAccess, fflib_Database.Context>{
         DataAccess.LEGACY => fflib_Database.Context.INHERIT,
