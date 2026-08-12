@@ -201,7 +201,6 @@ core:
                       # Exclude local mock files
                       - '!force-app/**/*fflib_Mocks*'
                       - '!force-app/**/*fflib_SObjectMocks*'
-                      -
 # ┌──────────────────────────────────────────────────────────────────────────────┐
 # │ LABEL: code-examples                                                         │
 # │ Applied when: Changes to any file under the code-examples/ root folder       │
