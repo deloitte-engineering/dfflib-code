@@ -7,6 +7,7 @@
 /**
  * Base class for generic Apex objects (including SObjects), providing core utilities to treat records as typed object instances for other framework layers
  *
+ *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
  *  @created    October 2025
  */
 public virtual class fflib_Objects implements fflib_IObjects{

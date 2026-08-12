@@ -3,6 +3,12 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+/**
+ * Class that defines an interface to the DML proxy servicing the Unit of Work implementation to be compatible with apex-mock framework
+ *
+ *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
+ *  @created    February 2023
+ */
 public interface fflib_Database_IDML{
     /**
      * Method template for executing DML actions on the behalf of the callee (aka Unit of Work instance).

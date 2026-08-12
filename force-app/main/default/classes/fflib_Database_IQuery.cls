@@ -3,6 +3,12 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+/**
+ * Class that defines an interface to the query proxy servicing selector-layer classes to be compatible with apex-mock framework
+ *
+ *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
+ *  @created    February 2023
+ */
 public interface fflib_Database_IQuery{
     /**
      * Method definition relaying a formatted string representing a query expression to the query proxy implementation of Database.query(), with an optional specified AccessLevel

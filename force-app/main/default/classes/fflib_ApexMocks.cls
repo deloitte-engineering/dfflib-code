@@ -9,6 +9,8 @@
  * the behavior of each method of the stubbed class in the handleMethodCall() method.
  * After creating a stubbed object, each invoked method on the stubbed object will call StubProvider.handleMethodCall(),
  * which performs the behavior that has been specified for each method.
+ *
+ * @group Core
  */
 public with sharing class fflib_ApexMocks implements System.StubProvider, fflib_IApexMocks{
 

@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+/**
+ * Contains counterparts for helper methods in the native System class.
+ * @group Core
+ */
+
 public class fflib_System{
 
     /**

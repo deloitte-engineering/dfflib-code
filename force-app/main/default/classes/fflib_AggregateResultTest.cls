@@ -6,6 +6,7 @@
 /**
  * Test class for fflib_AggregateResult class.
  *
+ * @author      Adam Marchbanks (amarchbanks@deloitte.nl)
  * @created     March 2019
  */
 @IsTest( isParallel = true )

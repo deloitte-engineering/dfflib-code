@@ -1,4 +1,4 @@
-/**
+﻿﻿﻿/**
  * Copyright (c), FinancialForce.com, inc
  * Copyright (c), Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
@@ -27,11 +27,8 @@
  * - Cross-object references currently require using String argument(s) to selectField(s).
  * - The behavior of serializing and deserializing an fflib_QueryFactory instance is currently untested and undefined.
  * - There is no out-of-the-box support for dynamic selector-fields, often limiting the reuse of selector methods.
- *
- * There is a google doc providing additional guidance on the use of this class with field sets at
- * https://docs.google.com/a/financialforce.com/document/d/1I4cxN4xHT4UJj_3Oi0YBL_MJ5chm-KG8kMN1D1un8-g/edit?usp=sharing
  */
-public virtual class fflib_QueryFactory{ // No explicit sharing declaration - inherit from caller
+public virtual inherited sharing class fflib_QueryFactory{
     public enum DistanceUnit{ KILOMETERS, MILES }
     public enum FLSEnforcement{ NONE, LEGACY, USER_MODE, SYSTEM_MODE }
     public enum SortOrder{ ASCENDING, DESCENDING }
@@ -68,10 +65,8 @@ public virtual class fflib_QueryFactory{ // No explicit sharing declaration - in
 
 
     /**
-     * The relationship and subselectQueryMap variables are used to support subselect queries. Subselects can be added to
-     * a query, as long as it isn't a subselect query itself. You may have many subselects inside
-     * a query, but they may only be 1 level deep (no subselect inside a subselect)
-     * to add a subselect, call the subselectQuery method, passing in the ChildRelationship.
+     * The relationship and subselectQueryMap variables are used to support subselect queries. 
+     * Subselects can be added to a query, calling the subselectQuery method, passing in the ChildRelationship.
      */
     private Schema.ChildRelationship relationship;
     private Map<Schema.ChildRelationship, fflib_QueryFactory> subSelectQueryMap;
@@ -524,7 +519,7 @@ public virtual class fflib_QueryFactory{ // No explicit sharing declaration - in
     public fflib_QueryFactory setHaving( String havingExpression ){
         this.havingExpression = havingExpression;
 
-        if( String.isBlank( this.groupByFieldName ) ){
+        if( String.isEmpty( this.getGroupByFieldName() ) ){
             System.debug( LoggingLevel.WARN, '*** IMPORTANT: A \'HAVING\' clause was set on this query without a \'GROUP BY\' clause. ' +
                 'The usage of this clause without a \'GROUP BY\' clause will cause a runtime exception. Please set a \'GROUP BY\' clause for the \'HAVING\' clause to be valid.' );
         }
@@ -593,9 +588,9 @@ public virtual class fflib_QueryFactory{ // No explicit sharing declaration - in
     /**
      * Method that sets the grouping of the query by the specified field name
      * NOTE: Automatically resets ORDER BY to prevent SOQL failure for when the default order-field (Name, Id, ...) is not in the group by clause.
-     *       When one requires the default ORDER BY field to be preserved, call setGroupByFieldName( groupByFieldName, true );
+     *       When one requires the default ORDER BY field to be preserved, call setGroupByField( groupByField, true );
      *
-     * @param   groupByFieldName     Field (String or SObjectField) by which the SOQL query should be GROUPed BY
+     * @param   groupByField         Field (String or SObjectField) by which the SOQL query should be GROUPed BY
      * @param   preserveOrderings    Opt. Boolean to keep default orderby fields, like when getOrderBy() method is overridden in selector implementation
      * @return  Returns this fflib_QueryFactory instance
      */
@@ -676,7 +671,7 @@ public virtual class fflib_QueryFactory{ // No explicit sharing declaration - in
      * <dt><span><strong>NOTE:</strong></span></dt><dd>
      *     Use the 'FOR VIEW' only when one is sure that the
      *     retrieved records will definitely be viewed by the logged-in user, else the clause incorrectly updates the usage information for the records.
-     *     Also, the user won’t recognize any incorrectly updated records when they display in the recent items and the global search auto-complete lists.</dd>
+     *     Also, the user won't recognize any incorrectly updated records when they display in the recent items and the global search auto-complete lists.</dd>
      * </dl>
      *
      * @param   forView    If true, the resulting query will include 'FOR VIEW'
@@ -694,7 +689,7 @@ public virtual class fflib_QueryFactory{ // No explicit sharing declaration - in
      * <dt><span><strong>NOTE:</strong></span></dt><dd>
      *     Use the 'FOR REFERENCE' only when one is sure that the
      *     retrieved records will definitely be viewed by the logged-in user, else the clause incorrectly updates the usage information for the records.
-     *     Also, the user won’t recognize any incorrectly updated records when they display in the recent items and the global search auto-complete lists.</dd>
+     *     Also, the user won't recognize any incorrectly updated records when they display in the recent items and the global search auto-complete lists.</dd>
      * </dl>
      *
      * @param   forReference   If true, the resulting query will include 'FOR REFERENCE'
@@ -836,9 +831,9 @@ public virtual class fflib_QueryFactory{ // No explicit sharing declaration - in
         // The child queryFactory should be configured in the same way as the parent by default - can override after if required
         subSelectQuery.setSortSelectFields( sortSelectFields );
         // TODO: Remove legacy enforceFLS/enforceCRUD boolean parameters (migrate to fflib_Database.Context).
-        //  Child queries inherit the parent's FLS enforcement level to ensure field path resolution behaves consistently —
+        //  Child queries inherit the parent's FLS enforcement level to ensure field path resolution behaves consistently -
         //  specifically, field name casing (lowercase for USER_MODE/SYSTEM_MODE vs. case-preserving for LEGACY) must match across the query hierarchy to prevent duplicate fields in SELECT clauses.
-        //  The database context (queryProxy) is intentionally not propagated: the parent QueryFactory owns the execution context, and child subqueries are embedded in the parent's SOQL — they cannot specify independent access levels.
+        //  The database context (queryProxy) is intentionally not propagated: the parent QueryFactory owns the execution context, and child subqueries are embedded in the parent's SOQL - they cannot specify independent access levels.
         subSelectQuery.setEnforceFLS( this.mFlsEnforcement );
         if( assertIsAccessible ){
             subSelectQuery.assertIsAccessible();
@@ -977,31 +972,6 @@ public virtual class fflib_QueryFactory{ // No explicit sharing declaration - in
     }
 
     /**
-	 * Add a field and longitude and latitude to be sorted on. This may be a direct field or a field
-	 * related through an object lookup or master-detail relationship.
-	 * Use the set to store unique field names, since we only want to sort
-	 * by the same field one time.  The sort expressions are stored in a list
-	 * so that they are applied to the SOQL in the same order that they
-	 * were added in.
-	 * The "NULLS FIRST" keywords will be included by default. If "NULLS LAST"
-	 * is required, use one of the overloaded addOrdering methods which include this parameter
-     *
-     * @param   field       The string value of the field to be sorted on (has to be a location or adress field)
-     * @param   longitude   The longitude of the geolocation for which to calculate the distance
-     * @param   latitude    The latitude of the geolocation for which to calculate the distance
-     * @param   unit        The unit to be sorted on (km or mi)
-     * @param   direction   The direction to be sorted on (ASCENDING or DESCENDING)
-     * @param   nullsLast   Whether to sort null values last (NULLS LAST keyword included)
-     * @return  Returns this fflib_QueryFactory instance
-     */
-    public fflib_QueryFactory addOrderingDistance( String field, Decimal longitude, Decimal latitude, DistanceUnit unit, SortOrder direction, Boolean nullsLast ){
-        order.add(
-            new Ordering( 'DISTANCE( ' + getFieldPath( field ) + ', GEOLOCATION( ' + latitude + ', ' + longitude + ' ), ' + ( unit == DistanceUnit.KILOMETERS ? '\'km\'' : '\'mi\'' ) + ' )', direction, nullsLast )
-        );
-        return this;
-    }
-
-    /**
      * Method that empties the default ordering by name/id by fflib
      */
     public void emptyOrdering(){
@@ -1079,24 +1049,23 @@ public virtual class fflib_QueryFactory{ // No explicit sharing declaration - in
     }
 
     /**
-     * Remove existing ordering and set a field and longitude and latitude to be sorted on. This may be a direct field or a field
-     * related through an object lookup or master-detail relationship.
-     * Use the set to store unique field names, since we only want to sort
-     * by the same field one time. The sort expressions are stored in a list
-     * so that they are applied to the SOQL in the same order that they
-     * were added in
+     * Returns a SOQL DISTANCE expression String for use in SELECT, WHERE, or ORDER BY clauses.
+     * The expression uses SOQL bind variable syntax ({@code :latitude}, {@code :longitude}) so that
+     * different coordinates reuse the same query plan. Ensure to pass the actual values via
+     * {@link fflib_Database#executeQuery(fflib_QueryFactory, Map)} or {@code Database.queryWithBinds}.
      *
-     * @param   field       The string value of the field to be sorted on (has to be a location or adress field)
-     * @param   longitude   The longitude of the geolocation for which to calculate the distance
-     * @param   latitude    The latitude of the geolocation for which to calculate the distance
-     * @param   unit        The unit to be sorted on (km or mi)
-     * @param   direction   The direction to be sorted on (ASCENDING or DESCENDING)
-     * @param   nullsLast   Whether to sort null values last (NULLS LAST keyword included)
-     * @return  Returns this fflib_QueryFactory instance
+     * @param   field   The {@link Schema.SObjectField} token of the location or address compound field
+     * @param   unit    The distance unit — {@link DistanceUnit#KILOMETERS} ('km') or {@link DistanceUnit#MILES} ('mi')
+     * @return  A {@code DISTANCE( fieldName, GEOLOCATION(:latitude, :longitude), 'unit' )} expression string
      */
-    public fflib_QueryFactory setOrderingDistance( String field, Decimal longitude, Decimal latitude, DistanceUnit unit, SortOrder direction, Boolean nullsLast ){
-        Ordering orderingObject = new Ordering( 'DISTANCE( ' + getFieldPath( field ) + ', GEOLOCATION( ' + latitude + ', ' + longitude + ' ), ' + ( unit == DistanceUnit.KILOMETERS ? '\'km\'' : '\'mi\'' ) + ' )', direction, nullsLast );
-        return setOrdering( orderingObject );
+    public String getDistanceString( SObjectField field, DistanceUnit unit ){
+        return String.format(
+            'DISTANCE( {0}, GEOLOCATION(:latitude, :longitude), {1} )',
+            new List<String>{
+                getFieldTokenPath( field ),
+                unit == DistanceUnit.KILOMETERS ? '\'km\'' : '\'mi\''
+            }
+        );
     }
 
     /**

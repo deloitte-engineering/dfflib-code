@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+/**
+ *  Interface listing all methods available and required for fflib_ISObjectUnitOfWork 2.0
+ *
+ *  Inspiration based on Apex-Commons repository from FinancialForce.com, Inc
+ *
+ *  @author    Reinier van den Assum (rvandenassum@deloitte.nl)
+ *  @created   December 2020
+ */
 public interface fflib_ISObjectUnitOfWork{
     /**
      * Setter to allow changing the database security context when committing records to the database. The default is INHERIT to match the sharing context, without explicit CRUD/FLS checks.

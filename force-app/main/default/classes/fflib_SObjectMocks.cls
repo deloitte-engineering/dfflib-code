@@ -29,8 +29,8 @@ public class fflib_SObjectMocks{
             return getRecords();
         }
 
-        public Boolean verifyTriggerEventSupported( fflib_SObjectDomain.TriggerEvent evt ){
-            return ( Boolean ) mocks.mockNonVoidMethod( this, 'verifyTriggerEventSupported', new List<Type>{ fflib_SObjectDomain.TriggerEvent.class }, new List<Object>{ evt } );
+        public Boolean verifyTriggerEventSupported( fflib_SObjectDomain.TriggerEvent event ){
+            return ( Boolean ) mocks.mockNonVoidMethod( this, 'verifyTriggerEventSupported', new List<Type>{ fflib_SObjectDomain.TriggerEvent.class }, new List<Object>{ event } );
         }
     }
 
