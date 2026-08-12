@@ -1613,7 +1613,7 @@ public with sharing class UT_SObjectFactory{
         public Id getRecordId( SObject record ){
             String sObjectName = record.getSObjectType().getDescribe().getName();
             Object value = record.get( fieldName );
-            List<SObject> records = Database.query( 'SELECT Id FROM ' + sObjectName + ' WHERE ' + fieldName + ' = :value LIMIT 1' );
+            List<SObject> records = Database.query( 'SELECT Id FROM ' + sObjectName + ' WHERE ' + fieldName + ' = :value LIMIT 1', AccessLevel.USER_MODE );
             return records.isEmpty() ? null : records[ 0 ].Id;
         }
     }
