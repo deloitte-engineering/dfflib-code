@@ -1,4 +1,4 @@
-﻿﻿﻿/**
+/**
  * Copyright (c), FinancialForce.com, inc
  * Copyright (c), Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
@@ -519,7 +519,7 @@ public virtual inherited sharing class fflib_QueryFactory{
     public fflib_QueryFactory setHaving( String havingExpression ){
         this.havingExpression = havingExpression;
 
-        if( String.isEmpty( this.getGroupByFieldName() ) ){
+        if( String.isEmpty( this.getGroupByField() ) ){
             System.debug( LoggingLevel.WARN, '*** IMPORTANT: A \'HAVING\' clause was set on this query without a \'GROUP BY\' clause. ' +
                 'The usage of this clause without a \'GROUP BY\' clause will cause a runtime exception. Please set a \'GROUP BY\' clause for the \'HAVING\' clause to be valid.' );
         }
@@ -598,14 +598,14 @@ public virtual inherited sharing class fflib_QueryFactory{
         return this.setGroupByField( groupByField, false );
     }
     public fflib_QueryFactory setGroupByField( SObjectField groupByField, Boolean preserveOrderings ){
-        return this.setGroupByFieldName( groupByField.getDescribe().getName(), preserveOrderings );
+        return this.setGroupByField( groupByField.getDescribe().getName(), preserveOrderings );
     }
 
-    public fflib_QueryFactory setGroupByFieldName( String groupByFieldName ){
-        return this.setGroupByFieldName( groupByFieldName, false );
+    public fflib_QueryFactory setGroupByField( String groupByField ){
+        return this.setGroupByField( groupByField, false );
     }
-    public fflib_QueryFactory setGroupByFieldName( String groupByFieldName, Boolean preserveOrderings ){
-        this.groupByFieldName = groupByFieldName;
+    public fflib_QueryFactory setGroupByField( String groupByField, Boolean preserveOrderings ){
+        this.groupByFieldName = groupByField;
         if( preserveOrderings == false ){
             this.emptyOrdering();
         }
@@ -618,7 +618,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      *
      * @return  The current value of the 'GROUP BY' clause field name, if any
      */
-    public String getGroupByFieldName(){
+    public String getGroupByField(){
         return this.groupByFieldName;
     }
 
@@ -1165,7 +1165,7 @@ public virtual inherited sharing class fflib_QueryFactory{
             .setOffset( this.getOffset() )
             .setCondition( this.getCondition() )
             .setAllRowsRequired( this.getAllRowsRequired() )
-            .setGroupByFieldName( this.getGroupByFieldName() )
+            .setGroupByField( this.getGroupByField() )
             .setHaving( this.havingExpression )
             .setForView( this.forView )
             .setForReference( this.forReference )

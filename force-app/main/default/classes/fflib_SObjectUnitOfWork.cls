@@ -12,6 +12,7 @@
  *
  *  Inspiration based on Apex-Commons repository from FinancialForce.com, Inc
  *
+ *  @author    Reinier van den Assum (rvandenassum@deloitte.nl)
  *  @created   December 2020
  */
 /**
@@ -33,7 +34,7 @@
  *
  * Please refer to the testMethod's in this class for example usage
  */
-public virtual class fflib_SObjectUnitOfWork implements fflib_ISObjectUnitOfWork{
+public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_ISObjectUnitOfWork{
     /**
      * DMLActions - this enum is used to easily share for what DML an SObjectType should be registered
      * Note, prefix of 'd' as NEW and INSERT are restricted values for enums
@@ -137,19 +138,11 @@ public virtual class fflib_SObjectUnitOfWork implements fflib_ISObjectUnitOfWork
     private fflib_Database.Context m_securityContext = fflib_Database.Context.INHERIT;
 
     /**
-     * Centralised one-off retrieval for UOW Configs to prevent each new SObjectType to result in a metadata-query
-     * Performing SOQL inline as UOW is often constructed before Selectors are available
+     * UOW Config metadata records.
+     * Injected by factory layer (fflib_Application.UnitOfWorkFactory) via setConfigs()
      */
     @TestVisible
-    private static List<FFLIB_UOW_Config__mdt> uowConfigs{
-        get{
-            if( uowConfigs == null ){
-                uowConfigs = fflib_Application.appConfig.getUnitOfWorkConfigs();
-            }
-            return uowConfigs;
-        }
-        set;
-    }
+    private List<FFLIB_UOW_Config__mdt> uowConfigs;
 
     /**
      * Method to enable Maps for newly requested DMLAction-SObjectType combi
@@ -311,7 +304,18 @@ public virtual class fflib_SObjectUnitOfWork implements fflib_ISObjectUnitOfWork
     }
 
     /**
-     * Constructs a new Unit Of Work with the default Inherit database context and based on metadata-SObjectTypes
+     * Constructs a new Unit Of Work with the default Inherit database context and based on metadata-SObjectTypes.
+     *
+     * Default security context: fflib_Database.Context.INHERIT
+     *   - AccessLevel : SYSTEM_MODE (no FLS or object permission enforcement)
+     *   - Sharing     : Inherits the sharing declaration of the calling class chain
+     *   - Record visibility: Determined by the calling class's sharing keyword
+     *
+     * API v67.0 note: At API v67.0+, any class in the calling chain without an explicit sharing keyword
+     * defaults to 'with sharing', which narrows record visibility to the running user's records only.
+     * To guarantee all-records visibility regardless of the calling class's sharing declaration,
+     * use fflib_Database.Context.NONE explicitly:
+     *   new fflib_SObjectUnitOfWork( fflib_Database.Context.NONE )
      */
     public fflib_SObjectUnitOfWork(){
         this( null, fflib_Database.Context.INHERIT );
@@ -349,6 +353,19 @@ public virtual class fflib_SObjectUnitOfWork implements fflib_ISObjectUnitOfWork
             constructorDefinedSObjectTypesList = true;
         }
         setContext( securityContext );
+    }
+
+    /**
+     * Fluent method to set the UOW Config metadata records on this instance.
+     * Called by fflib_Application.UnitOfWorkFactory inline during construction to inject pre-resolved configs,
+     * keeping fflib_SObjectUnitOfWork free of any upward dependency on fflib_Application.
+     *
+     * @param   uowConfigRecords    Pre-resolved list of FFLIB_UOW_Config__mdt records
+     * @return  This fflib_SObjectUnitOfWork instance (fluent interface)
+     */
+    public fflib_SObjectUnitOfWork setConfigs( List<FFLIB_UOW_Config__mdt> uowConfigRecords ){
+        this.uowConfigs = uowConfigRecords;
+        return this;
     }
 
     /**

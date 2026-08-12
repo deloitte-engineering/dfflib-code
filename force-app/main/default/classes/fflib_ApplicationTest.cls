@@ -11,6 +11,7 @@
  *  The usage of Type.forName methods to retrieve the type of an Apex class, which can be a built-in or a user-defined class can only be used to retrieve the type of public and global classes, and not private classes
  *  (even if the context user has access)
  *
+ *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
  *  @created    February 2022
  */
 @IsTest( isParallel = true )
@@ -81,8 +82,15 @@ private with sharing class fflib_ApplicationTest{
 
     @IsTest
     private static void unitOfWorkFactory_newInstance_DatabaseContext(){
-        // Given - create data a custom DML class
-        fflib_SObjectUnitOfWork.uowConfigs = new List<FFLIB_UOW_Config__mdt>{ new FFLIB_UOW_Config__mdt( SObjectType__c = accountSObjTypeText, SortOrder__c = 1 ) };
+        // Given - inject UOW configs via the factory's appConfig mock (avoids real metadata query)
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_ApplicationConfig m_ApplicationConfig = ( fflib_ApplicationConfig ) mocks.mock( fflib_ApplicationConfig.class );
+        mocks.startStubbing();
+        mocks.when( m_ApplicationConfig.getUnitOfWorkConfigs() ).thenReturn(
+            new List<FFLIB_UOW_Config__mdt>{ new FFLIB_UOW_Config__mdt( SObjectType__c = accountSObjTypeText, SortOrder__c = 1 ) }
+        );
+        mocks.stopStubbing();
+        fflib_Application.appConfig = m_ApplicationConfig;
 
         // When - perform test the unit of work is instantiated from the Application Class and the record is registered and committed
         fflib_ISObjectUnitOfWork unitOfWork = unitOfWorkTestFactory.newInstance( fflib_Database.Context.FULL );
@@ -93,9 +101,7 @@ private with sharing class fflib_ApplicationTest{
 
     @IsTest
     private static void unitOfWorkFactory_newInstance_CustomObjectTypesAndDatabaseContext(){
-        // Given - create data a custom DML class
-        fflib_SObjectUnitOfWork.uowConfigs = new List<FFLIB_UOW_Config__mdt>{ new FFLIB_UOW_Config__mdt( SObjectType__c = accountSObjTypeText, SortOrder__c = 1 ) };
-
+        // No config injection needed — List<SObjectType> constructor bypasses uowConfigs entirely
         // When - perform test the unit of work is instantiated from the Application Class and the record is registered and committed
         fflib_ISObjectUnitOfWork unitOfWork = unitOfWorkTestFactory.newInstance(
             new List<SObjectType>{ Account.SObjectType },

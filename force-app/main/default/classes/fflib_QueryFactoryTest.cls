@@ -359,59 +359,21 @@ private with sharing class fflib_QueryFactoryTest{
     }
 
     @IsTest
-    private static void setOrderingDistance_ReplacesPreviousOrderingsWithExpectedOrdering(){
-        // Given - create data
+    private static void getDistanceString_returnsExpectedExpression(){
+        // Given
         fflib_QueryFactory qf = new fflib_QueryFactory( Account.SObjectType );
 
-        // When - perform test
-        qf.selectField( 'Id' );
-
-        // Test base method
-        qf.setOrderingDistance( 'BillingAddress', 6.0, 5.5, fflib_QueryFactory.DistanceUnit.KILOMETERS, fflib_QueryFactory.SortOrder.ASCENDING, true );
-
-        // Then - validate
-        System.Assert.areEqual( 1, qf.getOrderings().size(), 'Unexpected order size - setOrderingDistance should replace default Orderings' );
-        System.Assert.areEqual( 'DISTANCE( BillingAddress, GEOLOCATION( 5.5, 6.0 ), \'km\' )', qf.getOrderings()[ 0 ].getField(), 'Unexpected order field - should have been resolved from the field Address' );
-        System.Assert.areEqual( fflib_QueryFactory.SortOrder.ASCENDING, qf.getOrderings()[ 0 ].getDirection(), 'Unexpected order direction.' );
-
-        // Test base method
-        qf.setOrderingDistance( 'BillingAddress', 6.0, 5.5, fflib_QueryFactory.DistanceUnit.MILES, fflib_QueryFactory.SortOrder.ASCENDING, true );
-
-        // Then - validate
-        System.Assert.areEqual( 1, qf.getOrderings().size(), 'Unexpected order size - setOrderingDistance should replace default Orderings' );
-        System.Assert.areEqual( 'DISTANCE( BillingAddress, GEOLOCATION( 5.5, 6.0 ), \'mi\' )', qf.getOrderings()[ 0 ].getField(), 'Unexpected order field - should have been resolved from the field Address' );
-        System.Assert.areEqual( fflib_QueryFactory.SortOrder.ASCENDING, qf.getOrderings()[ 0 ].getDirection(), 'Unexpected order direction.' );
-    }
-
-    @IsTest
-    private static void addOrderingDistance_AddsOrderingsWithExpectedOrdering(){
-        // Given - create data
-        fflib_QueryFactory qf = new fflib_QueryFactory( Account.SObjectType );
-
-        // When - perform test
-        qf.selectField( 'Id' );
-        qf.setOrdering( Account.Name, fflib_QueryFactory.SortOrder.ASCENDING, true );
-
-        // Test base method
-        qf.addOrderingDistance( 'BillingAddress', 6.0, 5.5, fflib_QueryFactory.DistanceUnit.KILOMETERS, fflib_QueryFactory.SortOrder.ASCENDING, true );
-
-        // Then - validate
-        System.Assert.areEqual( 2, qf.getOrderings().size(), 'Unexpected order size - addOrderingDistance should replace default Orderings' );
-        System.Assert.areEqual( 'Name', qf.getOrderings()[ 0 ].getField(), 'Unexpected order field - should have been resolved from the field Name' );
-        System.Assert.areEqual( 'DISTANCE( BillingAddress, GEOLOCATION( 5.5, 6.0 ), \'km\' )', qf.getOrderings()[ 1 ].getField(), 'Unexpected order field - should have been resolved from the field Address' );
-        System.Assert.areEqual( fflib_QueryFactory.SortOrder.ASCENDING, qf.getOrderings()[ 0 ].getDirection(), 'Unexpected order direction.' );
-
-        // When - perform test
-        qf.setOrdering( Account.Name, fflib_QueryFactory.SortOrder.ASCENDING, true );
-
-        // Test base method
-        qf.addOrderingDistance( 'BillingAddress', 6.0, 5.5, fflib_QueryFactory.DistanceUnit.MILES, fflib_QueryFactory.SortOrder.ASCENDING, true );
-
-        // Then - validate
-        System.Assert.areEqual( 2, qf.getOrderings().size(), 'Unexpected order size - addOrderingDistance should replace default Orderings' );
-        System.Assert.areEqual( 'Name', qf.getOrderings()[ 0 ].getField(), 'Unexpected order field - should have been resolved from the field Name' );
-        System.Assert.areEqual( 'DISTANCE( BillingAddress, GEOLOCATION( 5.5, 6.0 ), \'mi\' )', qf.getOrderings()[ 1 ].getField(), 'Unexpected order field - should have been resolved from the field Address' );
-        System.Assert.areEqual( fflib_QueryFactory.SortOrder.ASCENDING, qf.getOrderings()[ 0 ].getDirection(), 'Unexpected order direction.' );
+        // When & Then
+        System.Assert.areEqual(
+            'DISTANCE( BillingAddress, GEOLOCATION(:latitude, :longitude), \'km\' )',
+            qf.getDistanceString( Account.BillingAddress, fflib_QueryFactory.DistanceUnit.KILOMETERS ),
+            'Expected KILOMETERS DISTANCE expression with bind variables'
+        );
+        System.Assert.areEqual(
+            'DISTANCE( BillingAddress, GEOLOCATION(:latitude, :longitude), \'mi\' )',
+            qf.getDistanceString( Account.BillingAddress, fflib_QueryFactory.DistanceUnit.MILES ),
+            'Expected MILES DISTANCE expression with bind variables'
+        );
     }
 
     @IsTest
@@ -945,7 +907,7 @@ private with sharing class fflib_QueryFactoryTest{
             .setOffset( 2 )
             .selectField( 'Description' )
             .setAllRowsRequired( true )
-            .setGroupByFieldName( 'Description' )
+            .setGroupByField( 'Description' )
             .addOrdering( new fflib_QueryFactory.Ordering( 'Contact', 'name', fflib_QueryFactory.SortOrder.ASCENDING ) )
             .addOrdering( new fflib_QueryFactory.Ordering( 'Contact', 'CreatedDATE', fflib_QueryFactory.SortOrder.DESCENDING ) )
             .setEnforceFLS( true );
@@ -957,7 +919,7 @@ private with sharing class fflib_QueryFactoryTest{
             .setAllRowsRequired( false )
             .setCondition( 'id=54321' )
             .selectField( 'Fax' )
-            .setGroupByFieldName( 'Fax', true ) // preserve ordering of cloned QueryFactory
+            .setGroupByField( 'Fax', true ) // preserve ordering of cloned QueryFactory
             .addOrdering( new fflib_QueryFactory.Ordering( 'Contact', 'Fax', fflib_QueryFactory.SortOrder.ASCENDING ) )
             .setEnforceFLS( false );
 
@@ -976,8 +938,8 @@ private with sharing class fflib_QueryFactoryTest{
         System.Assert.isTrue( qf.getAllRowsRequired() );
         System.Assert.isFalse( qf2.getAllRowsRequired() );
 
-        System.Assert.areEqual( 'Description', qf.getGroupByFieldName() );
-        System.Assert.areEqual( 'Fax', qf2.getGroupByFieldName() );
+        System.Assert.areEqual( 'Description', qf.getGroupByField() );
+        System.Assert.areEqual( 'Fax', qf2.getGroupByField() );
 
         String query = qf.toSOQL();
         String query2 = qf2.toSOQL();
@@ -1076,26 +1038,26 @@ private with sharing class fflib_QueryFactoryTest{
     }
 
     @IsTest
-    private static void setGroupByFieldName_resetOrdering(){
+    private static void setGroupByField_string_resetOrdering(){
         // Given - create data
         fflib_QueryFactory qf = new fflib_QueryFactory( User.SObjectType );
         qf.addOrdering( new fflib_QueryFactory.Ordering( User.Name, fflib_QueryFactory.SortOrder.ASCENDING ) );
         
         // When - perform test, with preserve orderings default to false
-        qf.setGroupByFieldName( 'ProfileId' );
+        qf.setGroupByField( 'ProfileId' );
 
         // Then - validate
         System.Assert.areEqual( qf.getOrderings().size(), 0, 'Expected orderings to be cleared when group by field is set.' );
     }
 
     @IsTest
-    private static void setGroupByFieldName_preserveOrdering(){
+    private static void setGroupByField_string_preserveOrdering(){
         // Given - create data
         fflib_QueryFactory qf = new fflib_QueryFactory( User.SObjectType );
         qf.addOrdering( new fflib_QueryFactory.Ordering( User.Name, fflib_QueryFactory.SortOrder.ASCENDING ) );
         
         // When - perform test, with preserve orderings default to false
-        qf.setGroupByFieldName( 'ProfileId', true );
+        qf.setGroupByField( 'ProfileId', true );
 
         // Then - validate
         System.Assert.areEqual( qf.getOrderings().size(), 1, 'Expected orderings to be preserved when group by field is set with preserveOrderings=true.' );
@@ -1105,7 +1067,7 @@ private with sharing class fflib_QueryFactoryTest{
     private static void setHaving_testSettingSOQLClause(){
         // Given - create data
         fflib_QueryFactory qf = new fflib_QueryFactory( Contact.SObjectType );
-        qf.setGroupByFieldName( 'Name' );
+        qf.setGroupByField( 'Name' );
 
         // When - perform test
         qf.setHaving( 'COUNT(Id) > 1' );
@@ -1120,7 +1082,7 @@ private with sharing class fflib_QueryFactoryTest{
     private static void setHaving_testSequenceOfSOQLClauseOrdering(){
         // Given - create data
         fflib_QueryFactory qf = new fflib_QueryFactory( Contact.SObjectType );
-        qf.setGroupByFieldName( 'Name' );
+        qf.setGroupByField( 'Name' );
         qf.setHaving( 'COUNT(Id) > 5' );
         qf.setLimit( 10 );
 

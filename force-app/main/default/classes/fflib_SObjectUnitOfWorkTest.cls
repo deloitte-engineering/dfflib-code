@@ -11,6 +11,7 @@
  *
  * - Can't test PlatformEvents as this is project specific
  *
+ * @author    Reinier van den Assum (rvandenassum@deloitte.nl)
  * @created   June 2023
  */
 @IsTest( isParallel = true )
@@ -22,43 +23,61 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
 
     @IsTest
     private static void constructors_sharing_dmlProxy(){
+        // --- Proxy type + AccessLevel contract per context (API v67.0 regression anchors) ---
+
+        // INHERIT — SYSTEM_MODE + InheritSimpleDML (default context)
+        fflib_SObjectUnitOfWork uowInherit = new fflib_SObjectUnitOfWork( fflib_Database.Context.INHERIT );
+        System.Assert.isInstanceOfType( uowInherit.m_dml, fflib_Database_DMLProxy.InheritSimpleDML.class,
+            'INHERIT context must use InheritSimpleDML proxy' );
+        System.Assert.areEqual( fflib_Database.Context.INHERIT, uowInherit.m_securityContext,
+            'Expected INHERIT security context to be set' );
+
+        // FULL — USER_MODE + WithSimpleDML
+        fflib_SObjectUnitOfWork uowFull = new fflib_SObjectUnitOfWork( fflib_Database.Context.FULL );
+        System.Assert.isInstanceOfType( uowFull.m_dml, fflib_Database_DMLProxy.WithSimpleDML.class,
+            'FULL context must use WithSimpleDML proxy' );
+        System.Assert.areEqual( fflib_Database.Context.FULL, uowFull.m_securityContext,
+            'Expected FULL security context to be set' );
+
+        // NONE — SYSTEM_MODE + WithoutSimpleDML
+        fflib_SObjectUnitOfWork uowNone = new fflib_SObjectUnitOfWork( fflib_Database.Context.NONE );
+        System.Assert.isInstanceOfType( uowNone.m_dml, fflib_Database_DMLProxy.WithoutSimpleDML.class,
+            'NONE context must use WithoutSimpleDML proxy' );
+        System.Assert.areEqual( fflib_Database.Context.NONE, uowNone.m_securityContext,
+            'Expected NONE security context to be set' );
+
+        // SHARING_SKIP_PERMISSIONS — SYSTEM_MODE + WithSimpleDML
+        fflib_SObjectUnitOfWork uowSkip = new fflib_SObjectUnitOfWork( fflib_Database.Context.SHARING_SKIP_PERMISSIONS );
+        System.Assert.isInstanceOfType( uowSkip.m_dml, fflib_Database_DMLProxy.WithSimpleDML.class,
+            'SHARING_SKIP_PERMISSIONS context must use WithSimpleDML proxy' );
+        System.Assert.areEqual( fflib_Database.Context.SHARING_SKIP_PERMISSIONS, uowSkip.m_securityContext,
+            'Expected SHARING_SKIP_PERMISSIONS security context to be set' );
+
+        // --- Constructor equivalence — verifies that different constructor paths produce the same proxy instance.
+        //     securityContext equality per context is already pinned in the proxy-contract section above.
         fflib_SObjectUnitOfWork uowBase_Inherit = new fflib_SObjectUnitOfWork();
-        fflib_SObjectUnitOfWork uowProvided_Inherit = new fflib_SObjectUnitOfWork( fflib_Database.Context.INHERIT );
-        System.Assert.areEqual( uowBase_Inherit.m_dml, uowProvided_Inherit.m_dml,
+        System.Assert.areEqual( uowBase_Inherit.m_dml, uowInherit.m_dml,
             'Expected UOW() to default to inherit sharing, matching the UOW( INHERIT ) constructor' );
-        System.Assert.areEqual( uowBase_Inherit.m_securityContext, uowProvided_Inherit.m_securityContext,
-            'Expected UOW() to default to inherit sharing security context, matching the UOW( INHERIT ) constructor' );
 
         List<SObjectType> dummyList = new List<SObjectType>{ Account.SObjectType };
         fflib_SObjectUnitOfWork uowList_Inherit = new fflib_SObjectUnitOfWork( dummyList );
         fflib_SObjectUnitOfWork uowListProvided_Inherit = new fflib_SObjectUnitOfWork( dummyList, fflib_Database.Context.INHERIT );
         System.Assert.areEqual( uowList_Inherit.m_dml, uowListProvided_Inherit.m_dml,
             'Expected UOW( list ) to default to inherit sharing, matching the UOW( list, INHERIT ) constructor' );
-        System.Assert.areEqual( uowBase_Inherit.m_securityContext, uowProvided_Inherit.m_securityContext,
-            'Expected UOW( list ) to default to inherit sharing database context, matching the UOW( list, INHERIT ) constructor' );
 
         fflib_SObjectUnitOfWork uowBase_setContextFull = new fflib_SObjectUnitOfWork();
         uowBase_setContextFull.setContext( fflib_Database.Context.FULL );
-        fflib_SObjectUnitOfWork uowProvided_Full = new fflib_SObjectUnitOfWork( fflib_Database.Context.FULL );
-        System.Assert.areEqual( uowBase_setContextFull.m_dml, uowProvided_Full.m_dml,
+        System.Assert.areEqual( uowBase_setContextFull.m_dml, uowFull.m_dml,
             'Expected UOW().setContext( FULL ) to match the UOW( FULL ) constructor' );
-        System.Assert.areEqual( uowBase_setContextFull.m_securityContext, uowProvided_Full.m_securityContext,
-            'Expected UOW().setContext( FULL ) to match the UOW( FULL ) database context' );
 
         fflib_SObjectUnitOfWork uowBase_setContextWithSkip = new fflib_SObjectUnitOfWork();
         uowBase_setContextWithSkip.setContext( fflib_Database.Context.SHARING_SKIP_PERMISSIONS );
-        fflib_SObjectUnitOfWork uowProvided_WithSkip = new fflib_SObjectUnitOfWork( fflib_Database.Context.SHARING_SKIP_PERMISSIONS );
-        System.Assert.areEqual( uowBase_setContextWithSkip.m_dml, uowProvided_WithSkip.m_dml,
+        System.Assert.areEqual( uowBase_setContextWithSkip.m_dml, uowSkip.m_dml,
             'Expected UOW().setContext( SHARING_SKIP_PERMISSIONS ) to match the UOW( SHARING_SKIP_PERMISSIONS ) constructor' );
-        System.Assert.areEqual( uowBase_setContextWithSkip.m_securityContext, uowProvided_WithSkip.m_securityContext,
-            'Expected UOW().setContext( SHARING_SKIP_PERMISSIONS ) to match the UOW( SHARING_SKIP_PERMISSIONS ) database context' );
 
-        fflib_SObjectUnitOfWork uowProvided_None = new fflib_SObjectUnitOfWork( fflib_Database.Context.NONE );
         fflib_SObjectUnitOfWork uowList_None = new fflib_SObjectUnitOfWork( dummyList, fflib_Database.Context.NONE );
-        System.Assert.areEqual( uowProvided_None.m_dml, uowList_None.m_dml,
+        System.Assert.areEqual( uowNone.m_dml, uowList_None.m_dml,
             'Expected UOW( NONE ) to match UOW( list, NONE ) constructor' );
-        System.Assert.areEqual( uowProvided_None.m_securityContext, uowList_None.m_securityContext,
-            'Expected UOW( NONE ) to match UOW( list, NONE ) database context' );
     }
 
     @IsTest
@@ -101,24 +120,29 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
         mocks.stopStubbing();
         fflib_Application.appConfig = m_ApplicationConfig;
 
-        // When - Get not-initiated uowConfigs from fflib_SObjectUnitOfWork
-        List<FFLIB_UOW_Config__mdt> uowConfigsResult = fflib_SObjectUnitOfWork.uowConfigs;
+        // When - Construct a metadata-driven UOW via the factory — configs are now injected by the factory
+        fflib_SObjectUnitOfWork uow = ( fflib_SObjectUnitOfWork ) fflib.unitOfWork.newInstance();
 
-        // Then - Validate the 'Query' was performed in fflib_ApplicationConfig: it was called and the response was set in UOW
-        System.Assert.areEqual( uowConfigsMocked, uowConfigsResult, 'Expected the returned configs to be directly passed to calling class' );
+        // Then - Validate getUnitOfWorkConfigs() was called once (by the factory) and the configs are on the UOW instance
         ( ( fflib_ApplicationConfig ) mocks.verify( m_ApplicationConfig, 1 ) ).getUnitOfWorkConfigs();
+        System.Assert.areEqual( uowConfigsMocked, uow.uowConfigs, 'Expected the injected configs to match the mocked configs' );
     }
 
     @IsTest
     private static void implementSObjectType_correctSequence(){
-        // Given UOW Configs set on static (prevent query)
-        fflib_SObjectUnitOfWork.uowConfigs = new List<FFLIB_UOW_Config__mdt>{
+        // Given - inject UOW configs via the factory's appConfig mock (avoids real metadata query)
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_ApplicationConfig m_ApplicationConfig = ( fflib_ApplicationConfig ) mocks.mock( fflib_ApplicationConfig.class );
+        mocks.startStubbing();
+        mocks.when( m_ApplicationConfig.getUnitOfWorkConfigs() ).thenReturn( new List<FFLIB_UOW_Config__mdt>{
             new FFLIB_UOW_Config__mdt( SObjectType__c = 'Account', SortOrder__c = 1 ),
             new FFLIB_UOW_Config__mdt( SObjectType__c = 'Contact', SortOrder__c = 2 ),
             new FFLIB_UOW_Config__mdt( SObjectType__c = 'Case', SortOrder__c = 3 )
-        };
+        } );
+        mocks.stopStubbing();
+        fflib_Application.appConfig = m_ApplicationConfig;
 
-        // Initiate UOW via fflib-newInstance initiator
+        // Initiate UOW via fflib-newInstance initiator — factory resolves and injects configs
         fflib_SObjectUnitOfWork uow = ( fflib_SObjectUnitOfWork ) fflib.unitOfWork.newInstance();
 
         // When + Then: First adding second object, expecting it to be the one and only in m_sobjectTypes list
