@@ -76,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Install Salesforce CLI (sf) - pinned to 2.137.6 for reproducible builds
       - name: Install and Setup Salesforce CLI
