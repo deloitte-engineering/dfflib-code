@@ -9,7 +9,6 @@
  * According to Mockito's syntax the type is passed in the captor construction,
  * however Apex cannot perform the auto casting that Java can.
  * To be consistent with Mockito, the captor does not perform any checks on the type of the argument.
- * @group Core
  */
 public with sharing class fflib_ArgumentCaptor{
     protected List<Object> argumentsCaptured = new List<Object>();

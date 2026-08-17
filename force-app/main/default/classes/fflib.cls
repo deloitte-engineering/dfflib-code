@@ -13,8 +13,6 @@
  * FFLIB Structure setup:
  * - Returning correct business implementation for UnitOfWork, Service, Selector and Domain Layers within the application
  *
- * @author      Reinier van den Assum (rvandenassum@deloitte.nl)
- * @created     June 2020
  */
 public with sharing class fflib{
 

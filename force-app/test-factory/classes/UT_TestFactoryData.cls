@@ -6,8 +6,6 @@
 /**
  * The TestFactoryData contains all the default fields
  *
- * @author         Dirk van de Lindt (dvandelindt@deloitte.nl)
- * @created        November 2017
  */
 @IsTest
 public with sharing class UT_TestFactoryData{

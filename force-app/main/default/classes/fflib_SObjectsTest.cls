@@ -7,8 +7,6 @@
 /**
  *  Unit test module for the fflib_SObjects class
  * 
- *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
- *  @created    October 2025
  */
 @IsTest( IsParallel = true )
 private with sharing class fflib_SObjectsTest{

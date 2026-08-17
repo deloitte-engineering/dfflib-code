@@ -5,7 +5,6 @@
  * See LICENSE in the repository root for the full license text.
  */
 /**
- * @group Core
  */
 public with sharing class fflib_QualifiedMethodAndArgValues{
     private final fflib_QualifiedMethod qm;

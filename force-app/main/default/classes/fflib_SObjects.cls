@@ -9,8 +9,6 @@
  *  Unlike the base Domain class (#fflib_SObjectDomain), this class does not handle trigger event dispatching. It is intended for domain logic that can be invoked independently or from services,
  *  and is fully testable in isolation via factory and mocks framework
  *
- *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
- *  @created    October 2025
  */
 public virtual with sharing class fflib_SObjects extends fflib_Objects implements fflib_ISObjects{
 

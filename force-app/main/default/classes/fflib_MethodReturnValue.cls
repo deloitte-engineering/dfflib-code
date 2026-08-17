@@ -6,7 +6,6 @@
  */
 /**
  * Class defining a method return value.
- * @group Core
  */
 @IsTest
 public with sharing class fflib_MethodReturnValue{
@@ -74,7 +73,6 @@ public with sharing class fflib_MethodReturnValue{
     /**
      * Inner class to handle all the stubs that do not use the thenAnswer method directly.
      * For internal use only.
-     * @group Core
      */
     public class StandardAnswer implements fflib_Answer{
         private Integer whichStubReturnIndex = 0;

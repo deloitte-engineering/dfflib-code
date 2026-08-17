@@ -9,8 +9,6 @@
  *
  *  Inspiration based on Apex-Commons repository from FinancialForce.com, Inc
  *
- *  @author    Reinier van den Assum (rvandenassum@deloitte.nl)
- *  @created   December 2020
  */
 public interface fflib_ISObjectUnitOfWork{
     /**

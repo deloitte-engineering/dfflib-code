@@ -12,8 +12,6 @@
  *
  * Applied in a.o. fflib_ApplicationTest to allow testing and verifying the application of defineMock()
  *
- * @author     Reinier van den Assum (rvandenassum@deloitte.nl)
- * @created    April 2024
  */
 public interface fflib_IApexMocks{
     Object mock( Type classToMock );

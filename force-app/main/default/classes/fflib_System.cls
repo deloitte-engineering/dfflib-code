@@ -6,7 +6,6 @@
  */
 /**
  * Contains counterparts for helper methods in the native System class.
- * @group Core
  */
 
 public class fflib_System{
