@@ -5,7 +5,6 @@
  */
 /**
  * Class that defines an interface to the query proxy servicing selector-layer classes to be compatible with apex-mock framework
- *
  */
 public interface fflib_Database_IQuery{
     /**

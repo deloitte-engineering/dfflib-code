@@ -7,7 +7,6 @@
 /**
  * Contains counterparts for helper methods in the native System class.
  */
-
 public class fflib_System{
 
     /**

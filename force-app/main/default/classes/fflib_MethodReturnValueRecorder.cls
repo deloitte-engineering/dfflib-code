@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
-/**
- */
 public with sharing class fflib_MethodReturnValueRecorder{
     public Boolean Stubbing{ get; set; }
 

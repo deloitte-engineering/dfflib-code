@@ -5,7 +5,6 @@
  */
 /**
  * Unit test class for fflib_Database class
- * 
  */
 @IsTest
 private with sharing class fflib_DatabaseTest{

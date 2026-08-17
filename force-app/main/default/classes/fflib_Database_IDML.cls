@@ -5,7 +5,6 @@
  */
 /**
  * Class that defines an interface to the DML proxy servicing the Unit of Work implementation to be compatible with apex-mock framework
- *
  */
 public interface fflib_Database_IDML{
     /**

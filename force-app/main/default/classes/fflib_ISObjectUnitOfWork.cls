@@ -8,7 +8,6 @@
  *  Interface listing all methods available and required for fflib_ISObjectUnitOfWork 2.0
  *
  *  Inspiration based on Apex-Commons repository from FinancialForce.com, Inc
- *
  */
 public interface fflib_ISObjectUnitOfWork{
     /**

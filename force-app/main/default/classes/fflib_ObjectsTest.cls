@@ -6,7 +6,6 @@
  */
 /**
  *  Unit test module for the fflib_Objects class
- * 
  */
 @IsTest( isParallel = true )
 private with sharing class fflib_ObjectsTest{

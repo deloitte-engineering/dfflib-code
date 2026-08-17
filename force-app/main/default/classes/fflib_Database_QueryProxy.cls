@@ -9,7 +9,6 @@
  * 2) Allowing optimal separation of concerns where QueryFactory focuses on construction and fflib_Database_QueryProxy on database retrieval
  *      This allows to simplify Test methods, and make the framework more environment-independent (test-classes not failing on added validations)
  *      Lastly, this enables unlocked packages where framework code is not needed to be touched by project developers
- *
  */
 public abstract class fflib_Database_QueryProxy{
 

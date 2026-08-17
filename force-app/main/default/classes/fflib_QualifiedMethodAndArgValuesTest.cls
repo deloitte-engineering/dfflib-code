@@ -6,7 +6,6 @@
  */
 /**
  * Unit test class for fflib_QualifiedMethodAndArgValues class.
- *
  */
 @IsTest( isParallel = true )
 private with sharing class fflib_QualifiedMethodAndArgValuesTest{
