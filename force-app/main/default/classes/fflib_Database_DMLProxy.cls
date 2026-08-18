@@ -9,7 +9,6 @@
  * 2) Allowing optimal separation of concerns where UOW focuses on registration and fflib_Database_DMLProxy on database interactions
  *      This allows to simplify Test methods, and make the framework more environment-independent (test-classes not failing on added validations)
  *      Lastly, this enables unlocked packages where framework code is not needed to be touched by project developers
- *
  */
 public abstract class fflib_Database_DMLProxy{
 
