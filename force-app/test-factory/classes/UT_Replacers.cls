@@ -7,7 +7,6 @@
  * A replacer is used when adding values to an instance of SObjectMock within UT_SObjectFactory. Replacers provide
  * the ability to use merge fields for dynamic values, such as counters or ensuring randomised values each time an
  * sObject is mocked or saved to the database.
- *
  */
 @IsTest
 public with sharing class UT_Replacers{

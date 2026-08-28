@@ -5,7 +5,6 @@
  */
 /**
  * Test class for fflib_AggregateResult class.
- *
  */
 @IsTest( isParallel = true )
 public with sharing class fflib_AggregateResultTest{

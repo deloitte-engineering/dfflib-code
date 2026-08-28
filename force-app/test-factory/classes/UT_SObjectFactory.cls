@@ -66,7 +66,6 @@
  * and these will not be overwritten by the defaults.
  *
  *         Account record = ( Account ) factory.create( new Account( Rating = 'Cold' ) ).save();
- *
  */
 @IsTest
 public with sharing class UT_SObjectFactory{

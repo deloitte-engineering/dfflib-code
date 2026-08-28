@@ -10,7 +10,6 @@
  *  (https://developer.salesforce.com/docs/atlas.en-us.apexref.meta/apexref/apex_methods_system_type.htm#apex_System_Type_forName_2)
  *  The usage of Type.forName methods to retrieve the type of an Apex class, which can be a built-in or a user-defined class can only be used to retrieve the type of public and global classes, and not private classes
  *  (even if the context user has access)
- *
  */
 @IsTest( isParallel = true )
 private with sharing class fflib_ApplicationTest{
