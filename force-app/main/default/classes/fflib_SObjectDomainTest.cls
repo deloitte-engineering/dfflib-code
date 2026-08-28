@@ -111,6 +111,16 @@ private with sharing class fflib_SObjectDomainTest{
             return;
         } // Abort the test if unable to create a user with low enough access
 
+        // Inject appConfig mock so the no-arg UoW constructor does not issue a SOQL query inside System.runAs.
+        // An empty config list is safe here: the CRUD exception is thrown from handleAfterInsert() before
+        // commitWork() is ever reached, so no SObjectType registration against the UoW takes place.
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_ApplicationConfig configMock = ( fflib_ApplicationConfig ) mocks.mock( fflib_ApplicationConfig.class );
+        mocks.startStubbing();
+        mocks.when( configMock.getUnitOfWorkConfigs() ).thenReturn( new List<FFLIB_UOW_Config__mdt>() );
+        mocks.stopStubbing();
+        fflib_Application.appConfig = configMock;
+
         // When - perform test
         System.runAs( testUser ){
             // Test Create object security

@@ -3,6 +3,13 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+/**
+ * Centralised class to group all Database DML operations:
+ * 1) Allowing to easily apply different database security models, through sharing modes and access levels (AccessLevel)
+ * 2) Allowing optimal separation of concerns where UOW focuses on registration and fflib_Database_DMLProxy on database interactions
+ *      This allows to simplify Test methods, and make the framework more environment-independent (test-classes not failing on added validations)
+ *      Lastly, this enables unlocked packages where framework code is not needed to be touched by project developers
+ */
 public abstract class fflib_Database_DMLProxy{
 
     /**

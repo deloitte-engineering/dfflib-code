@@ -5,13 +5,20 @@
  * See LICENSE in the repository root for the full license text.
  */
 /**
- * Class providing common database query support for abstracting and encapsulating query logic.
- * Inherits sharing, allowing extending-selectors to control whether SObjectDescribe runs in system (without) or user (with) mode.
- * Enabling to (opt.) bypass unavailable SObjectTypes like AccountTeamMembers for Community Licenses (do align with Project Salesforce Success Manager).
- * Note, SObjectSelector is an abstract class with no queries being performed, so no regression data vulnerability are expected.
- * To still run those queries with sharing enforced, one can construct the base selector with the desired security context ({@link fflib_Database.Context})
+ * Abstract base class providing common database query support for abstracting and encapsulating query logic.
+ *
+ * Sharing model: Declares 'inherited sharing' to explicitly propagate the calling class's sharing context.
+ * This ensures the framework is transparent - it adopts whatever sharing mode the client selector declares.
+ * Note, when upgrading to API v67.0+ and NOT having an explicit sharing annotation defined on the extended selector,
+ * this will cause Selectors to run in USER_MODE, thus enforcing user's record visibility.
+ *
+ * Security context: Queries are executed via fflib_Database_QueryProxy with an explicit AccessLevel parameter
+ * derived from the fflib_Database.Context set on this selector instance. The default context is INHERIT
+ * (AccessLevel.SYSTEM_MODE - no FLS enforcement, record visibility determined by the calling class's sharing).
+ * Use fflib_Database.Context.FULL for full user-mode enforcement (FLS + sharing).
+ * Use fflib_Database.Context.NONE to guarantee all-records visibility regardless of sharing declarations.
  */
-public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
+public abstract inherited sharing class fflib_SObjectSelector implements fflib_ISObjectSelector{
     public enum DataAccess{ LEGACY, USER_MODE, SYSTEM_MODE }
     private static final Map<DataAccess, fflib_Database.Context> ACCESS_TO_CONTEXT_MAP = new Map<DataAccess, fflib_Database.Context>{
         DataAccess.LEGACY => fflib_Database.Context.INHERIT,
@@ -100,8 +107,8 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
 
     /**
      * NOTE: In API version 65.0 and later, an abstract or override method requires a protected, public, or global access modifier.
-     *  If one of these access modifiers isn’t explicitly included in the method declaration, then method access defaults to private.
-     *  Private access is invalid for these method types because the implementing class can’t access the abstract method.
+     *  If one of these access modifiers isn-t explicitly included in the method declaration, then method access defaults to private.
+     *  Private access is invalid for these method types because the implementing class can-t access the abstract method.
      *  Therefore, by attempting to declare an abstract or override method without an allowed access modifier, one would get the compilation error
      *  'Abstract methods require at least one of the following: global, public, protected.'
      *
@@ -130,7 +137,21 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
     }
 
     /**
-     * Constructs the Selector with the default settings. Security context to be provided through SelectorFactory or explicitly
+     * Constructs the Selector with the default settings. Security context to be provided through SelectorFactory or explicitly.
+     *
+     * Default security context: fflib_Database.Context.INHERIT (resolved lazily on first query execution)
+     *   - AccessLevel : SYSTEM_MODE (no FLS or object permission enforcement)
+     *   - Sharing     : Inherits the sharing declaration of the calling class chain
+     *   - Record visibility: Determined by the calling class's sharing keyword
+     *
+     * Note: At API v67.0+, any class in the calling chain without an explicit sharing keyword defaults to 'with sharing',
+     * which narrows record visibility to the running user's records only.
+     *
+     * Example:
+     *  To guarantee all-records visibility regardless of the calling class's sharing declaration, use fflib_Database.Context.NONE explicitly
+     *  when constructing a selector:
+     *
+     *   SEL_Accounts.newInstance( fflib_Database.Context.NONE ).selectSObjectsById( ... )
      */
     public fflib_SObjectSelector(){}
 
@@ -582,8 +603,12 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
      *
      * @param   parentQueryFactory  Parent QueryFactory instance
      * @return  The parent QueryFactory instance
+     * @deprecated Ambiguous when the same child SObject is reachable via multiple relationships.
+     *             Use {@link #addQueryFactorySubselect(fflib_QueryFactory, String)} instead, passing the explicit relationship name.
      */
     public fflib_QueryFactory addQueryFactorySubselect( fflib_QueryFactory parentQueryFactory ){
+        System.debug( LoggingLevel.WARN, 'fflib_SObjectSelector.addQueryFactorySubselect(fflib_QueryFactory) is deprecated. '
+            + 'Use addQueryFactorySubselect(fflib_QueryFactory, String) with an explicit relationship name instead.' );
         return addQueryFactorySubselect( parentQueryFactory, true );
     }
 
@@ -593,8 +618,12 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
      * @param   parentQueryFactory      Parent QueryFactory instance
      * @param   includeSelectorFields   Boolean whether to include selected fields
      * @return  The parent QueryFactory instance
+     * @deprecated Ambiguous when the same child SObject is reachable via multiple relationships.
+     *               Use {@link #addQueryFactorySubselect(fflib_QueryFactory, String, Boolean)} instead, passing the explicit relationship name.
      */
     public fflib_QueryFactory addQueryFactorySubselect( fflib_QueryFactory parentQueryFactory, Boolean includeSelectorFields ){
+        System.debug( LoggingLevel.WARN, 'fflib_SObjectSelector.addQueryFactorySubselect(fflib_QueryFactory, Boolean) is deprecated. '
+            + 'Use addQueryFactorySubselect(fflib_QueryFactory, String, Boolean) with an explicit relationship name instead.' );
         fflib_QueryFactory subSelectQueryFactory = parentQueryFactory.subselectQuery( getSObjectType2() );
         return configureQueryFactory( subSelectQueryFactory, m_enforceCRUD, m_enforceFLS, includeSelectorFields, m_includeRelatedFieldSetFields );
     }
@@ -1094,7 +1123,7 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
     /**
      * Returns a {@link Database.Cursor} for the given raw SOQL string, enabling incremental processing of large result sets (up to 50M rows) across chained Queueable jobs.
      *
-     * @deprecated  Prefer {@link #getCursor(fflib_QueryFactory)} — raw SOQL strings bypass QueryFactory's
+     * @deprecated  Prefer {@link #getCursor(fflib_QueryFactory)} - raw SOQL strings bypass QueryFactory's
      *              field-level safety, FLS enforcement, and compile-time field validation.
      *              Use this overload only when a QueryFactory cannot be constructed
      *
@@ -1109,7 +1138,7 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
 
     /**
      * Returns a {@link Database.Cursor} for the given QueryFactory, enabling incremental processing of large result sets (up to 50M rows) across chained Queueable jobs.
-     * Prefer this overload over {@link #getCursor(String)} — QueryFactory enforces field-level safety, FLS, and compile-time field validation.
+     * Prefer this overload over {@link #getCursor(String)} - QueryFactory enforces field-level safety, FLS, and compile-time field validation.
      *
      * @param   qf  The QueryFactory instance to execute as a cursor
      * @return  Database.Cursor for incremental processing of large result sets
@@ -1122,7 +1151,7 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
     /**
      * Returns a {@link Database.Cursor} for the given raw SOQL string with bind variables, enabling incremental processing of large result sets (up to 50M rows) across chained Queueable jobs.
      *
-     * @deprecated  Prefer {@link #getCursor(fflib_QueryFactory, Map)} — raw SOQL strings bypass QueryFactory's
+     * @deprecated  Prefer {@link #getCursor(fflib_QueryFactory, Map)} - raw SOQL strings bypass QueryFactory's
      *              field-level safety, FLS enforcement, and compile-time field validation.
      *              Use this overload only when a QueryFactory cannot be constructed
      *
@@ -1138,7 +1167,7 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
 
     /**
      * Returns a {@link Database.Cursor} for the given QueryFactory with bind variables, enabling incremental processing of large result sets (up to 50M rows) across chained Queueable jobs.
-     * Prefer this overload over {@link #getCursor(String, Map)} — QueryFactory enforces field-level safety, FLS, and compile-time field validation.
+     * Prefer this overload over {@link #getCursor(String, Map)} - QueryFactory enforces field-level safety, FLS, and compile-time field validation.
      *
      * @param   qf                  The QueryFactory instance to execute as a cursor
      * @param   bindVariablesMap    Map of bind variable names to their values
@@ -1154,7 +1183,7 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
      * Returns a {@link Database.PaginationCursor} for the given raw SOQL string, designed for UI-based pagination (up to 100K rows).
      * Unlike standard cursors, {@code fetchPage()} skips deleted records to ensure consistent page sizes.
      *
-     * @deprecated  Prefer {@link #getPaginationCursor(fflib_QueryFactory)} — raw SOQL strings bypass QueryFactory's
+     * @deprecated  Prefer {@link #getPaginationCursor(fflib_QueryFactory)} - raw SOQL strings bypass QueryFactory's
      *              field-level safety, FLS enforcement, and compile-time field validation.
      *              Use this overload only when a QueryFactory cannot be constructed
      *
@@ -1170,7 +1199,7 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
     /**
      * Returns a {@link Database.PaginationCursor} for the given QueryFactory, designed for UI-based pagination (up to 100K rows).
      * Unlike standard cursors, {@code fetchPage()} skips deleted records to ensure consistent page sizes.
-     * Prefer this overload over {@link #getPaginationCursor(String)} — QueryFactory enforces field-level safety, FLS, and compile-time field validation.
+     * Prefer this overload over {@link #getPaginationCursor(String)} - QueryFactory enforces field-level safety, FLS, and compile-time field validation.
      *
      * @param   qf  The QueryFactory instance to execute as a pagination cursor
      * @return  Database.PaginationCursor for UI-based pagination
@@ -1184,7 +1213,7 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
      * Returns a {@link Database.PaginationCursor} for the given raw SOQL string with bind variables, designed for UI-based pagination (up to 100K rows).
      * Unlike standard cursors, {@code fetchPage()} skips deleted records to ensure consistent page sizes.
      *
-     * @deprecated  Prefer {@link #getPaginationCursor(fflib_QueryFactory, Map)} — raw SOQL strings bypass QueryFactory's
+     * @deprecated  Prefer {@link #getPaginationCursor(fflib_QueryFactory, Map)} - raw SOQL strings bypass QueryFactory's
      *              field-level safety, FLS enforcement, and compile-time field validation.
      *              Use this overload only when a QueryFactory cannot be constructed
      *
@@ -1201,7 +1230,7 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
     /**
      * Returns a {@link Database.PaginationCursor} for the given QueryFactory with bind variables, designed for UI-based pagination (up to 100K rows).
      * Unlike standard cursors, {@code fetchPage()} skips deleted records to ensure consistent page sizes.
-     * Prefer this overload over {@link #getPaginationCursor(String, Map)} — QueryFactory enforces field-level safety, FLS, and compile-time field validation.
+     * Prefer this overload over {@link #getPaginationCursor(String, Map)} - QueryFactory enforces field-level safety, FLS, and compile-time field validation.
      *
      * @param   qf                  The QueryFactory instance to execute as a pagination cursor
      * @param   bindVariablesMap    Map of bind variable names to their values
@@ -1216,7 +1245,7 @@ public abstract class fflib_SObjectSelector implements fflib_ISObjectSelector{
      * Validates a raw SOQL query string for compatibility with {@link Database#getCursor()} and {@link Database#getPaginationCursor()}
      * before dispatching to the proxy layer.
      *
-     * FOR UPDATE and GROUP BY are rejected by the platform (throw {@code System.QueryException}) — empirically verified.
+     * FOR UPDATE and GROUP BY are rejected by the platform (throw {@code System.QueryException}) - empirically verified.
      * This guard provides an early, descriptive failure via {@link InvalidCursorQueryException} before the query reaches the proxy.
      *
      * Called internally by all {@code getCursor()} and {@code getPaginationCursor()} overloads via their String delegation path.

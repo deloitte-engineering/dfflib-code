@@ -6,10 +6,9 @@
 /**
  * The TestFactoryData contains all the default fields
  *
- * @created        November 2017
  */
 @IsTest
-public class UT_TestFactoryData{
+public with sharing class UT_TestFactoryData{
 
     /**
      * Map which links an sObjectType to a class which is responsible for generating keys based upon the populated
@@ -42,7 +41,7 @@ public class UT_TestFactoryData{
             Id userId = UserInfo.getUserId();
             String fieldNames = String.join( UT_SObjectFactoryUtils.getFieldNameList( sType ), ',' );
 
-            for( SObject record : Database.query( 'SELECT ' + fieldNames + ' FROM ' + sType.getDescribe().getName() + ' WHERE CreatedById = :userId AND CreatedDate = TODAY' ) ){
+            for( SObject record : Database.query( 'SELECT ' + fieldNames + ' FROM ' + sType.getDescribe().getName() + ' WHERE CreatedById = :userId AND CreatedDate = TODAY', AccessLevel.USER_MODE ) ){
                 if( generateKey( record ) != null ){
                     records.add( record );
                 }

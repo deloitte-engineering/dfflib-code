@@ -5,8 +5,6 @@
  */
 /**
  * Test class for fflib_AggregateResult class.
- *
- * @created     March 2019
  */
 @IsTest( isParallel = true )
 public with sharing class fflib_AggregateResultTest{
