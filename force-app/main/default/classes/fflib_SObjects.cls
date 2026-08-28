@@ -610,7 +610,7 @@ public virtual with sharing class fflib_SObjects extends fflib_Objects implement
     public class ErrorFactory{
         private List<Error> errorList = new List<Error>();
 
-        public ErrorFactory(){}
+        private ErrorFactory(){}
 
         public String error( String message, SObject record ){
             return error( null, message, record );
