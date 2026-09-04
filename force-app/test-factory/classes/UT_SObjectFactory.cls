@@ -66,8 +66,6 @@
  * and these will not be overwritten by the defaults.
  *
  *         Account record = ( Account ) factory.create( new Account( Rating = 'Cold' ) ).save();
- *
- * @created        December 2017
  */
 @IsTest
 public with sharing class UT_SObjectFactory{
@@ -1564,7 +1562,7 @@ public with sharing class UT_SObjectFactory{
             String selectClause = String.join( UT_SObjectFactoryUtils.getFieldNameList( record.getSObjectType() ), ', ' );
             String sObjectName = record.getSObjectType().getDescribe().getName();
             String query = 'SELECT ' + selectClause + ' FROM ' + sObjectName + ' WHERE Id = :recordId LIMIT 1';
-            return Database.query( query );
+            return Database.query( query, AccessLevel.USER_MODE );
         }
 
         public virtual DomainObject queryDomain(){
@@ -1613,7 +1611,7 @@ public with sharing class UT_SObjectFactory{
         public Id getRecordId( SObject record ){
             String sObjectName = record.getSObjectType().getDescribe().getName();
             Object value = record.get( fieldName );
-            List<SObject> records = Database.query( 'SELECT Id FROM ' + sObjectName + ' WHERE ' + fieldName + ' = :value LIMIT 1' );
+            List<SObject> records = Database.query( 'SELECT Id FROM ' + sObjectName + ' WHERE ' + fieldName + ' = :value LIMIT 1', AccessLevel.USER_MODE );
             return records.isEmpty() ? null : records[ 0 ].Id;
         }
     }
@@ -1646,7 +1644,7 @@ public with sharing class UT_SObjectFactory{
                 otherRecord.Id
             );
 
-            update toUpdate;
+            Database.update( toUpdate, AccessLevel.USER_MODE );
         }
 
     }

@@ -5,11 +5,9 @@
  */
 /**
  * Unit test utility methods to support unit tests.
- *
- * @created		November 2020
  */
 @IsTest
-public class UT_Utils{
+public with sharing class UT_Utils{
 
     // Private static
     private static final Map<String, Map<String, SObject>> sObjectCache = new Map<String, Map<String, SObject>>();
@@ -54,7 +52,7 @@ public class UT_Utils{
         }
 
         if( doInsert ){
-            insert records;
+            Database.insert( records, AccessLevel.USER_MODE );
         }
 
         return records;
@@ -120,7 +118,7 @@ public class UT_Utils{
             }
             soqlStr += ' FROM ' + objectName + ' WHERE ' + fieldName + ' in: keysToLoad';
 
-            for( SObject obj : Database.query( soqlStr ) ){
+            for( SObject obj : Database.query( soqlStr, AccessLevel.USER_MODE ) ){
                 resultMap.put( ( String ) obj.get( fieldName ), obj );
             }
             cachedMap.putAll( resultMap );

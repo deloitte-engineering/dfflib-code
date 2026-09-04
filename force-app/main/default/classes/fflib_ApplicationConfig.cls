@@ -8,7 +8,6 @@
  *  Note this class intentionally performs queries outside a Selector layer context,
  *  allowing proper mocking injection using apex-mocks framework without the need for self-referencing custom metadata records
  *
- *  @created    February 2022
  */
 public with sharing class fflib_ApplicationConfig implements IApplicationConfig{
 

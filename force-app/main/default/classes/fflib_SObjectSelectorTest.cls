@@ -508,38 +508,51 @@ private with sharing class fflib_SObjectSelectorTest{
 
     @IsTest
     private static void shouldCorrectlyEnforceSecuritySettings(){
-        // Given - create data
-        Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector( fflib_Database.Context.NONE );
+        // NONE - SYSTEM_MODE + QueryWithoutSharing (all records, no FLS)
+        Testfflib_SObjectSelector selectorNone = new Testfflib_SObjectSelector( fflib_Database.Context.NONE );
+        System.Assert.isInstanceOfType( selectorNone.m_queryProxy, fflib_Database_QueryProxy.QueryWithoutSharing.class,
+            'NONE context must use QueryWithoutSharing proxy' );
+        System.Assert.areEqual( fflib_Database.Context.NONE, selectorNone.getContext(), 'Expected NONE context to be set' );
 
-        // When, Then
-        System.Assert.isInstanceOfType( selector.m_queryProxy, fflib_Database_QueryProxy.QueryWithoutSharing.class );
+        // FULL - USER_MODE + QueryWithSharing (FLS + sharing enforced)
+        Testfflib_SObjectSelector selectorFull = new Testfflib_SObjectSelector( fflib_Database.Context.FULL );
+        System.Assert.isInstanceOfType( selectorFull.m_queryProxy, fflib_Database_QueryProxy.QueryWithSharing.class,
+            'FULL context must use QueryWithSharing proxy' );
+        System.Assert.areEqual( fflib_Database.Context.FULL, selectorFull.getContext(), 'Expected FULL context to be set' );
 
+        // SHARING_SKIP_PERMISSIONS - SYSTEM_MODE + QueryWithSharing (sharing enforced, no FLS)
+        Testfflib_SObjectSelector selectorSkip = new Testfflib_SObjectSelector( fflib_Database.Context.SHARING_SKIP_PERMISSIONS );
+        System.Assert.isInstanceOfType( selectorSkip.m_queryProxy, fflib_Database_QueryProxy.QueryWithSharing.class,
+            'SHARING_SKIP_PERMISSIONS context must use QueryWithSharing proxy' );
+        System.Assert.areEqual( fflib_Database.Context.SHARING_SKIP_PERMISSIONS, selectorSkip.getContext(), 'Expected SHARING_SKIP_PERMISSIONS context to be set' );
+
+        // INHERIT - SYSTEM_MODE + QueryInheritedSharing (propagates calling class chain)
+        Testfflib_SObjectSelector selectorInherit = new Testfflib_SObjectSelector( fflib_Database.Context.INHERIT );
+        System.Assert.isInstanceOfType( selectorInherit.m_queryProxy, fflib_Database_QueryProxy.QueryInheritedSharing.class,
+            'INHERIT context must use QueryInheritedSharing proxy' );
+        System.Assert.areEqual( fflib_Database.Context.INHERIT, selectorInherit.getContext(), 'Expected INHERIT context to be set' );
+
+        // setContext() must throw when context already assigned
         try{
-            selector.setContext( fflib_Database.Context.FULL );
+            selectorNone.setContext( fflib_Database.Context.FULL );
             System.Assert.fail( 'Expected InvalidContextAssignmentException to be thrown as Context can only be defined once' );
         } catch( fflib_SObjectSelector.InvalidContextAssignmentException ex ){
-            String expectedMessage = 'Database security context can only be defined when constructing a new selector instance! Please provide a valid fflib_Database.Context when creating a new instance of a selector class.';
-            // Then - validate
-            System.Assert.areEqual( expectedMessage, ex.getMessage() );
+            System.Assert.areEqual(
+                'Database security context can only be defined when constructing a new selector instance! Please provide a valid fflib_Database.Context when creating a new instance of a selector class.',
+                ex.getMessage()
+            );
         }
 
+        // setDataAccess() must also throw when context already assigned
         try{
-            selector.setDataAccess( fflib_SObjectSelector.DataAccess.USER_MODE );
+            selectorNone.setDataAccess( fflib_SObjectSelector.DataAccess.USER_MODE );
             System.Assert.fail( 'Expected InvalidContextAssignmentException to be thrown as Context and DataAccess can only be defined once' );
         } catch( fflib_SObjectSelector.InvalidContextAssignmentException ex ){
-            String expectedMessage = 'Database security context can only be defined when constructing a new selector instance! Please provide a valid fflib_Database.Context when creating a new instance of a selector class.';
-            // Then - validate
-            System.Assert.areEqual( expectedMessage, ex.getMessage() );
+            System.Assert.areEqual(
+                'Database security context can only be defined when constructing a new selector instance! Please provide a valid fflib_Database.Context when creating a new instance of a selector class.',
+                ex.getMessage()
+            );
         }
-
-        selector = new Testfflib_SObjectSelector( fflib_Database.Context.FULL );
-        System.Assert.isInstanceOfType( selector.m_queryProxy, fflib_Database_QueryProxy.QueryWithSharing.class );
-
-        selector = new Testfflib_SObjectSelector( fflib_Database.Context.SHARING_SKIP_PERMISSIONS );
-        System.Assert.isInstanceOfType( selector.m_queryProxy, fflib_Database_QueryProxy.QueryWithSharing.class );
-
-        selector = new Testfflib_SObjectSelector( fflib_Database.Context.INHERIT );
-        System.Assert.isInstanceOfType( selector.m_queryProxy, fflib_Database_QueryProxy.QueryInheritedSharing.class );
     }
 
     @IsTest
@@ -620,7 +633,7 @@ private with sharing class fflib_SObjectSelectorTest{
 
         // Given - create data
         Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
-        fflib_QueryFactory testQueryFactory = selector.newQueryFactory().setGroupByFieldName( 'Industry' );
+        fflib_QueryFactory testQueryFactory = selector.newQueryFactory().setGroupByField( 'Industry' );
         String mockedSOQLString = testQueryFactory.toSOQL();
         AccessLevel mockedAccessLevel = fflib_Database.getAccessLevel( selector.getContext() );
         List<AggregateResult> mockedResults = new List<AggregateResult>();
@@ -654,7 +667,7 @@ private with sharing class fflib_SObjectSelectorTest{
         Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
         fflib_QueryFactory testQueryFactory = selector.newQueryFactory()
             .setCondition( 'Id IN :accountIds' )
-            .setGroupByFieldName( 'Industry' );
+            .setGroupByField( 'Industry' );
         String mockedSOQLString = testQueryFactory.toSOQL();
         AccessLevel mockedAccessLevel = fflib_Database.getAccessLevel( selector.getContext() );
         List<AggregateResult> mockedResults = new List<AggregateResult>();
@@ -912,7 +925,7 @@ private with sharing class fflib_SObjectSelectorTest{
     private static void getCursor_shouldThrowOnGroupByQuery(){
         // Given - create data
         Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
-        fflib_QueryFactory qfWithGroupBy = selector.newQueryFactory().setGroupByFieldName( 'Name' );
+        fflib_QueryFactory qfWithGroupBy = selector.newQueryFactory().setGroupByField( 'Name' );
 
         // When, Then - GROUP BY via QueryFactory flag (caught before toSOQL())
         try{
@@ -935,7 +948,7 @@ private with sharing class fflib_SObjectSelectorTest{
     private static void getPaginationCursor_shouldThrowOnGroupByQuery(){
         // Given - create data
         Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector();
-        fflib_QueryFactory qfWithGroupBy = selector.newQueryFactory().setGroupByFieldName( 'Name' );
+        fflib_QueryFactory qfWithGroupBy = selector.newQueryFactory().setGroupByField( 'Name' );
 
         // When, Then - GROUP BY is not supported by pagination cursors
         try{

@@ -6,7 +6,6 @@
 /**
  * Common utilities for the unit test class factory classes.
  *
- * @created        December 2017
  */
 @IsTest
 public with sharing class UT_SObjectFactoryUtils{

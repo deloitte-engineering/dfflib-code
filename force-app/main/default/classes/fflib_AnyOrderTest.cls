@@ -7,7 +7,6 @@
 /**
  * Unit test class for fflib_AnyOrder class.
  *
- * @created     July 2020
  */
 @IsTest( isParallel = true )
 private with sharing class fflib_AnyOrderTest{

@@ -7,8 +7,6 @@
 /**
  * Class provides inner classes implementing factories for the main components of the Apex Enterprise Patterns, Service, Unit Of Work, Selector and Domain.
  * It constructs the factory implementations using a custom metadata-driven approach, removing the need of supplying all compatible SObjectTypes and class implementation on compile time
- *
- * @created    February 2022
  */
 public with sharing virtual class fflib_Application{
     // Inner instantiation of the application config class, allowing easy mocking injection in test classes
@@ -34,10 +32,10 @@ public with sharing virtual class fflib_Application{
         public UnitOfWorkFactory(){}
 
         /**
-         * Constructor for a completely blank fflib_ISObjectUnitOfWork
+         * Constructor for a metadata-driven fflib_ISObjectUnitOfWork
          */
         public fflib_ISObjectUnitOfWork newInstance(){
-            return m_mockUow ?? new fflib_SObjectUnitOfWork();
+            return m_mockUow ?? new fflib_SObjectUnitOfWork().setConfigs( appConfig.getUnitOfWorkConfigs() );
         }
 
         /**
@@ -53,13 +51,13 @@ public with sharing virtual class fflib_Application{
         }
 
         /**
-         * Constructor for an fflib_ISObjectUnitOfWork with desired security enforcement
+         * Constructor for a metadata-driven fflib_ISObjectUnitOfWork with specified security context
          *
          * @param   securityContext     Security context to be set on new UOW instance
          * @return  UnitOfWorkInterface to allow a fluent interface
          */
         public fflib_ISObjectUnitOfWork newInstance( fflib_Database.Context securityContext ){
-            return m_mockUow ?? new fflib_SObjectUnitOfWork( securityContext );
+            return m_mockUow ?? new fflib_SObjectUnitOfWork( securityContext ).setConfigs( appConfig.getUnitOfWorkConfigs() );
         }
 
         /**

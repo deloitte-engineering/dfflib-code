@@ -6,7 +6,6 @@
 /**
  * Allows aggregate results to be used to mock when testing
  *
- * @created     March 2019
  */
 public with sharing class fflib_AggregateResult {
 
