@@ -6,8 +6,6 @@
 /**
  * Unit test class for fflib_Database class
  * 
- * @author      Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
- * @created     March 2023
  */
 @IsTest
 private with sharing class fflib_DatabaseTest{

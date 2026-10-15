@@ -8,8 +8,6 @@
  * the ability to use merge fields for dynamic values, such as counters or ensuring randomised values each time an
  * sObject is mocked or saved to the database.
  *
- * @author      Adam Marchbanks (amarchbanks@deloitte.nl)
- * @created     January 2017
  */
 @IsTest
 public with sharing class UT_Replacers{

@@ -6,8 +6,6 @@
 /**
  * Unit test utility methods to support unit tests.
  *
- * @author 		Orkhan Asif (oasif@deloitte.nl)
- * @created		November 2020
  */
 @IsTest
 public with sharing class UT_Utils{

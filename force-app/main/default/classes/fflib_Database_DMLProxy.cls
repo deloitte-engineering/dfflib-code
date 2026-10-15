@@ -10,8 +10,6 @@
  *      This allows to simplify Test methods, and make the framework more environment-independent (test-classes not failing on added validations)
  *      Lastly, this enables unlocked packages where framework code is not needed to be touched by project developers
  *
- *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
- *  @created    February 2023
  */
 public abstract class fflib_Database_DMLProxy{
 

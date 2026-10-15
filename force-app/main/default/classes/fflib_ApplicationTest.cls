@@ -11,8 +11,6 @@
  *  The usage of Type.forName methods to retrieve the type of an Apex class, which can be a built-in or a user-defined class can only be used to retrieve the type of public and global classes, and not private classes
  *  (even if the context user has access)
  *
- *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
- *  @created    February 2022
  */
 @IsTest( isParallel = true )
 private with sharing class fflib_ApplicationTest{

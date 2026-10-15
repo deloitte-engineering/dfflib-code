@@ -6,8 +6,6 @@
 /**
  * Common utilities for the unit test class factory classes.
  *
- * @author         Dirk van de Lindt (dvandelindt@deloitte.nl)
- * @created        December 2017
  */
 @IsTest
 public with sharing class UT_SObjectFactoryUtils{

@@ -12,8 +12,6 @@
  *
  *  Inspiration based on Apex-Commons repository from FinancialForce.com, Inc
  *
- *  @author    Reinier van den Assum (rvandenassum@deloitte.nl)
- *  @created   December 2020
  */
 /**
  * Provides an implementation of the Enterprise Application Architecture Unit Of Work, as defined by Martin Fowler
