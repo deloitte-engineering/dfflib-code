@@ -5,12 +5,20 @@
 #           This is a BLOCKING check - PRs cannot be merged without passing.
 #
 # Triggers: pull_request_target (opened, edited, synchronize, reopened)
+# Concurrency: pr-template-validation-<PR#>, cancel-in-progress: true
+#           (own group, separate from pr-labels.yml)
+# Runner:   ubuntu-24.04 (pinned)
+#
+# Fresh Data:
+#   Title and description are fetched from the pulls API, not the webhook
+#   payload, which can hold stale values after rapid edits.
 #
 # Validations:
 #   1. Description must be at least 10 characters (not placeholder text)
 #   2. PR title prefix (conventional commit format):
 #      - Title must match: <type>: <description> or <type>(<scope>): <description>
-#      - Valid types: feat, fix, docs, style, refactor, perf, test, chore, build, ci
+#      - Valid types (lowercase, case-sensitive): feat, fix, docs, style, refactor,
+#        perf, test, chore, build, ci — kept in sync with pr-labels.yml
 #      - Missing or invalid prefix = ERROR (blocks merge)
 #   3. At least one checklist item must be checked (warning only)
 #
@@ -46,19 +54,18 @@ permissions:
 jobs:
   validate-template:
     name: Validate PR Template
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # NOTE: No 'if' condition here - job always runs to report status
     # Bot detection is handled inside the script to ensure status is always reported
     
     steps:
       - name: Validate Required Fields
         id: validate
-        uses: actions/github-script@v7
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         timeout-minutes: 5
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const pr = context.payload.pull_request;
             const actor = context.actor;
             
             // Check for bot PRs first - auto-approve without validation
@@ -72,6 +79,13 @@ jobs:
             }
             
             core.setOutput('skipped', 'false');
+            
+            // The webhook payload can hold a stale title/body on rapid edits.
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
             
             const body = pr.body || '';
             const errors = [];
@@ -97,14 +111,14 @@ jobs:
             
             // VALIDATION 2: PR Title Prefix (conventional commit format)
             const prTitle = pr.title || '';
-            const prefixRegex = /^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\([^)]+\))?:\s+.+/i;
-            const titleMatch = prTitle.match(/^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\([^)]+\))?:/i);
-            const detectedType = titleMatch ? titleMatch[1].toLowerCase() : null;
+            const prefixRegex = /^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\([^)]+\))?:\s+.+/;
+            const titleMatch = prTitle.match(/^(feat|fix|docs|style|refactor|perf|test|chore|build|ci)(\([^)]+\))?:/);
+            const detectedType = titleMatch ? titleMatch[1] : null;
             
             if (!prefixRegex.test(prTitle)) {
               errors.push(
                 '❌ **PR Title**: Must follow conventional commit format: `<type>: <description>` or `<type>(<scope>): <description>`.\n' +
-                '   Valid types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `build`.\n' +
+                '   Valid types (lowercase): `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `build`, `ci`.\n' +
                 `   Current title: \`${prTitle || '(empty)'}\``
               );
               core.info(`❌ PR title does not match conventional commit format: "${prTitle}"`);
@@ -189,11 +203,11 @@ jobs:
 
       - name: Report Status
         if: always()
+        env:
+          VALID: ${{ steps.validate.outputs.valid }}
+          SKIPPED: ${{ steps.validate.outputs.skipped }}
+          TYPE: ${{ steps.validate.outputs.selected_type }}
         run: |
-          VALID="${{ steps.validate.outputs.valid }}"
-          SKIPPED="${{ steps.validate.outputs.skipped }}"
-          TYPE="${{ steps.validate.outputs.selected_type }}"
-          
           if [ "$SKIPPED" == "true" ]; then
             echo "✅ PR template validation skipped (bot PR)"
             exit 0

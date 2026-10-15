@@ -11,6 +11,8 @@
 # ║   - Review approved → Add 'lgtm' label                                       ║
 # ║   - Changes requested → Remove 'lgtm' label                                  ║
 # ║   - Review dismissed → Remove 'lgtm' label                                   ║
+# ║                                                                              ║
+# ║ RUNNER: ubuntu-24.04 (pinned)                                                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: Manage Review Labels
@@ -46,7 +48,7 @@ jobs:
   # │   - Requires pull-requests:write and issues:write permissions               │
   # └──────────────────────────────────────────────────────────────────────────────┘
   label-on-review:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pull-requests: write
       issues: write

@@ -2,7 +2,7 @@
 # validate-project.yml - Salesforce Project Validation Workflow
 # =============================================================================
 # Purpose:  Validates the full Salesforce project (force-app/main/default and
-#           force-app/test-factory) against the packaging org on feature and
+#           force-app/test-factory) against the buildcheck org on feature and
 #           release branches. Runs deployment validation with tests.
 #
 # Triggers: - workflow_dispatch  (manual trigger via GitHub Actions UI)
@@ -17,7 +17,15 @@
 #   Pushes to branches without an open PR are keyed on branch name.
 #   Different branches/PRs run in parallel.
 #
-# Setup:    See .github/SETUP_SALESFORCE_CICD.md for full setup instructions
+# Permissions: contents: read (workflow-level; least-privilege — this job only
+#              reads code and deploys to an org, never writes to the repo)
+#
+# Secrets:  - SF_BUILDCHECK_CLIENT_ID     Consumer Key from Connected App (buildcheck org)
+#            - SF_BUILDCHECK_USERNAME      Salesforce username to authenticate as (buildcheck org)
+#            - SF_BUILDCHECK_PRIVATE_KEY   Private key (RSA) for JWT signing (buildcheck org)
+#            - SF_BUILDCHECK_INSTANCE_URL  Instance URL of the buildcheck org
+#
+# Runner:   ubuntu-24.04 (pinned)
 # =============================================================================
 
 # Allow parallel runs across different branches, but cancel concurrent runs on the same branch
@@ -27,8 +35,17 @@ concurrency:
 
 name: Validate Project Build
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Enable debug output (org details, verbose auth). Default: false'
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - 'feature/*'
@@ -46,7 +63,7 @@ on:
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║ JOB PIPELINE                                                                  ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║ validate ─── Validates deployment against packaging org with tests           ║
+# ║ validate ─── Validates deployment against buildcheck org with tests          ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 jobs:
@@ -55,7 +72,7 @@ jobs:
   # ├──────────────────────────────────────────────────────────────────────────────┤
   # │ PURPOSE:                                                                     │
   # │   Validates the full Salesforce project (force-app/main/default and         │
-  # │   force-app/test-factory) against the packaging org with RunLocalTests.     │
+  # │   force-app/test-factory) against the buildcheck org with RunLocalTests.    │
   # │                                                                              │
   # │ DEPENDENCIES: None (first and only job)                                      │
   # │                                                                              │
@@ -73,18 +90,23 @@ jobs:
   # └──────────────────────────────────────────────────────────────────────────────┘
   validate:
     name: validate-deployment
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      DEBUG: ${{ github.event.inputs.debug || 'false' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Install Salesforce CLI (sf) - pinned to 2.137.6 for reproducible builds
+      # Sets a predictable npm prefix and writes it to $GITHUB_PATH once — all
+      # subsequent steps in this job inherit the path without re-exporting.
       - name: Install and Setup Salesforce CLI
         run: |
-          export PATH="$PATH:$(npm root -g)"
+          set -euo pipefail
+          npm config set prefix "$HOME/.npm-global"
+          echo "$HOME/.npm-global/bin" >> "$GITHUB_PATH"
           npm install -g @salesforce/cli@2.137.6
-          export PATH="$PATH:$(npm root -g)"
-          echo "CLI installed: $(sf --version 2>&1)"
+          "$HOME/.npm-global/bin/sf" --version
 
       # Authenticate to Buildcheck Org using JWT Bearer flow
       - name: Authenticate to Buildcheck Org
@@ -94,27 +116,34 @@ jobs:
           SF_PRIVATE_KEY: ${{ secrets.SF_BUILDCHECK_PRIVATE_KEY }}
           SF_INSTANCE_URL: ${{ secrets.SF_BUILDCHECK_INSTANCE_URL }}
         run: |
-          export PATH="$PATH:$(npm root -g)"
-          echo "Authenticating to Buildcheck Org..."
+          set -euo pipefail
+          echo "🔐 Authenticating to buildcheck org..."
           sf org login jwt \
             --instance-url "$SF_INSTANCE_URL" \
             --client-id "$SF_CLIENT_ID" \
             --jwt-key-file <(echo "$SF_PRIVATE_KEY") \
             --username "$SF_USERNAME" \
             --set-default \
-            -a dfflib-buildcheck
-          echo "✅ Authentication successful."
+            -a dfflib-buildcheck \
+            && echo "✅ Authentication successful." \
+            || { echo "::error::Authentication failed."; exit 1; }
+
+          if [[ "$DEBUG" == "true" ]]; then
+            echo ""
+            echo "🔍 Auth details:"
+            sf org display --target-org dfflib-buildcheck
+          fi
 
       # Validate deployment including test factory (lives under force-app/test-factory)
       - name: Validate Deployment
         run: |
-          export PATH="$PATH:$(npm root -g)"
+          set -euo pipefail
           echo "🚀 Starting deployment validation..."
           echo "   Source: force-app/main/default + force-app/test-factory"
           echo "   Test level: RunLocalTests"
           echo ""
           # --wait 60 polls until the deployment completes before returning.
-          # Exit code 0 = Succeeded, non-zero = any failure
+          # Exit code 0 = Succeeded, non-zero = any failure. No jq parsing needed.
           sf project deploy validate \
             --source-dir force-app/main/default \
             --source-dir force-app/test-factory \

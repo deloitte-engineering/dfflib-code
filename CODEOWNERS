@@ -2,20 +2,25 @@
 #
 # List of approvers/reviewers for D'fflib project
 #
+# Syntax: https://docs.github.com/articles/about-code-owners
+# Rules are LAST-MATCH-WINS: the final matching pattern for a
+# file decides its owners. Keep specific paths BELOW the
+# global default so they take precedence.
+#
 ##############################################################
 #
 # Get in touch with us via the published Community
 #  https://github.com/deloitte-engineering/dfflib
 #
 
-# These owners will be the default owners for everything in the repo.
-* @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+# Default owners for everything in the repo.
+*                                @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
 
-# fflib specific layer classes
-force-app/main/default/classes/*.cls @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+# D'fflib framework layer classes (source + metadata).
+/force-app/main/default/classes/ @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
 
-# UT Test Factory classes
-force-app/test-factory/classes/*.cls @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+# Unit Test Factory classes (source + metadata).
+/force-app/test-factory/classes/ @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
 
-# Documentation
-*.md @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+# Documentation.
+*.md                             @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder

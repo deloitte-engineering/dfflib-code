@@ -1,0 +1,254 @@
+# =============================================================================
+# pr-labels.yml - All PR labelling (files, title, community)
+# =============================================================================
+# Purpose:  Applies every automatic PR label from ONE workflow whose jobs run in
+#           sequence, so no label write can clobber another and each PR event
+#           starts exactly one run.
+# Triggers: pull_request_target (opened, edited, synchronize, reopened).
+# Concurrency: 'pr-labels-<PR#>', cancel-in-progress false. GitHub keeps one
+#           running + one pending run per group and a newer pending run replaces
+#           an older one. That is safe ONLY because file-labels and
+#           conventional-label run on EVERY event and recompute from fresh data,
+#           so the replacing run does the replaced run's work. Do not gate them
+#           by event type or actor (only by PR-constant facts like the author).
+#           Separate workflows sharing this group used to drop each other's
+#           runs on `opened`.
+# Secrets:  GITHUB_TOKEN only.
+# Runner:   ubuntu-24.04 (pinned)
+#
+# Job pipeline (needs: chain; !cancelled() so a skipped job never skips the next):
+#   file-labels ──► conventional-label ──► community-label
+#   file-labels        every event, non-bot authors.
+#                      actions/labeler REPLACES the label set (setLabels), so it
+#                      must run before the jobs that add labels.
+#   conventional-label every event, non-bot authors. One label from the PR title
+#                      type.
+#   community-label    opened only (the first run for a PR, never replaced).
+#                      'community' for external contributors.
+#
+# SECURITY: pull_request_target gives write access on fork PRs. No job checks out
+# or executes PR code; only file paths, title and author are read.
+# =============================================================================
+
+name: PR Labels
+
+on:
+  pull_request_target:
+    types: [ opened, edited, synchronize, reopened ]
+
+concurrency:
+  group: pr-labels-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # file-labels: labels from changed-file patterns in .github/labeler.yml.
+  # ---------------------------------------------------------------------------
+  file-labels:
+    name: add-files-changed-labelling
+    runs-on: ubuntu-24.04
+    if: github.event.pull_request.user.type != 'Bot'
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b # v6.0.1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # conventional-label: a single conventional label derived from the PR title.
+  # Step 1: amannn/action-semantic-pull-request fetches the fresh PR title
+  #         (webhook payloads can be stale on rapid edits) and parses `type`.
+  # Step 2: removes any stale conventional label, then applies the expected one.
+  #
+  # Allowed types mirror pr-template-validation.yml (lowercase, case-sensitive):
+  #   feat fix docs style refactor perf test chore build ci
+  # Step 1 is continue-on-error: pr-template-validation.yml is the single BLOCKING
+  # title check, so an invalid title must not add a second red check here.
+  #
+  # Label Mapping: feat->enhancement, fix->bug, chore->chore,
+  #                style->style, refactor->refactor, perf->performance
+  # `ci` is NOT managed here; the file labeler (labeler.yml) owns it.
+  #
+  # Non-destructive: an invalid title skips step 2, and a type with no mapped label
+  # (docs/test/build/ci) leaves labels untouched, so a stale title read can never
+  # strip a correctly-applied label.
+  # ---------------------------------------------------------------------------
+  conventional-label:
+    name: Apply Conventional Label
+    needs: file-labels
+    runs-on: ubuntu-24.04
+    if: ${{ !cancelled() && github.event.pull_request.user.type != 'Bot' }}
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Parse PR Title
+        id: semantic
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            chore
+            build
+            ci
+          requireScope: false
+
+      - name: Sync Conventional Label from PR Type
+        if: ${{ steps.semantic.outcome == 'success' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          PR_TYPE: ${{ steps.semantic.outputs.type }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const labelMap = {
+              'feat': 'enhancement',
+              'fix': 'bug',
+              'chore': 'chore',
+              'style': 'style',
+              'refactor': 'refactor',
+              'perf': 'performance'
+            };
+            const allLabels = Object.values(labelMap);
+
+            const type = process.env.PR_TYPE || '';
+            const expectedLabel = labelMap[type] || '';
+
+            if (expectedLabel) {
+              console.log(`type "${type}" → ${expectedLabel}`);
+            } else {
+              console.log(`⚠ type "${type}" has no conventional label`);
+            }
+
+            // No mapped label: leave labels untouched so a stale/racing
+            // title read can never strip a correctly-applied conventional label.
+            if (!expectedLabel) {
+              return;
+            }
+
+            const prNumber = context.payload.pull_request.number;
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+            const currentLabels = labels.map(l => l.name);
+
+            // Drop any conventional label that is not the expected one
+            for (const label of allLabels) {
+              if (label !== expectedLabel && currentLabels.includes(label)) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    name: label
+                  });
+                } catch (e) { /* ignore */ }
+              }
+            }
+
+            if (!currentLabels.includes(expectedLabel)) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: [expectedLabel]
+              });
+              console.log(`Applied ${expectedLabel}`);
+            }
+
+  # ---------------------------------------------------------------------------
+  # community-label: 'community' for PRs from external contributors.
+  # author_association is NOT used; it under-reports org members, which used to
+  # mislabel internal members. Label ONLY when both explicit signals say external:
+  #   1. repo collaborator (repos.checkCollaborator)
+  #   2. org member        (orgs.checkMembershipForUser, public members)
+  # In a public org both resolve for the default GITHUB_TOKEN.
+  # ---------------------------------------------------------------------------
+  community-label:
+    name: add-label
+    needs: conventional-label
+    runs-on: ubuntu-24.04
+    if: ${{ !cancelled() && github.event.action == 'opened' }}
+    permissions:
+      pull-requests: write
+    steps:
+      - name: add-community-label
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+            const { owner, repo } = context.repo;
+
+            // Diagnostic: author_association under-reports org members, the root
+            // cause of internal members being mislabelled. Logged for runtime
+            // confirmation; not used for the gate.
+            console.log(`author=${author} author_association=${pr.author_association}`);
+
+            // Decide from explicit signals; label ONLY when none indicate internal.
+            function shouldLabelCommunity({ isCollaborator, isOrgMember }) {
+              if (isCollaborator) return false;
+              if (isOrgMember) return false;
+              return true;
+            }
+
+            // Signal 1: repo collaborator (visible to the default token).
+            let isCollaborator = false;
+            try {
+              await github.rest.repos.checkCollaborator({ owner, repo, username: author });
+              isCollaborator = true;
+            } catch (error) {
+              // Non-204 (e.g. 404) => not a collaborator.
+            }
+
+            // Signal 2: org membership — public members resolve for the default
+            // token (the repo's org is public).
+            let isOrgMember = false;
+            try {
+              await github.rest.orgs.checkMembershipForUser({ org: owner, username: author });
+              isOrgMember = true;
+            } catch (error) {
+              // Non-204 (404/302) => not a visible member.
+            }
+
+            const external = shouldLabelCommunity({ isCollaborator, isOrgMember });
+            console.log(`isCollaborator=${isCollaborator} isOrgMember=${isOrgMember} => ${external ? 'EXTERNAL' : 'INTERNAL'}`);
+
+            if (!external) {
+              console.log(`Skipping community label for internal contributor ${author}`);
+              return;
+            }
+
+            // Ensure the label exists before applying it.
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: 'community' });
+            } catch (error) {
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name: 'community',
+                color: '7057ff',
+                description: 'Contribution from an external community member'
+              });
+              console.log('Created missing community label');
+            }
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: pr.number,
+              labels: ['community']
+            });
+            console.log(`Added community label to PR #${pr.number} (external contributor ${author})`);
