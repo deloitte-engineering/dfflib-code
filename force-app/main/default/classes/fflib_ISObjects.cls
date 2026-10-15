@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+@NamespaceAccessible
 public interface fflib_ISObjects extends fflib_IObjects{
     /**
      * @return Return the SObject records contained in the domain

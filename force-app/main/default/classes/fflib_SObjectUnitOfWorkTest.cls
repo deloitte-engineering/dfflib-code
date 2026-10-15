@@ -11,6 +11,8 @@
  *
  * - Can't test PlatformEvents as this is project specific
  *
+ * @author    Reinier van den Assum (rvandenassum@deloitte.nl)
+ * @created   June 2023
  */
 @IsTest( isParallel = true )
 private with sharing class fflib_SObjectUnitOfWorkTest{
@@ -639,6 +641,192 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
         System.Assert.areEqual( accList[ 1 ], newAccounts[ 0 ], 'Expected 2nd Account to be registered as new' );
     }
 
+    @IsTest
+    private static void registerUpsert_accumulatesMultipleCallsIntoSingleDML(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_Database_IDML m_IDML = ( fflib_Database_IDML ) mocks.mock( fflib_Database_IDML.class );
+
+        // Given - create data - two separate registerUpsert() calls for the same externalId field (Account.Id, via the 'name == Id' bypass)
+        Account acc1 = new Account( Id = ID_ACCOUNT, Name = 'Acc1' );
+        Account acc2 = new Account( Id = ID_ACCOUNT2, Name = 'Acc2' );
+        fflib_SObjectUnitOfWork uow = new fflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType } );
+        uow.m_dml = m_IDML;
+
+        // When - register both individually, then commit
+        uow.registerUpsert( acc1, Account.Id );
+        uow.registerUpsert( acc2, Account.Id );
+        uow.commitWork();
+
+        // Then - Validate both Accounts were combined into a single Database.upsert() DML call, not two separate calls
+        ( ( fflib_Database_IDML ) mocks.verify( m_IDML, 1 ) ).performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPSERT, new List<Account>{ acc1, acc2 }, Account.Id, true, fflib_Database.getAccessLevel( uow.m_securityContext ) );
+    }
+
+    /**
+     * Method to verify registerUpsert( records, externalIdField ) sends a MIXED Id-state list (one existing record,
+     * one without an Id) through as a SINGLE genuine Database.upsert() DML call, rather than being split into
+     * separate insert/update DML the way the no-externalIdField overload does (see registerUpsert() test above).
+     * This is distinct from registerUpsert_accumulatesMultipleCallsIntoSingleDML, which proves accumulation across
+     * multiple separate registerUpsert() calls rather than a single call with mixed Id states.
+     */
+    @IsTest
+    private static void registerUpsert_ExternalId_MixedIdStates(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_Database_IDML m_IDML = ( fflib_Database_IDML ) mocks.mock( fflib_Database_IDML.class );
+
+        // Given - create data: a mixed Id-state list, registered by the standard Id field
+        List<Account> accList = new List<Account>{
+            new Account( Id = ID_ACCOUNT, Name = 'Existing Account' ),
+            new Account( Name = 'New Account' )
+        };
+        fflib_SObjectUnitOfWork uow = new fflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType } );
+        uow.m_dml = m_IDML;
+
+        // When - register the mixed list by Id and commit
+        uow.registerUpsert( accList, Account.Id );
+        uow.commitWork();
+
+        // Then - Validate a single genuine Database.upsert() DML call fired for the whole mixed list, not split insert/update
+        ( ( fflib_Database_IDML ) mocks.verify( m_IDML, 1 ) ).performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPSERT, accList, Account.Id, true, fflib_Database.getAccessLevel( uow.m_securityContext ) );
+    }
+
+    @IsTest
+    private static void registerUpsert_InvalidInputs(){
+        // Given - create data - explicit SObjectType list, since the last sub-case proceeds into implementSObjectType()
+        // which needs metadata-driven config; a directly-constructed UOW without a list has no injected uowConfigs
+        Account a = new Account( Id = ID_ACCOUNT, Name = 'test' );
+        fflib_SObjectUnitOfWork uow = new fflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType } );
+
+        // When/Then - externalIdField not provided
+        try{
+            uow.registerUpsert( a, null );
+            System.Assert.fail( 'This should never happen as externalIdField was not provided' );
+        } catch( dfflib_Utils.InvalidInputValueException ex ){
+            System.Assert.areEqual( 'externalIdField cannot be null', ex.getMessage(), 'Expected different message' );
+        }
+
+        // When/Then - field is neither marked External Id nor the standard Id field
+        try{
+            uow.registerUpsert( a, Account.Name );
+            System.Assert.fail( 'This should never happen as Account.Name has no ExternalId characteristic' );
+        } catch( fflib_SObjectUnitOfWork.UnitOfWorkException ex ){
+            System.Assert.areEqual( 'The provided Field can\'t be used for upserts as it doesn\'t have the ExternalId characteristic Name', ex.getMessage(), 'Expected different message' );
+        }
+
+        // When/Then - field belongs to a different SObjectType than the record (Contact.Id passes the 'name == Id' bypass, but is Contact's, not Account's)
+        try{
+            uow.registerUpsert( a, Contact.Id );
+            System.Assert.fail( 'This should never happen as Contact.Id does not belong to Account' );
+        } catch( fflib_SObjectUnitOfWork.UnitOfWorkException ex ){
+            System.Assert.areEqual( 'The ExternalId should be of the same SObjectType as the record provided Contact vs Account', ex.getMessage(), 'Expected different message' );
+        }
+
+        // When/Then - a blank value is explicitly ALLOWED when externalIdField is the standard Id field itself - that's what
+        // enables a single Database.upsert() call to handle a mixed insert/update list, so this must NOT throw
+        Account blankIdAccount = new Account( Name = 'no id' );
+        try{
+            uow.registerUpsert( blankIdAccount, Account.Id );
+        } catch( Exception ex ){
+            System.Assert.fail( 'This should never happen - a blank Id is valid when externalIdField is the standard Id field itself: ' + ex );
+        }
+    }
+
+    @IsTest
+    private static void registerPriorityUpsert_Sequence(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_Database_IDML m_IDML = ( fflib_Database_IDML ) mocks.mock( fflib_Database_IDML.class );
+        fflib_InOrder inOrder = new fflib_InOrder( mocks, new List<Object>{ m_IDML } );
+
+        // Given - create data
+        fflib_SObjectUnitOfWork uow = new fflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType } );
+        Account accDirty = new Account( Id = ID_ACCOUNT, Name = 'dirty' );
+        Account accUpsert = new Account( Id = ID_ACCOUNT2, Name = 'upsert' );
+        Account accDelete = new Account( Id = fflib_IDGenerator.generate( Account.SObjectType ), Name = 'delete' );
+        uow.m_dml = m_IDML;
+        AccessLevel accessLevel = fflib_Database.getAccessLevel( uow.m_securityContext );
+
+        // When - register priority dirty, priority upsert (by Id) and priority delete for Account, then commit
+        uow.registerPriorityDirty( accDirty );
+        uow.registerPriorityUpsert( accUpsert, Account.Id );
+        uow.registerPriorityDeleted( accDelete );
+        uow.commitWork();
+
+        // Then - Validate the 3 DML phases fired in the expected order: priority-dirty, priority-upsert, priority-delete
+        ( ( fflib_Database_IDML ) inOrder.verify( m_IDML, mocks.calls( 1 ) ) ).performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPDATE_PRIO, new List<Account>{ accDirty }, ( Database.DMLOptions ) null, accessLevel );
+        ( ( fflib_Database_IDML ) inOrder.verify( m_IDML, mocks.calls( 1 ) ) ).performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPSERT_PRIO, new List<Account>{ accUpsert }, Account.Id, true, accessLevel );
+        ( ( fflib_Database_IDML ) inOrder.verify( m_IDML, mocks.calls( 1 ) ) ).performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dDELETE_PRIO, new List<Account>{ accDelete }, true, accessLevel );
+    }
+
+    @IsTest
+    private static void registerUpsert_Sequence(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_Database_IDML m_IDML = ( fflib_Database_IDML ) mocks.mock( fflib_Database_IDML.class );
+        fflib_InOrder inOrder = new fflib_InOrder( mocks, new List<Object>{ m_IDML } );
+
+        // Given - create data
+        fflib_SObjectUnitOfWork uow = new fflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType } );
+        Account accImmediate = new Account( Id = ID_ACCOUNT, Name = 'immediate' );
+        Account accUpsert = new Account( Id = ID_ACCOUNT2, Name = 'upsert' );
+        Account accDirty = new Account( Id = fflib_IDGenerator.generate( Account.SObjectType ), Name = 'dirty' );
+        uow.m_dml = m_IDML;
+        AccessLevel accessLevel = fflib_Database.getAccessLevel( uow.m_securityContext );
+
+        // When - register update-immediate, upsert (by Id) and dirty-update for Account, then commit
+        uow.registerDirtyImmediate( accImmediate );
+        uow.registerUpsert( accUpsert, Account.Id );
+        uow.registerDirty( accDirty );
+        uow.commitWork();
+
+        // Then - Validate the 3 DML phases fired in the expected order: update-immediate, upsert, dirty-update
+        ( ( fflib_Database_IDML ) inOrder.verify( m_IDML, mocks.calls( 1 ) ) ).performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPDATE_IMMEDIATE, new List<Account>{ accImmediate }, accessLevel );
+        ( ( fflib_Database_IDML ) inOrder.verify( m_IDML, mocks.calls( 1 ) ) ).performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPSERT, new List<Account>{ accUpsert }, Account.Id, true, accessLevel );
+        ( ( fflib_Database_IDML ) inOrder.verify( m_IDML, mocks.calls( 1 ) ) ).performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPDATE, new List<Account>{ accDirty }, ( Database.DMLOptions ) null, accessLevel );
+    }
+
+    /**
+     * Method to verify registerUpsertedAllOrNone(), when set to allOrNone = false:
+     * 1) Automatically enables SaveResults (without an explicit setSaveResultsRequired( true ) call)
+     * 2) Passes allOrNone = false through to the DML Proxy call
+     * 3) Retains a mixed success/failure response via getUpsertResults(), since allOrNone = false allows partial success
+     */
+    @IsTest
+    private static void registerUpsertedAllOrNone_savesResults(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_Database_IDML m_IDML = ( fflib_Database_IDML ) mocks.mock( fflib_Database_IDML.class );
+
+        // Given - create data: two Accounts to be upserted by Id, with a mixed success/failure DML response
+        fflib_SObjectUnitOfWork uow = new fflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType } );
+        List<Account> accList = new List<Account>{
+            new Account( Id = ID_ACCOUNT, Name = 'Test' ),
+            new Account( Id = ID_ACCOUNT2, Name = 'Test 2' )
+        };
+        AccessLevel accessLevel = fflib_Database.getAccessLevel( uow.m_securityContext );
+        Database.UpsertResult srSuccess = ( Database.UpsertResult ) JSON.deserialize( '{"success":true,"created":false}', Database.UpsertResult.class );
+        Database.UpsertResult srFailure = ( Database.UpsertResult ) JSON.deserialize( '{"success":false}', Database.UpsertResult.class );
+
+        // Set mocks - allOrNone = false is expected to be passed through to the DML Proxy
+        mocks.startStubbing();
+        mocks.when( m_IDML.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPSERT, accList, Account.Id, false, accessLevel ) ).thenReturn( new List<Database.UpsertResult>{ srSuccess, srFailure } );
+        mocks.stopStubbing();
+        uow.m_dml = m_IDML;
+
+        // When - Register upsert with allOrNone = false (without an explicit setSaveResultsRequired() call) and commit
+        uow.registerUpsert( accList, Account.Id );
+        uow.registerUpsertedAllOrNone( Account.SObjectType, false );
+        uow.commitWork();
+
+        // Then - Validate SaveResults were auto-enabled by allOrNone = false and the mixed success/failure response is preserved
+        List<Database.UpsertResult> respUpsertResults = uow.getUpsertResults( Account.SObjectType );
+        System.Assert.areEqual( 2, respUpsertResults?.size(), 'Expected 2 UpsertResults to be returned since SaveResults were auto-enabled by allOrNone = false' );
+        System.Assert.areEqual( srSuccess, respUpsertResults[ 0 ], 'Expected 1st UpsertResult to reflect the successful record' );
+        System.Assert.areEqual( srFailure, respUpsertResults[ 1 ], 'Expected 2nd UpsertResult to reflect the failed record, permitted by allOrNone = false' );
+        ( ( fflib_Database_IDML ) mocks.verify( m_IDML, 1 ) ).performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPSERT, accList, Account.Id, false, accessLevel );
+    }
+
     /**
      * Method to verify:
      * 1) Whether UOW executes in the correct sequence given an constructor-input-list
@@ -833,7 +1021,7 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
 
         // Set mocks
         mocks.startStubbing();
-        ( ( fflib_Database_IDML ) mocks.doThrowWhen( new fflib.MissingDataException( exceptionMessage ), m_IDML ) ).performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dPUB_BEFORE, evtList, accessLevel );
+        ( ( fflib_Database_IDML ) mocks.doThrowWhen( new dfflib_Utils.MissingDataException( exceptionMessage ), m_IDML ) ).performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dPUB_BEFORE, evtList, accessLevel );
         mocks.stopStubbing();
         uow.m_dml = m_IDML;
 
@@ -844,7 +1032,7 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
         try{
             uow.commitWork();
             System.Assert.fail( 'Expected commitWork() to throw an Exception given the mocking of Publish Before' );
-        } catch( fflib.MissingDataException ex ){
+        } catch( dfflib_Utils.MissingDataException ex ){
             System.Assert.areEqual( exceptionMessage, ex.getMessage(), 'Expected different Exception message' );
         }
 
@@ -1215,7 +1403,7 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
 
         // Set mocks
         mocks.startStubbing();
-        ( ( fflib_Database_IDML ) mocks.doThrowWhen( new fflib.MissingDataException( exceptionMessage ), m_IDML ) ).performOperation( fflib_SObjectUnitOfWork.Operations.SEND_EMAIL, msgList );
+        ( ( fflib_Database_IDML ) mocks.doThrowWhen( new dfflib_Utils.MissingDataException( exceptionMessage ), m_IDML ) ).performOperation( fflib_SObjectUnitOfWork.Operations.SEND_EMAIL, msgList );
         mocks.stopStubbing();
         uow.m_dml = m_IDML;
 
@@ -1227,7 +1415,7 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
         try{
             uow.performAction( fflib_SObjectUnitOfWork.Operations.SEND_EMAIL, msgList );
             System.Assert.fail( 'Expected performOperation() to throw an Exception' );
-        } catch( fflib.MissingDataException ex ){
+        } catch( dfflib_Utils.MissingDataException ex ){
             System.Assert.areEqual( exceptionMessage, ex.getMessage(), 'Expected different Exception message' );
         }
     }
@@ -1290,11 +1478,15 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
         fflib_SObjectUnitOfWork uow = new fflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType, eventSObjectType } );
         List<Account> accList_New = new List<Account>{ new Account( Name = 'Test' ) };
         List<Account> accList_WithId = new List<Account>{ new Account( Name = 'Test 2', Id = ID_ACCOUNT ) };
+        List<Account> accList_UpsertPrio = new List<Account>{ new Account( Name = 'Test 3', Id = fflib_IDGenerator.generate( Account.SObjectType ) ) };
+        List<Account> accList_Upsert = new List<Account>{ new Account( Name = 'Test 4', Id = ID_ACCOUNT2 ) };
         List<Messaging.SingleEmailMessage> emailMsgList = new List<Messaging.SingleEmailMessage>{ new Messaging.SingleEmailMessage() };
         List<Approval.ProcessSubmitRequest> apprProcessList = new List<Approval.ProcessSubmitRequest>{ new Approval.ProcessSubmitRequest() };
         List<SObject> evtList = new List<SObject>{ eventSObjectType.newSObject() };
         Database.SaveResult srNew = ( Database.SaveResult ) JSON.deserialize( '{"success":true}', Database.SaveResult.class );
         Database.SaveResult srDirty = ( Database.SaveResult ) JSON.deserialize( '{"success":true}', Database.SaveResult.class );
+        Database.UpsertResult srUpsertPrio = ( Database.UpsertResult ) JSON.deserialize( '{"success":true,"created":true}', Database.UpsertResult.class );
+        Database.UpsertResult srUpsert = ( Database.UpsertResult ) JSON.deserialize( '{"success":true,"created":false}', Database.UpsertResult.class );
         Database.DeleteResult srDeleted = ( Database.DeleteResult ) JSON.deserialize( '{"success":true}', Database.DeleteResult.class );
         Database.EmptyRecycleBinResult srEmptyRecycle = ( Database.EmptyRecycleBinResult ) JSON.deserialize( '{"success":true}', Database.EmptyRecycleBinResult.class );
         Database.UndeleteResult srUndeleted = ( Database.UndeleteResult ) JSON.deserialize( '{"success":true}', Database.UndeleteResult.class );
@@ -1307,6 +1499,8 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
         mocks.startStubbing();
         mocks.when( m_IDML.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dNEW, accList_New, ( Database.DMLOptions ) null, accessLevel ) ).thenReturn( new List<Database.SaveResult>{ srNew } );
         mocks.when( m_IDML.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPDATE, accList_New, ( Database.DMLOptions ) null, accessLevel ) ).thenReturn( new List<Database.SaveResult>{ srDirty } );
+        mocks.when( m_IDML.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPSERT_PRIO, accList_UpsertPrio, Account.Id, true, accessLevel ) ).thenReturn( new List<Database.UpsertResult>{ srUpsertPrio } );
+        mocks.when( m_IDML.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPSERT, accList_Upsert, Account.Id, true, accessLevel ) ).thenReturn( new List<Database.UpsertResult>{ srUpsert } );
         mocks.when( m_IDML.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dDELETE, accList_WithId, true, accessLevel ) ).thenReturn( new List<Database.DeleteResult>{ srDeleted } );
         mocks.when( m_IDML.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dEMPTY_RECBIN, accList_WithId, accessLevel ) ).thenReturn( new List<Database.EmptyRecycleBinResult>{ srEmptyRecycle } );
         mocks.when( m_IDML.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUNDELETE, accList_WithId, true, accessLevel ) ).thenReturn( new List<Database.UndeleteResult>{ srUndeleted } );
@@ -1319,6 +1513,8 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
         // When - Records registered and SaveResults requested, validate whether DML response is returned
         uow.registerNew( accList_New );
         uow.registerDirty( accList_New );
+        uow.registerPriorityUpsert( accList_UpsertPrio, Account.Id );
+        uow.registerUpsert( accList_Upsert, Account.Id );
         uow.registerPermanentlyDeleted( accList_WithId ); // Delete & EmptyRecycleBin
         uow.registerUndeleted( accList_WithId );
         uow.registerPublishAfterSuccessTransaction( evtList );
@@ -1340,6 +1536,11 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
         List<Database.SaveResult> respSR_Publish_Evt = uow.getPublishResults( eventSObjectType );
         List<Messaging.SendEmailResult> respSR_Email = uow.getEmailResults();
         List<Approval.ProcessResult> respSR_Approvals = uow.getApprovalProcessResults();
+        List<Database.UpsertResult> respSR_Upsert_Account = uow.getUpsertResults( Account.SObjectType );
+
+        System.Assert.areEqual( 2, respSR_Upsert_Account?.size(), 'Expected 2 UpsertResults for Account accumulated across dUPSERT_PRIO and dUPSERT actions, not overwritten' );
+        System.Assert.areEqual( srUpsertPrio, respSR_Upsert_Account[ 0 ], 'Expected 1st UpsertResult to be from Priority Upsert (fires before normal Upsert)' );
+        System.Assert.areEqual( srUpsert, respSR_Upsert_Account[ 1 ], 'Expected 2nd UpsertResult to be from normal Upsert, appended rather than overwriting the 1st' );
 
         System.Assert.areEqual( 1, respSR_New_Account?.size(), 'Expected 1 SaveResult for New Accounts' );
         System.Assert.areEqual( srNew, respSR_New_Account[ 0 ], 'Expected SR to match DML Proxy response for New Account' );
@@ -1373,5 +1574,6 @@ private with sharing class fflib_SObjectUnitOfWorkTest{
         System.Assert.areEqual( null, uow.getPublishResults( eventSObjectType ), 'Expected reset PlatformEvent Results' );
         System.Assert.areEqual( null, uow.getEmailResults(), 'Expected reset Email Results' );
         System.Assert.areEqual( null, uow.getApprovalProcessResults(), 'Expected reset Email Results' );
+        System.Assert.areEqual( null, uow.getUpsertResults( Account.SObjectType ), 'Expected reset Upsert Account Results' );
     }
 }

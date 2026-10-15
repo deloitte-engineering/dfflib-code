@@ -5,6 +5,7 @@
  * See LICENSE in the repository root for the full license text.
  */
 @IsTest( isParallel = true )
+@SuppressWarnings('PMD.ClassNamingConventions, PMD.ApexUnitTestClassShouldHaveRunAs')
 private with sharing class fflib_InOrderTest{
 
     private static fflib_ApexMocks MY_MOCKS = new fflib_ApexMocks();
@@ -13,7 +14,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderAllTheMethodsCalled(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -47,7 +48,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderDifferentMethodsCalledWithSameArguments(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -70,7 +71,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderDifferentMethodsCalledWithSameArgumentsOrderFail(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -101,7 +102,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderDifferentMethodsCalledWithSameArgumentsDoubleCallFail(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -132,7 +133,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderCallMethodWithMatches(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-0' );
@@ -150,7 +151,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderCallMethodWithMatchesFailsIfVerifyACallAlreadyInTheMatcher(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-0' );
@@ -183,7 +184,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderCallMethodWithMultipleMatches(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
 
@@ -207,7 +208,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderCallMethodWithMultipleMatchesMixed(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -228,7 +229,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderCallMethodWithMultipleMatchesMixedFailWhenMatcherHaveAlreadyVerifiedMethod(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -263,7 +264,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderCanSkipMethodsCalledUntilFindTheOneThatNeedsVerify(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -295,7 +296,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderCanHandleMultipleMethodsCalls(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -314,7 +315,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderCanHandleMultipleMethodsCallsAndNotFailsIfVerifyCountIsGreaterThenExpected(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -333,7 +334,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyInOrderCanHandleMultipleMethodsCallsButFailsIfVerifyCountIsLessThenExpected(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -401,7 +402,7 @@ private with sharing class fflib_InOrderTest{
         fflib_MyList secondMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
         fflib_MyList thirdMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
 
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
         fflib_InOrder inOrder2 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock, secondMock } );
 
         // When - perform test
@@ -437,7 +438,7 @@ private with sharing class fflib_InOrderTest{
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
         fflib_MyList secondMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
 
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -465,7 +466,7 @@ private with sharing class fflib_InOrderTest{
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
 
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         String customErrorMessage = 'Some custom error message';
 
@@ -496,7 +497,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyAtMostThrowsExceptionBecauseNotImplemented(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -522,7 +523,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyBetweenThrowsExceptionBecauseNotImplemented(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -549,7 +550,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyNever(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -571,7 +572,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyNeverWithMatchers(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -593,7 +594,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyNeverFailsWhenCalled(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -627,7 +628,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyNeverFailsWhenCalledWithMatchers(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -681,7 +682,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyNoMoreInteractionsFails(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1', '1-1', '1-1', '1-1' );
@@ -704,7 +705,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyNoMoreInteractionsFailsWhenOnLyOneMethodLeft(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1', '1-1', '1-1', '1-1' );
@@ -727,7 +728,7 @@ private with sharing class fflib_InOrderTest{
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
         fflib_MyList secondMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
         fflib_InOrder inOrder2 = new fflib_InOrder( MY_MOCKS, new List<Object>{ secondMock } );
 
         // When - perform test
@@ -753,7 +754,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyNoMoreInteractionsFailsWhenNoInteracionOccurs(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -774,7 +775,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyNoInteractionsFails(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -796,7 +797,7 @@ private with sharing class fflib_InOrderTest{
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
         fflib_MyList secondMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
 
         // When - perform test
@@ -810,7 +811,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatStrictVerificationCanBePerformed(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -829,7 +830,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatMixedVerificationDoNotInterfierWithOtherImplementationChecking(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -852,7 +853,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyAtLeastPassWithSameCallsOfAssertion(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' ); // Consumed by -> verify(firstMock, MY_MOCKS.calls(1))).add('1-1');
@@ -874,7 +875,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyAtLeastPassWithMoreCallsThenAsserted(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' ); // Consumed by -> verify(firstMock, MY_MOCKS.calls(1))).add('1-1');
@@ -896,7 +897,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyAtLeastThrowsErrorIfCalledLessTimes(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' ); // Consumed by -> verify(firstMock, MY_MOCKS.calls(1))).add('1-1');
@@ -930,7 +931,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyAtLeastConsumeAllTheInstances(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' ); // Consumed by -> verify(firstMock, MY_MOCKS.calls(1))).add('1-1');
@@ -969,7 +970,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyAtLeastConsumeAllTheInstancesForOnlyTheMethodVerified(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -990,7 +991,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyAtLeastOnce(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1005,7 +1006,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyAtLeastOnceConsumesInstancesUntilLastMethodVerified(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1022,7 +1023,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyAtLeastOnceThrowsErrorIfCalledLessTimes(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1051,7 +1052,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyAtLeastOnceConsumesAllTheInstances(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1083,7 +1084,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyTimes(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1104,7 +1105,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyTimesThrowsExceptionIfCalledMoreTimesThanExpected(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1138,7 +1139,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyTimesThrowsExceptionIfCalledLessTimesThanExpected(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1172,7 +1173,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyTimesPassWhenAnotherMethodIsCalledBetweenMethodsCalls(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1197,7 +1198,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyTimesPassWhenAnotherMethodIsCalledBetweenMethodsCalls2(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1223,7 +1224,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyTimesPassWhenAnotherMethodIsCalledBetweenMethodsCalls3(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1254,7 +1255,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyTimesPassWhenAnotherMethodIsCalledBetweenMethodsCalls4(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1282,7 +1283,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyTimesThrowsExceptionWhenAnotherMethodIsCalledBetweenMethodsCalls(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1317,7 +1318,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatStrictVerificationCanBeEnforced(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1342,7 +1343,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatTimesOneIsTheDefaultVerification(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1377,7 +1378,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatWithOldNotation(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1398,7 +1399,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatWithOldNotationThrowsExceptionIfCalledMoreTimesThanExpected(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1431,7 +1432,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatWithOldNotationThrowsExceptionIfCalledLessTimesThanExpected(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1464,7 +1465,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatWithOldNotationPassWhenAnotherMethodIsCalledBetweenMethodsCalls(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1487,7 +1488,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatWithOldNotationThrowsExceptionWhenAnotherMethodIsCalledBetweenMethodsCalls(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1522,7 +1523,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatStrictVerificationCanBeEnforcedWithOldNotation(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1547,7 +1548,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatStrictVerificationCanBeEnforcedWithOldNotationUsingDefaultTimesOne(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.add( '1-1' );
@@ -1572,7 +1573,7 @@ private with sharing class fflib_InOrderTest{
     private static void thatVerifyAtLeastConsumesAllTheInstances2(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         //When
         firstMock.add( '1-1' );
@@ -1607,7 +1608,7 @@ private with sharing class fflib_InOrderTest{
     private static void verifyAtLeastAndCapture(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.get2( 1, '1-1' );
@@ -1629,7 +1630,7 @@ private with sharing class fflib_InOrderTest{
     private static void verifyTimesAndCaptor(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.get2( 1, '1-1' );
@@ -1656,7 +1657,7 @@ private with sharing class fflib_InOrderTest{
     private static void verifyCallsAndCapture(){
         // Create mocks
         fflib_MyList firstMock = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
-        fflib_InOrder inOrder1 = new fflib_InOrder( MY_MOCKS, new List<Object>{ firstMock } );
+        fflib_InOrder inOrder1 = MY_MOCKS.inOrder( new List<Object>{ firstMock } );
 
         // When - perform test
         firstMock.get2( 1, '1-1' );

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+@NamespaceAccessible
 public interface fflib_ISObjectDomain extends fflib_IDomain{
-
     /**
      * Return the SObjectType the Domain class represents.
      *

@@ -9,6 +9,9 @@
  * 2) Allowing optimal separation of concerns where UOW focuses on registration and fflib_Database_DMLProxy on database interactions
  *      This allows to simplify Test methods, and make the framework more environment-independent (test-classes not failing on added validations)
  *      Lastly, this enables unlocked packages where framework code is not needed to be touched by project developers
+ *
+ *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
+ *  @created    February 2023
  */
 public abstract class fflib_Database_DMLProxy{
 
@@ -97,6 +100,17 @@ public abstract class fflib_Database_DMLProxy{
                 }
             }
             return null;
+        }
+
+        public List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel ){
+            switch on action{
+                when dUPSERT, dUPSERT_PRIO{
+                    return Database.upsert( objList, externalIdField, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with ExternalIdField ' + action );
+                }
+            }
         }
 
         public List<Object> performOperation( fflib_SObjectUnitOfWork.Operations operation, List<Object> objList ){
@@ -193,6 +207,17 @@ public abstract class fflib_Database_DMLProxy{
             return null;
         }
 
+        public List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel ){
+            switch on action{
+                when dUPSERT, dUPSERT_PRIO{
+                    return Database.upsert( objList, externalIdField, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with ExternalIdField ' + action );
+                }
+            }
+        }
+
         public List<Object> performOperation( fflib_SObjectUnitOfWork.Operations operation, List<Object> objList ){
             if( objList != null && !objList.isEmpty() ){
                 // Per operation convert List<Any> to right format by looping per record to prevent "Invalid conversion" exception
@@ -285,6 +310,17 @@ public abstract class fflib_Database_DMLProxy{
                 }
             }
             return null;
+        }
+
+        public List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel ){
+            switch on action{
+                when dUPSERT, dUPSERT_PRIO{
+                    return Database.upsert( objList, externalIdField, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with ExternalIdField ' + action );
+                }
+            }
         }
 
         public List<Object> performOperation( fflib_SObjectUnitOfWork.Operations operation, List<Object> objList ){

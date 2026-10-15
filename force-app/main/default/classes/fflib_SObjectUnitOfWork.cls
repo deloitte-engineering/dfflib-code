@@ -12,6 +12,8 @@
  *
  *  Inspiration based on Apex-Commons repository from FinancialForce.com, Inc
  *
+ *  @author    Reinier van den Assum (rvandenassum@deloitte.nl)
+ *  @created   December 2020
  */
 /**
  * Provides an implementation of the Enterprise Application Architecture Unit Of Work, as defined by Martin Fowler
@@ -32,6 +34,7 @@
  *
  * Please refer to the testMethod's in this class for example usage
  */
+@NamespaceAccessible
 public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_ISObjectUnitOfWork{
     /**
      * DMLActions - this enum is used to easily share for what DML an SObjectType should be registered
@@ -40,6 +43,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
     public enum DMLActions{
         dNEW, dNEW_PRIO, dNEW_IMMEDIATE,
         dUPDATE, dUPDATE_PRIO, dUPDATE_IMMEDIATE,
+        dUPSERT, dUPSERT_PRIO,
         dDELETE, dDELETE_PRIO, dDELETE_IMMEDIATE,
         dUNDELETE,
         dEMPTY_RECBIN,
@@ -49,6 +53,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         PROCESS_APPROVAL_PROCESS, SEND_EMAIL
     }
     private final Set<DMLActions> ACTIONS_DMLOPTIONS = new Set<DMLActions>{ DMLActions.dNEW, DMLActions.dNEW_PRIO, DMLActions.dUPDATE, DMLActions.dUPDATE_PRIO };
+    private final Set<DMLActions> ACTIONS_UPSERT = new Set<DMLActions>{ DMLActions.dUPSERT, DMLActions.dUPSERT_PRIO };
     private final Set<DMLActions> ACTIONS_ALLORNONE = new Set<DMLActions>{ DMLActions.dDELETE, DMLActions.dDELETE_PRIO, DMLActions.dUNDELETE };
     private final Set<DMLActions> ACTIONS_EVENTS = new Set<DMLActions>{ DMLActions.dPUB_BEFORE, DMLActions.dPUB_AFTER_SUCCESS, DMLActions.dPUB_AFTER_FAILURE };
 
@@ -68,6 +73,9 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
     // No Map, since no later updates on record are allowed after registration
     protected Map<Schema.SObjectType, List<SObject>> m_dirtyImmediateListByType = new Map<Schema.SObjectType, List<SObject>>();
     protected Map<Schema.SObjectType, Map<String, SObject>> m_dirtyPriorityMapByType = new Map<Schema.SObjectType, Map<String, SObject>>();
+
+    protected Map<Schema.SObjectType, Map<Schema.SObjectField, List<SObject>>> m_upsertMapByTypeAndField = new Map<Schema.SObjectType, Map<Schema.SObjectField, List<SObject>>>();
+    protected Map<Schema.SObjectType, Map<Schema.SObjectField, List<SObject>>> m_upsertPriorityMapByTypeAndField = new Map<Schema.SObjectType, Map<Schema.SObjectField, List<SObject>>>();
 
     protected Map<Schema.SObjectType, List<SObject>> m_deletedListByType = new Map<Schema.SObjectType, List<SObject>>();
     protected Map<Schema.SObjectType, List<SObject>> m_deletedImmediateListByType = new Map<Schema.SObjectType, List<SObject>>();
@@ -89,6 +97,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
     @TestVisible private Boolean saveResultsRequired = false;
     private Map<Schema.SObjectType, List<Database.SaveResult>> m_newSaveResults;
     private Map<Schema.SObjectType, List<Database.SaveResult>> m_dirtySaveResults;
+    private Map<Schema.SObjectType, List<Database.UpsertResult>> m_upsertSaveResults;
     private Map<Schema.SObjectType, List<Database.DeleteResult>> m_deletedSaveResults;
     private Map<Schema.SObjectType, List<Database.UndeleteResult>> m_undeletedSaveResults;
     private Map<Schema.SObjectType, List<Database.EmptyRecycleBinResult>> m_emptyRecycleBinSaveResults;
@@ -109,6 +118,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
     protected Map<Schema.SObjectType, Database.DMLOptions> m_newDmlOptions = new Map<Schema.SObjectType, Database.DMLOptions>();
     protected Map<Schema.SObjectType, Database.DMLOptions> m_dirtyDmlOptions = new Map<Schema.SObjectType, Database.DMLOptions>();
 
+    protected Map<Schema.SObjectType, Boolean> m_upsertAllOrNone = new Map<Schema.SObjectType, Boolean>();
     protected Map<Schema.SObjectType, Boolean> m_deletedAllOrNone = new Map<Schema.SObjectType, Boolean>();
     protected Map<Schema.SObjectType, Boolean> m_undeletedAllOrNone = new Map<Schema.SObjectType, Boolean>();
 
@@ -117,6 +127,8 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         DMLActions.dNEW_PRIO    => m_newDmlOptions,
         DMLActions.dUPDATE      => m_dirtyDmlOptions,
         DMLActions.dUPDATE_PRIO => m_dirtyDmlOptions,
+        DMLActions.dUPSERT      => m_upsertAllOrNone,
+        DMLActions.dUPSERT_PRIO => m_upsertAllOrNone,
         DMLActions.dDELETE      => m_deletedAllOrNone,
         DMLActions.dDELETE_PRIO => m_deletedAllOrNone,
         DMLActions.dUNDELETE    => m_undeletedAllOrNone
@@ -181,6 +193,14 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
             when dUPDATE_PRIO{
                 m_dirtyPriorityMapByType.put( sObjType, new Map<String, SObject>() );
             }
+            when dUPSERT{
+                m_upsertMapByTypeAndField.put( sObjType, new Map<Schema.SObjectField, List<SObject>>() );
+                m_upsertAllOrNone.put( sObjType, true );
+            }
+            when dUPSERT_PRIO{
+                m_upsertPriorityMapByTypeAndField.put( sObjType, new Map<Schema.SObjectField, List<SObject>>() );
+                m_upsertAllOrNone.put( sObjType, true );
+            }
             when dDELETE{
                 m_deletedListByType.put( sObjType, new List<SObject>() );
                 m_deletedAllOrNone.put( sObjType, true );
@@ -221,7 +241,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   sObjType    Type of SObject
      */
     private void checkDMLActionAllowedForSObjectType( DMLActions action, Schema.SObjectType sObjType ){
-        String sObjectTypeName = sObjType.getDescribe().getName();
+        String sObjectTypeName = fflib_SObjectDescribe.getDescribe( sObjType ).getDescribeName();
         Boolean isPlatformEventSObject = isPlatformEvent( sObjectTypeName );
         Boolean isPlatformEventAction = ACTIONS_EVENTS.contains( action );
 
@@ -315,6 +335,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * use fflib_Database.Context.NONE explicitly:
      *   new fflib_SObjectUnitOfWork( fflib_Database.Context.NONE )
      */
+    @NamespaceAccessible
     public fflib_SObjectUnitOfWork(){
         this( null, fflib_Database.Context.INHERIT );
     }
@@ -324,6 +345,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * Note, when using this option, an Exception is thrown when a record is registered which is not listed in this Constructor-list.
      * @param sObjTypes List of SObjectTypes to be registered for this Unit Of Work
      */
+    @NamespaceAccessible
     public fflib_SObjectUnitOfWork( List<SObjectType> sObjTypes ){
         this( sObjTypes, fflib_Database.Context.INHERIT );
     }
@@ -332,6 +354,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * Constructs a new Unit Of Work with specified database security model
      * @param securityContext Database Context to be applied for all records and operations within this Unit Of Work
      */
+    @NamespaceAccessible
     public fflib_SObjectUnitOfWork( fflib_Database.Context securityContext ){
         this( null, securityContext );
     }
@@ -341,6 +364,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param sObjTypes       List of SObjectTypes to be registered for this Unit Of Work
      * @param securityContext Database Context to be applied for all records and operations within this Unit Of Work
      */
+    @NamespaceAccessible
     public fflib_SObjectUnitOfWork( List<SObjectType> sObjTypes, fflib_Database.Context securityContext ){
         if( sObjTypes != null ){
             // Validate no duplicate SObjectTypes provided in list, by converting to Set which only keeps unique values
@@ -361,6 +385,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   uowConfigRecords    Pre-resolved list of FFLIB_UOW_Config__mdt records
      * @return  This fflib_SObjectUnitOfWork instance (fluent interface)
      */
+    @NamespaceAccessible
     public fflib_SObjectUnitOfWork setConfigs( List<FFLIB_UOW_Config__mdt> uowConfigRecords ){
         this.uowConfigs = uowConfigRecords;
         return this;
@@ -372,6 +397,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param   securityContext     Sharing mode to be used in this unit of work
      */
+    @NamespaceAccessible
     public void setContext( fflib_Database.Context securityContext ){
         this.m_securityContext = securityContext;
         this.m_dml = fflib_Database.getDMLProxy( securityContext );
@@ -385,10 +411,12 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param action    DMLAction requested for record
      * @param sObjType  ONLY for Update-With-Registration-DMLActions: SObjectType to check current registerNew() records for that SObjectType
      */
-    public void validateRecordForDMLAction( SObject record, DMLActions action ){
+    @TestVisible
+    protected void validateRecordForDMLAction( SObject record, DMLActions action ){
         this.validateRecordForDMLAction( record, action, null );
     }
-    public void validateRecordForDMLAction( SObject record, DMLActions action, Schema.SObjectType sObjType ){
+    @TestVisible
+    protected void validateRecordForDMLAction( SObject record, DMLActions action, Schema.SObjectType sObjType ){
         switch on action{
             when dNEW_PRIO, dNEW, dNEW_IMMEDIATE{
                 if( String.isNotBlank( record?.Id ) ){
@@ -434,20 +462,53 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
     }
 
     /**
+     * Validation for upsert-by-externalId registrations
+     * - Exception when either record or externalIdField is null
+     * - Field must be marked External Id/idLookup, or be the standard Id field
+     * - Field must belong to the same SObjectType as the record being registered
+     * - Record must have a populated value for the externalIdField, else the upsert key is meaningless
+     *
+     * @param   record          The record to be upserted
+     * @param   externalIdField The SObjectField to upsert by
+     * @return  The SObjectType of the record, resolved once for the caller to reuse
+     */
+    @TestVisible
+    protected Schema.SObjectType validateUpsert( SObject record, Schema.SObjectField externalIdField ){
+        dfflib_Utils.verifyNotNull( record, 'record' );
+        dfflib_Utils.verifyNotNull( externalIdField, 'externalIdField' );
+
+        Schema.SObjectType sObjType = record.getSObjectType();
+        Schema.DescribeFieldResult externalIdDescribe = fflib_SObjectDescribe.getFieldDescribe( externalIdField );
+        if( !externalIdDescribe.isExternalId() && externalIdDescribe.getName() != 'Id' ){
+            throw new UnitOfWorkException( 'The provided Field can\'t be used for upserts as it doesn\'t have the ExternalId characteristic ' + externalIdDescribe.getName() );
+        } else if( externalIdDescribe.getSObjectType() != sObjType ){
+            throw new UnitOfWorkException( 'The ExternalId should be of the same SObjectType as the record provided ' + externalIdDescribe.getSObjectType() + ' vs ' + sObjType );
+        } else if( record.get( externalIdField ) == null && externalIdDescribe.getName() != 'Id' ){
+            // Upsert allows to insert or update records depending on availability.
+            // When using for Id fields, a null value is acceptable as it indicates an insert operation rather than an update.
+            throw new UnitOfWorkException( 'The record should have a value for the provided ExternalId field ' + externalIdDescribe.getName() );
+        }
+        return sObjType;
+    }
+
+    /**
      * For specific scenarios you may wish to register new records to be inserted into the database before other records
      * within the same transaction are inserted to enable relationships to be populated correctly. E.g. inserting a
      * parent and child record of the same sObject type could not be linked together in the same unit of work otherwise.
      *
      * @param   record  A newly created SObject instance to be inserted during commitWork
      */
+    @NamespaceAccessible
     public void registerPriorityNew( SObject record ){
         registerPriorityNew( record, null, null );
     }
+    @NamespaceAccessible
     public void registerPriorityNew( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerPriorityNew( records[ i ] );
         }
     }
+    @NamespaceAccessible
     public void registerPriorityNew( SObject record, Schema.SObjectField relatedToParentField, SObject relatedToParentRecord ){
         validateRecordForDMLAction( record, DMLActions.dNEW_PRIO );
 
@@ -468,9 +529,11 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param   record  A newly created SObject instance to be inserted during commitWork
      */
+    @NamespaceAccessible
     public void registerNew( SObject record ){
         registerNew( record, null, null );
     }
+    @NamespaceAccessible
     public void registerNew( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             registerNew( records[ i ], null, null );
@@ -485,6 +548,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   relatedToParentField    A SObjectField reference to the child field that associates the child record with its parent
      * @param   relatedToParentRecord   A SObject instance of the parent record (should also be registered as new separately)
      */
+    @NamespaceAccessible
     public void registerNew( SObject record, Schema.SObjectField relatedToParentField, SObject relatedToParentRecord ){
         validateRecordForDMLAction( record, DMLActions.dNEW );
 
@@ -505,6 +569,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param record An instance of an External, Big or Special object to be inserted immediately
      */
+    @NamespaceAccessible
     public void registerNewImmediate( SObject record ){
         validateRecordForDMLAction( record, DMLActions.dNEW_IMMEDIATE );
 
@@ -514,6 +579,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         }
         m_newImmediateListByType.get( sObjType ).add( record );
     }
+    @NamespaceAccessible
     public void registerNewImmediate( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerNewImmediate( records[ i ] );
@@ -526,14 +592,17 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param   record  A existing SObject instance to be updated during commitWork
      */
+    @NamespaceAccessible
     public void registerPriorityDirty( SObject record ){
         registerPriorityDirty( record, null, null );
     }
+    @NamespaceAccessible
     public void registerPriorityDirty( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerPriorityDirty( records[ i ] );
         }
     }
+    @NamespaceAccessible
     public void registerPriorityDirty( SObject record, Schema.SObjectField relatedToParentField, SObject relatedToParentRecord ){
         Schema.SObjectType sObjType = record.getSObjectType();
         // On registry of updates with relations we allow records inserted in same transaction, else, each record should have an Id
@@ -557,9 +626,11 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param   record      An existing record
      */
+    @NamespaceAccessible
     public void registerDirty( SObject record ){
         registerDirty( record, null, null, null );
     }
+    @NamespaceAccessible
     public void registerDirty( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerDirty( records[ i ] );
@@ -578,9 +649,11 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   record              An existing record
      * @param   dirtyFields         The list of fields to be updated only
      */
+    @NamespaceAccessible
     public void registerDirty( SObject record, List<SObjectField> dirtyFields ){
         this.registerDirty( record, dirtyFields, null, null );
     }
+    @NamespaceAccessible
     public void registerDirty( List<SObject> records, List<SObjectField> dirtyFields ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerDirty( records[ i ], dirtyFields );
@@ -595,6 +668,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   relatedToParentField    The SObjectField reference to the field that associates the child record with its parent
      * @param   relatedToParentRecord   The SObject instance of the parent record (should be registered as new separately!)
      */
+    @NamespaceAccessible
     public void registerDirty( SObject record, Schema.SObjectField relatedToParentField, SObject relatedToParentRecord ){
         this.registerDirty( record, null, relatedToParentField, relatedToParentRecord );
     }
@@ -608,6 +682,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param relatedToParentField      Opt. SObjectField detailing the relation from this SObjectType to the parent (lookup) to populate
      * @param relatedToParentRecord     Opt. SObject referring to the parent record, which should be registeredNew separately to retrieve an ID in the UOW before update
      */
+    @NamespaceAccessible
     public void registerDirty( SObject record, List<SObjectField> dirtyFields, Schema.SObjectField relatedToParentField, SObject relatedToParentRecord ){
         // Validate whether the record is allowed to be registered for update (e.g. having recordId, or inserted in same transaction)
         // Note, to allow partial records (dirtyFields) the recordId should already be known, since a clone is made and no later update is then possible
@@ -663,6 +738,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param record An instance of an External, Big or Special object to be updated immediately
      */
+    @NamespaceAccessible
     public void registerDirtyImmediate( SObject record ){
         validateRecordForDMLAction( record, DMLActions.dUPDATE_IMMEDIATE );
 
@@ -672,6 +748,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         }
         m_dirtyImmediateListByType.get( sObjType ).add( record );
     }
+    @NamespaceAccessible
     public void registerDirtyImmediate( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerDirtyImmediate( records[ i ] );
@@ -683,6 +760,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param   record      A new or existing record
      */
+    @NamespaceAccessible
     public void registerUpsert( SObject record ){
         if( String.isBlank( record.Id ) ){
             this.registerNew( record, null, null );
@@ -690,9 +768,69 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
             this.registerDirty( record );
         }
     }
+    @NamespaceAccessible
     public void registerUpsert( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerUpsert( records[ i ] );
+        }
+    }
+
+    /**
+     * Register a record to be upserted by a specified ExternalId field during commitWork(). 
+     * Performing a Database.upsert(), with ability to register different externalIds for the same SObjectType, but different records.
+     *
+     * @param   record          The record to be upserted; either inserted or updated based on the ExternalId field's value
+     * @param   externalIdField The ExternalId (or Id) field to match the record on
+     */
+    @NamespaceAccessible
+    public void registerUpsert( SObject record, Schema.SObjectField externalIdField ){
+        Schema.SObjectType sObjType = validateUpsert( record, externalIdField );
+
+        if( !m_upsertMapByTypeAndField.containsKey( sObjType ) ){
+            implementSObjectType( sObjType, DMLActions.dUPSERT );
+        }
+        Map<Schema.SObjectField, List<SObject>> upsertRegistration = m_upsertMapByTypeAndField.get( sObjType );
+        List<SObject> registeredSObjects = upsertRegistration.get( externalIdField );
+        if( registeredSObjects != null ){
+            registeredSObjects.add( record );
+        } else{
+            upsertRegistration.put( externalIdField, new List<SObject>{ record } );
+        }
+    }
+    @NamespaceAccessible
+    public void registerUpsert( List<SObject> records, Schema.SObjectField externalIdField ){
+        for( Integer i = 0, j = records.size(); i < j; i++ ){
+            this.registerUpsert( records[ i ], externalIdField );
+        }
+    }
+
+    /**
+     * For specific scenarios you may wish to register records to be upserted by ExternalId field into the database before
+     * other records within the same transaction are inserted/updated, in Priority - thus before Priority Delete and after
+     * Priority Update. See {@link #registerUpsert( SObject, Schema.SObjectField )} for the general behaviour.
+     *
+     * @param   record          The record to be upserted; either inserted or updated based on the ExternalId field's value
+     * @param   externalIdField The ExternalId (or Id) field to match the record on
+     */
+    @NamespaceAccessible
+    public void registerPriorityUpsert( SObject record, Schema.SObjectField externalIdField ){
+        Schema.SObjectType sObjType = this.validateUpsert( record, externalIdField );
+
+        if( !m_upsertPriorityMapByTypeAndField.containsKey( sObjType ) ){
+            implementSObjectType( sObjType, DMLActions.dUPSERT_PRIO );
+        }
+        Map<Schema.SObjectField, List<SObject>> upsertPrioRegistration = m_upsertPriorityMapByTypeAndField.get( sObjType );
+        List<SObject> registeredSObjects = upsertPrioRegistration.get( externalIdField );
+        if( registeredSObjects != null ){
+            registeredSObjects.add( record );
+        } else{
+            upsertPrioRegistration.put( externalIdField, new List<SObject>{ record } );
+        }
+    }
+    @NamespaceAccessible
+    public void registerPriorityUpsert( List<SObject> records, Schema.SObjectField externalIdField ){
+        for( Integer i = 0, j = records.size(); i < j; i++ ){
+            this.registerPriorityUpsert( records[ i ], externalIdField );
         }
     }
 
@@ -702,6 +840,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param record An existing record to be deleted
      **/
+    @NamespaceAccessible
     public void registerPriorityDeleted( SObject record ){
         validateRecordForDMLAction( record, DMLActions.dDELETE_PRIO );
 
@@ -712,6 +851,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
 
         m_deletedPriorityListByType.get( sObjType ).add( record );
     }
+    @NamespaceAccessible
     public void registerPriorityDeleted( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerPriorityDeleted( records[ i ] );
@@ -723,6 +863,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param   record      An existing record to be deleted
      */
+    @NamespaceAccessible
     public void registerDeleted( SObject record ){
         validateRecordForDMLAction( record, DMLActions.dDELETE );
 
@@ -732,6 +873,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         }
         m_deletedListByType.get( sObjType ).add( record );
     }
+    @NamespaceAccessible
     public void registerDeleted( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerDeleted( records[ i ] );
@@ -744,6 +886,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param record An instance of an External, Big or Special object to be deleted immediately
      */
+    @NamespaceAccessible
     public void registerDeletedImmediate( SObject record ){
         validateRecordForDMLAction( record, DMLActions.dDELETE_IMMEDIATE );
 
@@ -753,6 +896,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         }
         m_deletedImmediateListByType.get( sObjType ).add( record );
     }
+    @NamespaceAccessible
     public void registerDeletedImmediate( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerDeletedImmediate( records[ i ] );
@@ -764,10 +908,12 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param   record      An existing record to be permanently deleted and thus directly removed from recycle bin
      */
+    @NamespaceAccessible
     public void registerPermanentlyDeleted( SObject record ){
         this.registerDeleted( record );
         this.registerEmptyRecycleBin( record );
     }
+    @NamespaceAccessible
     public void registerPermanentlyDeleted( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerPermanentlyDeleted( records[ i ] );
@@ -779,6 +925,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param  record      An existing record to be removed from recycle bin
      */
+    @NamespaceAccessible
     public void registerEmptyRecycleBin( SObject record ){
         Schema.SObjectType sObjType = record.getSObjectType();
         if( !m_emptyRecycleBinListByType.containsKey( sObjType ) ){
@@ -786,6 +933,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         }
         m_emptyRecycleBinListByType.get( sObjType ).add( record );
     }
+    @NamespaceAccessible
     public void registerEmptyRecycleBin( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             registerEmptyRecycleBin( records[ i ] );
@@ -797,6 +945,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param record A deleted record which should be 'undeleted'/'reverted'
      */
+    @NamespaceAccessible
     public void registerUndeleted( SObject record ){
         validateRecordForDMLAction( record, DMLActions.dUNDELETE );
 
@@ -806,6 +955,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         }
         m_undeletedListByType.get( sObjType ).add( record );
     }
+    @NamespaceAccessible
     public void registerUndeleted( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerUndeleted( records[ i ] );
@@ -817,6 +967,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param   record  A newly created SObject (Platform Event) instance to be inserted during commitWork
      */
+    @NamespaceAccessible
     public void registerPublishBeforeTransaction( SObject record ){
         Schema.SObjectType sObjType = record.getSObjectType();
         if( !m_publishBeforeListByType.containsKey( sObjType ) ){
@@ -825,6 +976,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
 
         m_publishBeforeListByType.get( sObjType ).add( record );
     }
+    @NamespaceAccessible
     public void registerPublishBeforeTransaction( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerPublishBeforeTransaction( records[ i ] );
@@ -836,6 +988,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param   record      A newly created SObject (Platform Event) instance to be inserted during commitWork
      */
+    @NamespaceAccessible
     public void registerPublishAfterFailureTransaction( SObject record ){
         Schema.SObjectType sObjType = record.getSObjectType();
         if( !m_publishAfterFailureListByType.containsKey( sObjType ) ){
@@ -844,6 +997,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
 
         m_publishAfterFailureListByType.get( sObjType ).add( record );
     }
+    @NamespaceAccessible
     public void registerPublishAfterFailureTransaction( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerPublishAfterFailureTransaction( records[ i ] );
@@ -855,6 +1009,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param   record      A newly created SObject (Platform Event) instance to be inserted during commitWork
      */
+    @NamespaceAccessible
     public void registerPublishAfterSuccessTransaction( SObject record ){
         Schema.SObjectType sObjType = record.getSObjectType();
         if( !m_publishAfterSuccessListByType.containsKey( sObjType ) ){
@@ -863,6 +1018,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
 
         m_publishAfterSuccessListByType.get( sObjType ).add( record );
     }
+    @NamespaceAccessible
     public void registerPublishAfterSuccessTransaction( List<SObject> records ){
         for( Integer i = 0, j = records.size(); i < j; i++ ){
             this.registerPublishAfterSuccessTransaction( records[ i ] );
@@ -874,6 +1030,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param work  A class instance which implements IDoWork interface and should be executed at the end of commitWork()
      */
+    @NamespaceAccessible
     public void registerWork( IDoWork work ){
         m_workList.add( work );
     }
@@ -883,6 +1040,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param email     Messaging.Email or Messaging.SingleEmailMessage instance to be send
      */
+    @NamespaceAccessible
     public void registerEmail( Messaging.Email email ){
         List<Object> emailsRegistered = m_operationObjects.get( Operations.SEND_EMAIL );
         if( emailsRegistered == null ){
@@ -899,6 +1057,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param email     Messaging.SingleEmailMessage instance to be send
      * @param relatedTo An SObject instance to be set as WhatId on the email
      */
+    @NamespaceAccessible
     public void registerEmail( Messaging.SingleEmailMessage email, SObject relatedTo ){
         this.registerEmail( email );
         this.registerRelationship( email, relatedTo );
@@ -909,6 +1068,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param process   Either a ProcessSubmitRequest or ProcessWorkitemRequest to be processed
      */
+    @NamespaceAccessible
     public void registerApprovalProcess( Approval.ProcessRequest process ){
         List<Object> approvalsRegistered = m_operationObjects.get( Operations.PROCESS_APPROVAL_PROCESS );
         if( approvalsRegistered == null ){
@@ -925,6 +1085,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param process   Either a ProcessSubmitRequest or ProcessWorkitemRequest to be processed
      * @param relatedTo An SObject instance to be set as the TargetObjectId on the approval process
      */
+    @NamespaceAccessible
     public void registerApprovalProcess( Approval.ProcessRequest process, SObject relatedTo ){
         this.registerApprovalProcess( process );
         this.registerRelationship( process, relatedTo );
@@ -938,9 +1099,11 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   relatedToField      A SObjectField reference to the lookup field that relates the two records together
      * @param   relatedTo           A SObject instance (yet to be committed to the database)
      */
+    @NamespaceAccessible
     public void registerRelationship( SObject record, Schema.SObjectField relatedToField, SObject relatedTo ){
         registerRelationship( record, relatedToField, relatedTo, null );
     }
+    @NamespaceAccessible
     public void registerRelationship( SObject record, Schema.SObjectField relatedToField, SObject relatedTo, DMLActions specificDMLAction ){
         Schema.SObjectType sObjType = record.getSObjectType();
 
@@ -969,9 +1132,11 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * Wraps putSObject, creating a new instance of the lookup sobject using the external id field and value.
      */
+    @NamespaceAccessible
     public void registerRelationship( SObject record, Schema.SObjectField relatedToField, Schema.SObjectField externalIdField, Object externalId ){
         registerRelationship( record, relatedToField, externalIdField, externalId, null );
     }
+    @NamespaceAccessible
     public void registerRelationship( SObject record, Schema.SObjectField relatedToField, Schema.SObjectField externalIdField, Object externalId, DMLActions specificDMLAction ){
         // NOTE: Due to the lack of ExternalID references on Standard Objects, this method can not be provided a standardized Unit Test. - Rick Parker
         Schema.SObjectType sObjType = record.getSObjectType();
@@ -996,6 +1161,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   email       Single email message instance
      * @param   relatedTo   A SObject instance (yet to be committed to the database)
      */
+    @NamespaceAccessible
     public void registerRelationship( Messaging.SingleEmailMessage email, SObject relatedTo ){
         addToRelationshipsMap( Operations.SEND_EMAIL, new EmailRelationship( email, relatedTo ) );
     }
@@ -1008,6 +1174,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   process     Process submit request instance
      * @param   relatedTo   A SObject instance (yet to be committed to the database)
      */
+    @NamespaceAccessible
     public void registerRelationship( Approval.ProcessRequest process, SObject relatedTo ){
         addToRelationshipsMap( Operations.PROCESS_APPROVAL_PROCESS, new ApprovalRelationship( process, relatedTo ) );
     }
@@ -1056,6 +1223,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   sType       SObject type to apply the DML options to.
      * @param   options     The DML options to be applied to the records being inserted.
      */
+    @NamespaceAccessible
     public void registerNewDmlOptions( Schema.SObjectType sType, Database.DMLOptions options ){
         m_newDmlOptions.put( sType, options );
     }
@@ -1067,6 +1235,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   sType       SObject type to apply the DML options to.
      * @param   options     The DML options to be applied to the records being updated.
      */
+    @NamespaceAccessible
     public void registerDirtyDmlOptions( Schema.SObjectType sType, Database.DMLOptions options ){
         m_dirtyDmlOptions.put( sType, options );
     }
@@ -1078,6 +1247,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   sType       SObject type to apply the all or none value to.
      * @param   allOrNone   True if all records should succeed, otherwise best effort will be used.
      */
+    @NamespaceAccessible
     public void registerNewAllOrNone( Schema.SObjectType sType, Boolean allOrNone ){
         if( !m_newDmlOptions.containsKey( sType ) ){
             m_newDmlOptions.put( sType, new Database.DMLOptions() );
@@ -1086,7 +1256,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         Database.DMLOptions options = m_newDmlOptions.get( sType );
         options.optAllOrNone = allOrNone;
         if( !allOrNone ){
-            this.setSaveResultsRequired( true );
+            setSaveResultsRequired( true );
         }
     }
 
@@ -1097,6 +1267,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   sType       SObject type to apply the all or none value to.
      * @param   allOrNone   True if all records should succeed, otherwise best effort will be used.
      */
+    @NamespaceAccessible
     public void registerDirtyAllOrNone( Schema.SObjectType sType, Boolean allOrNone ){
         if( !m_dirtyDmlOptions.containsKey( sType ) ){
             m_dirtyDmlOptions.put( sType, new Database.DMLOptions() );
@@ -1105,7 +1276,22 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         Database.DMLOptions options = m_dirtyDmlOptions.get( sType );
         options.optAllOrNone = allOrNone;
         if( !allOrNone ){
-            this.setSaveResultsRequired( true );
+            setSaveResultsRequired( true );
+        }
+    }
+
+    /**
+     * Sets DML AllOrNone Option when upserting (by externalId field) records for a given SObjectType
+     * Will automatically enable SaveResults in case partial-success is allowed (allOrNone = false)
+     *
+     * @param   sType       SObject type to apply the all or none value to.
+     * @param   allOrNone   True if all records should succeed, otherwise best effort will be used.
+     */
+    @NamespaceAccessible
+    public void registerUpsertedAllOrNone( Schema.SObjectType sType, Boolean allOrNone ){
+        m_upsertAllOrNone.put( sType, allOrNone );
+        if( !allOrNone ){
+            setSaveResultsRequired( true );
         }
     }
 
@@ -1116,10 +1302,11 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   sType       SObject type to apply the all or none value to.
      * @param   allOrNone   True if all records should succeed, otherwise best effort will be used.
      */
+    @NamespaceAccessible
     public void registerDeletedAllOrNone( Schema.SObjectType sType, Boolean allOrNone ){
         m_deletedAllOrNone.put( sType, allOrNone );
         if( !allOrNone ){
-            this.setSaveResultsRequired( true );
+            setSaveResultsRequired( true );
         }
     }
 
@@ -1130,10 +1317,11 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   sType       SObject type to apply the all or none value to.
      * @param   allOrNone   True if all records should succeed, otherwise best effort will be used.
      */
+    @NamespaceAccessible
     public void registerUndeletedAllOrNone( Schema.SObjectType sType, Boolean allOrNone ){
         m_undeletedAllOrNone.put( sType, allOrNone );
         if( !allOrNone ){
-            this.setSaveResultsRequired( true );
+            setSaveResultsRequired( true );
         }
     }
 
@@ -1142,6 +1330,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @return Boolean     True when work has been registered, False when no work has been registered
      */
+    @NamespaceAccessible
     public Boolean hasWork(){
         return
             ( constructorDefinedSObjectTypesList && constructorDefinedHasWork )
@@ -1154,6 +1343,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * Takes all the work that has been registered with the UnitOfWork and commits it to the database
      * For SaveResults, set setSaveResultsRequired( true ); and fetch results by e.g. getNewResults( Schema.SObjectType)
      */
+    @NamespaceAccessible
     public void commitWork(){
         // If we have no work then return early to save DML statements; note when any DML action is registered, sObject is always added to sObjectTypes
         if( !this.hasWork() ){
@@ -1197,6 +1387,19 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
                 }
             }
 
+            // Upsert all of the priority records by type and externalId field
+            if( !m_upsertPriorityMapByTypeAndField.isEmpty() ){
+                for( Integer i = 0; i < sObjectsSize; i++ ){
+                    Schema.SObjectType sObjType = m_sObjectTypes[ i ];
+                    Map<Schema.SObjectField, List<SObject>> upsertPrioRegistration = m_upsertPriorityMapByTypeAndField.get( sObjType );
+                    if( upsertPrioRegistration != null ){
+                        for( Schema.SObjectField externalIdField : upsertPrioRegistration.keySet() ){
+                            performAction( DMLActions.dUPSERT_PRIO, sObjType, upsertPrioRegistration.get( externalIdField ), externalIdField );
+                        }
+                    }
+                }
+            }
+
             // Delete all of the priority delete records by type (in reverse dependency order)
             if( !m_deletedPriorityListByType.isEmpty() ){
                 for( Integer i = ( sObjectsSize - 1 ); i >= 0; i-- ){
@@ -1226,6 +1429,19 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
                 for( Integer i = 0; i < sObjectsSize; i++ ){
                     Schema.SObjectType sObjType = m_sObjectTypes[ i ];
                     performAction( DMLActions.dUPDATE_IMMEDIATE, sObjType, m_dirtyImmediateListByType.get( sObjType ) );
+                }
+            }
+
+            // Upsert by type and externalId field
+            if( !m_upsertMapByTypeAndField.isEmpty() ){
+                for( Integer i = 0; i < sObjectsSize; i++ ){
+                    Schema.SObjectType sObjType = m_sObjectTypes[ i ];
+                    Map<Schema.SObjectField, List<SObject>> upsertRegistration = m_upsertMapByTypeAndField.get( sObjType );
+                    if( upsertRegistration != null ){
+                        for( Schema.SObjectField externalIdField : upsertRegistration.keySet() ){
+                            performAction( DMLActions.dUPSERT, sObjType, upsertRegistration.get( externalIdField ), externalIdField );
+                        }
+                    }
                 }
             }
 
@@ -1333,6 +1549,19 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param records       The list of SObject records to be processed
      */
     private void performAction( DMLActions action, SObjectType sObjType, List<SObject> records ){
+        this.performAction( action, sObjType, records, null );
+    }
+
+    /**
+     * Overload of {@link #performAction( DMLActions, SObjectType, List )} accepting an externalIdField, required for
+     * dUPSERT/dUPSERT_PRIO actions to identify which field Database.upsert() should key on.
+     *
+     * @param action        The DML Action to be performed
+     * @param sObjType      The SObjectType of the records to be processed
+     * @param records       The list of SObject records to be processed
+     * @param externalIdField ONLY for dUPSERT/dUPSERT_PRIO: the SObjectField to upsert by
+     */
+    private void performAction( DMLActions action, SObjectType sObjType, List<SObject> records, Schema.SObjectField externalIdField ){
         if( records == null || records.isEmpty() ){
             return;
         }
@@ -1353,6 +1582,8 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         try{
             if( ACTIONS_DMLOPTIONS.contains( action ) ){ // insert & updates
                 saveResults = m_dml.performDMLAction( action, records, ( Database.DMLOptions ) dmlOptionsPerAction.get( action ).get( sObjType ), fflib_Database.getAccessLevel( this.m_securityContext ) );
+            } else if( ACTIONS_UPSERT.contains( action ) ){ // upsert by externalId field
+                saveResults = m_dml.performDMLAction( action, records, externalIdField, ( Boolean ) dmlOptionsPerAction.get( action ).get( sObjType ), fflib_Database.getAccessLevel( this.m_securityContext ) );
             } else if( ACTIONS_ALLORNONE.contains( action ) ){ // delete & undelete
                 saveResults = m_dml.performDMLAction( action, records, ( Boolean ) dmlOptionsPerAction.get( action ).get( sObjType ), fflib_Database.getAccessLevel( this.m_securityContext ) );
             } else{ // publishEvents & emptyRecycleBin & registersImmediate
@@ -1361,10 +1592,21 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         } catch( Exception ex ){
             debug( ex, records );
         }
-        // When SaveResults retrieved (insert, update, delete or undelete) and set to be required, then add to Action-SObjectType specific Map
+        // When SaveResults retrieved (insert, update, delete, undelete or upsert) and set to be required, then add to Action-SObjectType specific Map
         if( this.saveResultsRequired && saveResults != null ){
-            // DMLAction-SObjectType combinations should be performed in once, so no need to check for existing data in the Map
-            SAVERESULTS_PER_DMLACTION.get( action ).put( sObjType, saveResults );
+            // For Upserts append results, given one DMLAction-SObjectType could have multiple results when specifying different ExternalId fields
+            if( ACTIONS_UPSERT.contains( action ) ){
+                Map<Schema.SObjectType, List<Object>> resultsByType = SAVERESULTS_PER_DMLACTION.get( action );
+                List<Object> existingResults = resultsByType.get( sObjType );
+                if( existingResults == null ){
+                    resultsByType.put( sObjType, saveResults );
+                } else{
+                    existingResults.addAll( saveResults );
+                }
+            // All other actions are expected to be performed only once per SObjectType per commitWork()
+            } else{
+                SAVERESULTS_PER_DMLACTION.get( action ).put( sObjType, saveResults );
+            }
         }
     }
 
@@ -1459,6 +1701,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      *
      * @param enabled   True to store SaveResults, False to skip logic for SaveResults
      */
+    @NamespaceAccessible
     public void setSaveResultsRequired( Boolean enabled ){
         this.saveResultsRequired = enabled;
 
@@ -1466,6 +1709,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         if( enabled ){
             this.m_newSaveResults               = new Map<Schema.SObjectType, List<Database.SaveResult>>();
             this.m_dirtySaveResults             = new Map<Schema.SObjectType, List<Database.SaveResult>>();
+            this.m_upsertSaveResults            = new Map<Schema.SObjectType, List<Database.UpsertResult>>();
             this.m_deletedSaveResults           = new Map<Schema.SObjectType, List<Database.DeleteResult>>();
             this.m_undeletedSaveResults         = new Map<Schema.SObjectType, List<Database.UndeleteResult>>();
             this.m_emptyRecycleBinSaveResults   = new Map<Schema.SObjectType, List<Database.EmptyRecycleBinResult>>();
@@ -1478,6 +1722,8 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
                 DMLActions.dUPDATE               => m_dirtySaveResults,
                 DMLActions.dUPDATE_IMMEDIATE     => m_dirtySaveResults,
                 DMLActions.dUPDATE_PRIO          => m_dirtySaveResults,
+                DMLActions.dUPSERT               => m_upsertSaveResults,
+                DMLActions.dUPSERT_PRIO          => m_upsertSaveResults,
                 DMLActions.dDELETE               => m_deletedSaveResults,
                 DMLActions.dDELETE_IMMEDIATE     => m_deletedSaveResults,
                 DMLActions.dDELETE_PRIO          => m_deletedSaveResults,
@@ -1495,6 +1741,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param sObjType The SObjectType for which to retrieve Insertion SaveResults
      * @return SaveResults for inserts on given SObjectType. null when no DMLs performed for that SObjectType, or storeSaveResults is false
      */
+    @NamespaceAccessible
     public List<Database.SaveResult> getNewResults( Schema.SObjectType sObjType ){
         return this.m_newSaveResults?.get( sObjType );
     }
@@ -1503,14 +1750,26 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param sObjType The SObjectType for which to retrieve Update SaveResults
      * @return SaveResults for updates on given SObjectType. null when no DMLs performed for that SObjectType, or storeSaveResults is false
      */
+    @NamespaceAccessible
     public List<Database.SaveResult> getDirtyResults( Schema.SObjectType sObjType ){
         return this.m_dirtySaveResults?.get( sObjType );
+    }
+
+    /**
+     * @param sObjType The SObjectType for which to retrieve Upsert SaveResults
+     * @return SaveResults for upserts (by externalId field) on given SObjectType, accumulated across all registered externalId
+     *         fields for that type. null when no DMLs performed for that SObjectType, or storeSaveResults is false
+     */
+    @NamespaceAccessible
+    public List<Database.UpsertResult> getUpsertResults( Schema.SObjectType sObjType ){
+        return this.m_upsertSaveResults?.get( sObjType );
     }
 
     /**
      * @param sObjType The SObjectType for which to retrieve DeletedResults
      * @return DeleteResults for deletes on given SObjectType. null when no DMLs performed for that SObjectType, or storeSaveResults is false
      */
+    @NamespaceAccessible
     public List<Database.DeleteResult> getDeletedResults( Schema.SObjectType sObjType ){
         return this.m_deletedSaveResults?.get( sObjType );
     }
@@ -1519,6 +1778,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param sObjType The SObjectType for which to retrieve UndeleteResults
      * @return UndeleteResults for undeletes on given SObjectType. null when no DMLs performed for that SObjectType, or storeSaveResults is false
      */
+    @NamespaceAccessible
     public List<Database.UndeleteResult> getUndeletedResults( Schema.SObjectType sObjType ){
         return this.m_undeletedSaveResults?.get( sObjType );
     }
@@ -1527,6 +1787,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param sObjType The SObjectType for which to retrieve EmptyRecycleBinResults
      * @return EmptyRecycleBinResult for emptyRecycleBins on given SObjectType. null when no DMLs performed for that SObjectType, or storeSaveResults is false
      */
+    @NamespaceAccessible
     public List<Database.EmptyRecycleBinResult> getEmptyRecycleBinResults( Schema.SObjectType sObjType ){
         return this.m_emptyRecycleBinSaveResults?.get( sObjType );
     }
@@ -1535,6 +1796,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param sObjType The SObjectType for which to retrieve Publish SaveResults
      * @return SaveResults for Published Events on given Event SObjectType. null when no DMLs performed for that SObjectType, or storeSaveResults is false
      */
+    @NamespaceAccessible
     public List<Database.SaveResult> getPublishResults( Schema.SObjectType sObjType ){
         return this.m_publishSaveResults?.get( sObjType );
     }
@@ -1542,6 +1804,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
     /**
      * @return SaveResults for Send Emails. null when no Email Operation performed, or storeSaveResults is false
      */
+    @NamespaceAccessible
     public List<Messaging.SendEmailResult> getEmailResults(){
         return ( List<Messaging.SendEmailResult> ) SAVERESULTS_PER_OPERATION?.get( Operations.SEND_EMAIL );
     }
@@ -1549,6 +1812,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
     /**
      * @return SaveResults for Approval Processes. null when no Approval Operation performed, or storeSaveResults is false
      */
+    @NamespaceAccessible
     public List<Approval.ProcessResult> getApprovalProcessResults(){
         return ( List<Approval.ProcessResult> ) SAVERESULTS_PER_OPERATION?.get( Operations.PROCESS_APPROVAL_PROCESS );
     }
@@ -1556,6 +1820,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
     /**
      * Clears all of the registered work within the unit of work instance to allow reusing the unit of work
      */
+    @NamespaceAccessible
     public void resetWork(){
         // Reset ordered list of SObjects available on this UnitOfWork - unless provided by constructor
         if( !constructorDefinedSObjectTypesList ){
@@ -1572,6 +1837,8 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         m_dirtyMapByType.clear();
         m_dirtyImmediateListByType.clear();
         m_dirtyPriorityMapByType.clear();
+        m_upsertMapByTypeAndField.clear();
+        m_upsertPriorityMapByTypeAndField.clear();
         m_deletedListByType.clear();
         m_deletedImmediateListByType.clear();
         m_deletedPriorityListByType.clear();
@@ -1585,6 +1852,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         // Reset DMLOptions
         m_newDmlOptions.clear();
         m_dirtyDmlOptions.clear();
+        m_upsertAllOrNone.clear();
         m_deletedAllOrNone.clear();
         m_undeletedAllOrNone.clear();
 
@@ -1600,10 +1868,12 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * Clears all SaveResults from (potential) previous commitWork() calls
      * In contrast to workLists, SaveResults lists are initiated within performDMLAction() only when a DML is performed
      */
+    @NamespaceAccessible
     public void resetSaveResults(){
         if( this.saveResultsRequired ){
             m_newSaveResults.clear();
             m_dirtySaveResults.clear();
+            m_upsertSaveResults.clear();
             m_deletedSaveResults.clear();
             m_undeletedSaveResults.clear();
             m_emptyRecycleBinSaveResults.clear();
@@ -1686,17 +1956,19 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
                 throw new UnitOfWorkException( 'Invalid argument: relatedToField or externalIdField is not provided.' );
             }
 
-            String relationshipName = relatedToField.getDescribe().getRelationshipName();
+            Schema.DescribeFieldResult relatedToFieldDescribe = fflib_SObjectDescribe.getFieldDescribe( relatedToField );
+            String relationshipName = relatedToFieldDescribe.getRelationshipName();
             if( String.isBlank( relationshipName ) ){
                 throw new UnitOfWorkException( 'Invalid argument: relatedToField. Field supplied is not a relationship field.' );
             }
 
-            List<Schema.SObjectType> relatedObjects = relatedToField.getDescribe().getReferenceTo();
+            List<Schema.SObjectType> relatedObjects = relatedToFieldDescribe.getReferenceTo();
             Schema.SObjectType relatedObject = relatedObjects[ 0 ];
 
-            String externalIdFieldName = externalIdField.getDescribe().getName();
-            Boolean relatedHasExternalIdField = relatedObject.getDescribe().fields.getMap().keySet().contains( externalIdFieldName.toLowerCase() );
-            Boolean externalIdFieldIsValid = externalIdField.getDescribe().isExternalId();
+            Schema.DescribeFieldResult externalIdFieldDescribe = fflib_SObjectDescribe.getFieldDescribe( externalIdField );
+            String externalIdFieldName = externalIdFieldDescribe.getName();
+            Boolean relatedHasExternalIdField = fflib_SObjectDescribe.getDescribe( relatedObject ).getFieldsMap().containsKey( externalIdFieldName.toLowerCase() );
+            Boolean externalIdFieldIsValid = externalIdFieldDescribe.isExternalId();
 
             if( !relatedHasExternalIdField ){
                 throw new UnitOfWorkException( 'Invalid argument: externalIdField. Field supplied is not a known field on the target sObject.' );
@@ -1730,7 +2002,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
                 return;
             }
             SObject relationshipObject = this.parentSObjectType.newSObject();
-            relationshipObject.put( parentExternalIdField.getDescribe().getName(), this.externalIdValue );
+            relationshipObject.put( fflib_SObjectDescribe.getFieldDescribe( parentExternalIdField ).getName(), this.externalIdValue );
             this.record.putSObject( this.relationshipName, relationshipObject );
             this.isResolved = true;
         }
@@ -1811,6 +2083,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * Interface for non-SObjectType related Work, to be performed during commitWork()
      * Followed by different implementations
      */
+    @NamespaceAccessible
     public interface IDoWork{
         void doWork();
     }
@@ -1818,5 +2091,20 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
     /**
      * UnitOfWork Exception
      */
+    @NamespaceAccessible
     public class UnitOfWorkException extends Exception{}
+
+    /**
+     * Deprecated IDML since referenced in fflib_IUnitOfWorkFactory and fflib_ISObjectUnitOfWork for old method signatures
+     * @deprecated Use fflib_Database_IDML instead.
+     */
+    @NamespaceAccessible
+    public interface IDML
+    {
+        void dmlInsert( List<SObject> objList );
+        void dmlUpdate( List<SObject> objList );
+        void dmlDelete( List<SObject> objList );
+        void eventPublish( List<SObject> objList );
+	    void emptyRecycleBin( List<SObject> objList );
+    }
 }

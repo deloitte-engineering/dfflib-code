@@ -66,6 +66,9 @@
  * and these will not be overwritten by the defaults.
  *
  *         Account record = ( Account ) factory.create( new Account( Rating = 'Cold' ) ).save();
+ *
+ * @author         Dirk van de Lindt (dvandelindt@deloitte.nl)
+ * @created        December 2017
  */
 @IsTest
 public with sharing class UT_SObjectFactory{
@@ -365,7 +368,7 @@ public with sharing class UT_SObjectFactory{
          * @param    sObj        sObject
          */
         public SObjectMock( SObject sObj ){
-            fflib_Objects.verifyNotNull( sObj, 'sObj' );
+            dfflib_Utils.verifyNotNull( sObj, 'sObj' );
             this.sObj = sObj;
             createWithSObjectTemplate( sObj );
         }
@@ -481,8 +484,8 @@ public with sharing class UT_SObjectFactory{
          * @param    children            List of SObjectMock instances which will be linked to this instance.
          */
         public SObjectMock addChildren( String relationshipName, List<SObjectMock> children ){
-            fflib_Objects.verifyNotBlank( relationshipName, 'relationshipName' );
-            fflib_Objects.verifyNotNull( children, 'children' );
+            dfflib_Utils.verifyNotBlank( relationshipName, 'relationshipName' );
+            dfflib_Utils.verifyNotNull( children, 'children' );
 
             // if withId(), add set the correct parentId;
             if( getId() != null && children != null ){
@@ -599,7 +602,7 @@ public with sharing class UT_SObjectFactory{
          * @param   defaults
          */
         public SObjectMock setDefaults( ISObjectDefaults defaults ){
-            fflib_Objects.verifyNotNull( defaults, 'defaults' );
+            dfflib_Utils.verifyNotNull( defaults, 'defaults' );
             this.defaults = defaults;
             return this;
         }
@@ -981,10 +984,10 @@ public with sharing class UT_SObjectFactory{
          * @return SObject
          */
         private SObject saveToUOW( fflib_ISObjectUnitOfWork uow ){
-            fflib_Objects.verifyNotNull( uow, 'uow' );
+            dfflib_Utils.verifyNotNull( uow, 'uow' );
 
             if( getId() != null ){
-                throw new SObjectFactoryException( 'createWithId cannot be used with saving records' );
+                throw new dfflib_Utils.InvalidImplementationException( 'createWithId cannot be used with saving records' );
             }
 
             SObject parent = getSObjectForSave();
@@ -1279,12 +1282,6 @@ public with sharing class UT_SObjectFactory{
         public Schema.SObjectField getRelationshipField(){
             return null;
         }
-    }
-
-    /**
-     * Exception classes
-     */
-    public class SObjectFactoryException extends Exception{
     }
 
     /**

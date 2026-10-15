@@ -106,7 +106,7 @@ private with sharing class fflib_QueryFactoryTest{
         try{
             qf.selectField( 'Account.(User)Owner.Phone' );
             qf.selectField( 'Owner.Phone' ); // Owner on Case is Polymorphic to Group and User
-            throw new fflib.InvalidImplementationException( 'This Exception should never been thrown since PolymorphicLookup Exception should be thrown due to Owner-Group field' );
+            throw new dfflib_Utils.InvalidImplementationException( 'This Exception should never been thrown since PolymorphicLookup Exception should be thrown due to Owner-Group field' );
         } catch( Exception ex ){
             System.Assert.areEqual( 'fflib_QueryFactory.InvalidFieldException', ex.getTypeName(), 'Expected different Exception Type' );
             System.Assert.areEqual( 'Invalid field \'Phone\' for object \'Group\'', ex.getMessage(), 'Expected Phone and Group message' );
@@ -455,7 +455,7 @@ private with sharing class fflib_QueryFactoryTest{
         // Given, When
         try{
             String path = fflib_QueryFactory.getFieldTokenPath( null );
-            throw new fflib.InvalidImplementationException( 'This Exception should never been thrown since InvalidFieldException should have been thrown' );
+            throw new dfflib_Utils.InvalidImplementationException( 'This Exception should never been thrown since InvalidFieldException should have been thrown' );
         } catch( Exception e ){
             System.Assert.areEqual( 'fflib_QueryFactory.InvalidFieldException', e.getTypeName() );
         }
@@ -906,7 +906,7 @@ private with sharing class fflib_QueryFactoryTest{
             .setCondition( 'id=12345' )
             .setOffset( 2 )
             .selectField( 'Description' )
-            .setAllRowsRequired( true )
+            .setallRows( true )
             .setGroupByField( 'Description' )
             .addOrdering( new fflib_QueryFactory.Ordering( 'Contact', 'name', fflib_QueryFactory.SortOrder.ASCENDING ) )
             .addOrdering( new fflib_QueryFactory.Ordering( 'Contact', 'CreatedDATE', fflib_QueryFactory.SortOrder.DESCENDING ) )
@@ -916,7 +916,7 @@ private with sharing class fflib_QueryFactoryTest{
         fflib_QueryFactory qf2 = qf.deepClone()
             .setLimit( 200 )
             .setOffset( 1 )
-            .setAllRowsRequired( false )
+            .setallRows( false )
             .setCondition( 'id=54321' )
             .selectField( 'Fax' )
             .setGroupByField( 'Fax', true ) // preserve ordering of cloned QueryFactory
@@ -935,8 +935,8 @@ private with sharing class fflib_QueryFactoryTest{
         System.Assert.areEqual( 2, qf.getOffset() );
         System.Assert.areEqual( 1, qf2.getOffset() );
 
-        System.Assert.isTrue( qf.getAllRowsRequired() );
-        System.Assert.isFalse( qf2.getAllRowsRequired() );
+        System.Assert.isTrue( qf.getallRows() );
+        System.Assert.isFalse( qf2.getallRows() );
 
         System.Assert.areEqual( 'Description', qf.getGroupByField() );
         System.Assert.areEqual( 'Fax', qf2.getGroupByField() );
@@ -1108,7 +1108,7 @@ private with sharing class fflib_QueryFactoryTest{
         try{
             qf.toSOQL();
             System.Assert.fail( 'Expected an exception to be thrown when a \'HAVING\' clause is set without a \'GROUP BY\' clause.' );
-        } catch( fflib.InvalidImplementationException ex ){
+        } catch( dfflib_Utils.InvalidImplementationException ex ){
             // Then - validate
             System.Assert.isTrue( ex.getMessage()
                 .contains( 'A \'HAVING\' clause was set on this query without a \'GROUP BY\' clause. Please set a \'GROUP BY\' clause for the \'HAVING\' clause to be valid.' ),
@@ -1178,7 +1178,7 @@ private with sharing class fflib_QueryFactoryTest{
         try{
             qf.toSOQL();
             System.Assert.fail( 'Expected an exception to be thrown when both FOR VIEW and FOR REFERENCE clauses are set.' );
-        } catch( fflib.InvalidImplementationException ex ){
+        } catch( dfflib_Utils.InvalidImplementationException ex ){
             // Then - validate
             System.Assert.isTrue( ex.getMessage()
                 .contains( 'A query cannot be set to use both FOR VIEW and FOR REFERENCE clauses. Please choose one or the other.' ), 'Expected error message about mutually exclusive FOR clauses.' );
@@ -1189,7 +1189,7 @@ private with sharing class fflib_QueryFactoryTest{
     private static void setForClause_testToSOQLClauseOrdering(){
         // Given - Test to ensure specific SOQL syntax order (LIMIT -> ALL ROWS -> FOR- clauses)
         fflib_QueryFactory qf = new fflib_QueryFactory( Contact.SObjectType );
-        qf.setLimit( 1 ).setAllRowsRequired( true ).setForReference( true ).setForUpdate( true );
+        qf.setLimit( 1 ).setallRows( true ).setForReference( true ).setForUpdate( true );
 
         // When - perform test
         String query = qf.toSOQL();

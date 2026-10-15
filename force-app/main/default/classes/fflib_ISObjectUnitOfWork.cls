@@ -6,9 +6,9 @@
  */
 /**
  *  Interface listing all methods available and required for fflib_ISObjectUnitOfWork 2.0
- *
- *  Inspiration based on Apex-Commons repository from FinancialForce.com, Inc
+ *  Inspired by Apex-Commons repository from FinancialForce.com, Inc
  */
+@NamespaceAccessible
 public interface fflib_ISObjectUnitOfWork{
     /**
      * Setter to allow changing the database security context when committing records to the database. The default is INHERIT to match the sharing context, without explicit CRUD/FLS checks.
@@ -132,6 +132,27 @@ public interface fflib_ISObjectUnitOfWork{
     void registerUpsert( List<SObject> records );
 
     /**
+     * Register a record to be upserted by a specified ExternalId field during the commitWork method.
+     * Performs a genuine Database.upsert() DML call, unlike registerUpsert( record ) which dispatches to registerNew()/registerDirty().
+     * Multiple different externalId fields can be registered for the same SObjectType within the same Unit of Work.
+     *
+     * @param   record          The record to be upserted; either inserted or updated based on the ExternalId field's value
+     * @param   externalIdField The ExternalId (or Id) field to match the record on
+     */
+    void registerUpsert( SObject record, Schema.SObjectField externalIdField );
+    void registerUpsert( List<SObject> records, Schema.SObjectField externalIdField );
+
+    /**
+     * For specific scenarios you may wish to register records to be upserted by ExternalId field into the database before
+     * other records within the same transaction are inserted/updated.
+     *
+     * @param   record          The record to be upserted; either inserted or updated based on the ExternalId field's value
+     * @param   externalIdField The ExternalId (or Id) field to match the record on
+     */
+    void registerPriorityUpsert( SObject record, Schema.SObjectField externalIdField );
+    void registerPriorityUpsert( List<SObject> records, Schema.SObjectField externalIdField );
+
+    /**
      * Register an existing record to be deleted during the commitWork method
      *
      * @param   record      An existing record
@@ -169,7 +190,7 @@ public interface fflib_ISObjectUnitOfWork{
      * Register an deleted record to be removed from the recycle bin during the commitWork method
      *
      * @param   record      An deleted record
-	 */
+     */
     void registerEmptyRecycleBin( SObject record );
     void registerEmptyRecycleBin( List<SObject> records );
 
@@ -331,6 +352,15 @@ public interface fflib_ISObjectUnitOfWork{
     void registerUndeletedAllOrNone( Schema.SObjectType sType, Boolean allOrNone );
 
     /**
+     * Allows setting the behavior of all or none when upserting (by externalId field) records for a given sObject type
+     * within the unit of work. Shared between normal and priority upsert registrations for the same SObjectType.
+     *
+     * @param   sType       SObject type to apply the all or none value to.
+     * @param   allOrNone   True if all records should succeed, otherwise best effort will be used.
+     */
+    void registerUpsertedAllOrNone( Schema.SObjectType sType, Boolean allOrNone );
+
+    /**
      * @return true when any record or work was registered to be committed
      */
     Boolean hasWork();
@@ -357,6 +387,12 @@ public interface fflib_ISObjectUnitOfWork{
      * @return SaveResults for updates on given SObjectType. null when no DMLs performed for that SObjectType
      */
     List<Database.SaveResult> getDirtyResults( Schema.SObjectType sObjType );
+    /**
+     * @param sObjType The SObjectType for which to retrieve Upsert SaveResults
+     * @return SaveResults for upserts (by externalId field) on given SObjectType, accumulated across all registered
+     *         externalId fields for that type. null when no DMLs performed for that SObjectType, or storeSaveResults is false
+     */
+    List<Database.UpsertResult> getUpsertResults( Schema.SObjectType sObjType );
     /**
      * @param sObjType The SObjectType for which to retrieve DeletedResults
      * @return DeleteResults for deletes on given SObjectType. null when no DMLs performed for that SObjectType

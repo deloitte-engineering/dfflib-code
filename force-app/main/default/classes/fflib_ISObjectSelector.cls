@@ -4,27 +4,29 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+
+@NamespaceAccessible
 public interface fflib_ISObjectSelector{
 
     /**
      * Provides the SObjectType for the object the given Selector is providing query logic for.
      *
-     * @return	Schema.SObjectType definition of the given selector
+     * @return    Schema.SObjectType definition of the given selector
      */
     Schema.SObjectType sObjectType();
 
     /**
      * Selects by Id records using the fields defined by the Selector configuration
      *
-     * @param 	idSet   Set of ids
-     * @return	A list of SObject's.
+     * @param     idSet   Set of ids
+     * @return    A list of SObject's.
      */
     List<SObject> selectSObjectsById( Set<Id> idSet );
 
     /**
      * Method for selecting records for deletion
      *
-     * @param 	queryConditionString	The query criteria (F.e. Origin = 'Phone')
+     * @param     queryConditionString    The query criteria (F.e. Origin = 'Phone')
      * @return  List of records for deletion.
      */
     Database.QueryLocator selectDeleteBatchRecords( String queryConditionString );
@@ -32,7 +34,7 @@ public interface fflib_ISObjectSelector{
     /**
      * Method for querying and retrieving all SObject records associated with the relevant SObjectType in context
      *
-     * @return	List of SObject records.
+     * @return    List of SObject records.
      */
     List<SObject> selectAllSObjectRecords();
 

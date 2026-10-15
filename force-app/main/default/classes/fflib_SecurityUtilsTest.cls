@@ -12,18 +12,20 @@ private with sharing class fflib_SecurityUtilsTest{
 
     @TestSetup
     private static void testSetup(){
-        // Create a Permission Set that grants "Read" access to Account, Contact and Lead.
+        // #315 Create a Permission Set that grants "Read" access to Account, Contact and Lead. We will use this in
+        // Spring '21 orgs that lack the "Read Only" Profile. See:
+        // https://help.salesforce.com/articleView?id=release-notes.rn_profiles_and_perms_read_only_new.htm&release=230&type=5).
         PermissionSet ps = new PermissionSet( Label = 'Read Only Permission Set', Name = 'ReadOnlyPermissionSet' );
         insert ps;
 
-        // Grant Read access to the SObjects for CRUD tests
+        // Grant Read access to the SObjects we use for CRUD tests
         List<ObjectPermissions> objectPerms = new List<ObjectPermissions>();
         objectPerms.add( createObjectPermissions( ps.Id, 'Account', false, true, false, false ) );
         objectPerms.add( createObjectPermissions( ps.Id, 'Contact', false, true, false, false ) );
         objectPerms.add( createObjectPermissions( ps.Id, 'Lead', false, true, false, false ) );
         insert objectPerms;
 
-        // Grant Read/Edit access to the SObject fields FLS tests
+        // Grant Read/Edit access to the SObject fields we use for FLS tests
         List<FieldPermissions> fieldPerms = new List<FieldPermissions>();
         fieldPerms.add( createFieldPermissions( ps.Id, 'Contact', 'BirthDate', true, false ) );
         fieldPerms.add( createFieldPermissions( ps.Id, 'Contact', 'Email', true, false ) );
@@ -55,13 +57,25 @@ private with sharing class fflib_SecurityUtilsTest{
         );
     }
 
-    private static User setupTestUser( String profileName ){
+    private static User setupTestUser( Boolean limitedAccess, Boolean grantReadAccess ){
         Profile p;
-        p = getProfile( profileName );
 
-        //Username global uniqueness is still enforced in tests
-        //Make sure we get something unique to avoid issues with parallel tests
-        String uniqueness = Datetime.now() + ':' + Math.random();
+        if( limitedAccess ){
+            try{
+                p = getProfile( 'Minimum Access - Salesforce' );
+            } catch( QueryException ex ){
+                if( ex.getMessage().contains( 'List has no rows for assignment to SObject' ) ){
+                    //#440 - not ideal, but we'll fall back to the rather liberally permissioned 'Read Only' profile that exists in very old orgs
+                    p = getProfile( 'Read Only' );
+                }
+            }
+        } else {
+            p = getProfile( 'System Administrator' );
+        }
+
+        // Username global uniqueness is still enforced in tests
+        // Make sure we get something unique to avoid issues with parallel tests
+        String uniqueness = DateTime.now() + ':' + Math.random();
         try{
             throw new NullPointerException();
         } catch( Exception e ){
@@ -82,62 +96,61 @@ private with sharing class fflib_SecurityUtilsTest{
         );
         insert usr;
 
-        return usr;
-    }
-
-    private static User assignPermissionSet( String permissionSetName, User usr ){
-        PermissionSet ps = [ SELECT Id FROM PermissionSet WHERE Name = :permissionSetName ];
-        PermissionSetAssignment psa = new PermissionSetAssignment( AssigneeId = usr.Id, PermissionSetId = ps.Id );
-        insert psa;
+        if( limitedAccess && grantReadAccess ){
+            // #315 We need to assign the Perm Set to grant Account "Read" access
+            PermissionSet accountReadPS = [ SELECT Id FROM PermissionSet WHERE Name = 'ReadOnlyPermissionSet' ];
+            PermissionSetAssignment psa = new PermissionSetAssignment( AssigneeId = usr.Id, PermissionSetId = accountReadPS.Id );
+            insert psa;
+        }
         return usr;
     }
 
     @IsTest
     private static void readonly_field_access(){
-        User testUser = assignPermissionSet( 'ReadOnlyPermissionSet', setupTestUser( 'Minimum Access - Salesforce' ) );
+        User testUser = setupTestUser( true, true );
         System.runAs( testUser ){
             {
                 fflib_SecurityUtils.SecurityException ex;
                 try{
-                    fflib_SecurityUtils.checkFieldIsInsertable( Account.SObjectType, 'Name' );
+                    fflib_SecurityUtils.checkFieldIsInsertable( Account.SObjectType, 'naMe' );
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNotNull( ex, 'Minimum Access - Salesforce profile should not be able to insert Account.Name' );
+                System.Assert.isNotNull( ex, 'Read only profile should not be able to insert Account.Name' );
                 System.Assert.isInstanceOfType( ex, fflib_SecurityUtils.FlsException.class, 'Expected an FlsException, got ' + ex.getTypeName() );
             }
             {
                 fflib_SecurityUtils.SecurityException ex;
                 try{
-                    fflib_SecurityUtils.checkFieldIsReadable( Contact.SObjectType, 'LastName' );
+                    fflib_SecurityUtils.checkFieldIsReadable( Contact.SObjectType, 'LastNAME' );
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNull( ex, 'Minimum Access - Salesforce profile should be able to read Contact.LastName' );
+                System.Assert.isNull( ex, 'Read only profile should be able to read Contact.LastName' );
             }
             {
                 fflib_SecurityUtils.SecurityException ex;
                 try{
-                    fflib_SecurityUtils.checkFieldIsUpdateable( Lead.SObjectType, 'Company' );
+                    fflib_SecurityUtils.checkFieldIsUpdateable( Lead.SObjectType, 'cOMPANY' );
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNotNull( ex, 'Minimum Access - Salesforce profile should not be able to update Lead.Company' );
+                System.Assert.isNotNull( ex, 'Read only profile should not be able to update Lead.Company' );
                 System.Assert.isInstanceOfType( ex, fflib_SecurityUtils.FlsException.class, 'Expected an FlsException, got ' + ex.getTypeName() );
             }
 
             fflib_SecurityUtils.BYPASS_INTERNAL_FLS_AND_CRUD = true;
-            { //No exceptions, despite no rights
-                fflib_SecurityUtils.checkFieldIsInsertable( Account.SObjectType, 'Name' );
-                fflib_SecurityUtils.checkFieldIsReadable( Contact.SObjectType, 'LastName' );
-                fflib_SecurityUtils.checkFieldIsUpdateable( Lead.SObjectType, 'Company' );
+            { // No exceptions, despite no rights
+                fflib_SecurityUtils.checkFieldIsInsertable( Account.SObjectType, 'naMe' );
+                fflib_SecurityUtils.checkFieldIsReadable( Contact.SObjectType, 'LastNAME' );
+                fflib_SecurityUtils.checkFieldIsUpdateable( Lead.SObjectType, 'cOMPANY' );
             }
         }
     }
 
     @IsTest
     private static void readonly_object_access(){
-        User testUser = assignPermissionSet( 'ReadOnlyPermissionSet', setupTestUser( 'Minimum Access - Salesforce' ) );
+        User testUser = setupTestUser( true, true );
         System.runAs( testUser ){
             {
                 fflib_SecurityUtils.SecurityException ex;
@@ -146,7 +159,7 @@ private with sharing class fflib_SecurityUtilsTest{
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNotNull( ex, 'Minimum Access - Salesforce profile should not be able to insert Account' );
+                System.Assert.isNotNull( ex, 'Read only profile should not be able to insert Account' );
                 System.Assert.isInstanceOfType( ex, fflib_SecurityUtils.CrudException.class, 'Expected an CrudException, got ' + ex.getTypeName() );
             }
             {
@@ -156,7 +169,7 @@ private with sharing class fflib_SecurityUtilsTest{
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNull( ex, 'Minimum Access - Salesforce profile should be able to read Contact' );
+                System.Assert.isNull( ex, 'Read only profile should be able to read Contact' );
             }
             {
                 fflib_SecurityUtils.SecurityException ex;
@@ -165,7 +178,7 @@ private with sharing class fflib_SecurityUtilsTest{
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNotNull( ex, 'Minimum Access - Salesforce profile should not be able to update Lead' );
+                System.Assert.isNotNull( ex, 'Read only profile should not be able to update Lead' );
                 System.Assert.isInstanceOfType( ex, fflib_SecurityUtils.CrudException.class, 'Expected an CrudException, got ' + ex.getTypeName() );
             }
             {
@@ -175,12 +188,12 @@ private with sharing class fflib_SecurityUtilsTest{
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNotNull( ex, 'Minimum Access - Salesforce profile should not be able to delete Opportunity' );
+                System.Assert.isNotNull( ex, 'Read only profile should not be able to delete Opportunity' );
                 System.Assert.isInstanceOfType( ex, fflib_SecurityUtils.CrudException.class, 'Expected an CrudException, got ' + ex.getTypeName() );
             }
 
             fflib_SecurityUtils.BYPASS_INTERNAL_FLS_AND_CRUD = true;
-            { //No exceptions, despite no rights
+            { // No exceptions, despite no rights
                 fflib_SecurityUtils.checkObjectIsInsertable( Account.SObjectType );
                 fflib_SecurityUtils.checkObjectIsReadable( Contact.SObjectType );
                 fflib_SecurityUtils.checkObjectIsUpdateable( Lead.SObjectType );
@@ -191,7 +204,7 @@ private with sharing class fflib_SecurityUtilsTest{
 
     @IsTest
     private static void readonly_objectAndField_access(){
-        User testUser = assignPermissionSet( 'ReadOnlyPermissionSet', setupTestUser( 'Minimum Access - Salesforce' ) );
+        User testUser = setupTestUser( true, true );
         System.runAs( testUser ){
             {
                 fflib_SecurityUtils.SecurityException ex;
@@ -201,13 +214,13 @@ private with sharing class fflib_SecurityUtilsTest{
                         new List<String>{
                             'Name',
                             'ParentId',
-                            'OwnerId'
+                            'ownerId'
                         }
                     );
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNotNull( ex, 'Minimum Access - Salesforce profile should not be able to insert Account' );
+                System.Assert.isNotNull( ex, 'Read only profile should not be able to insert Account' );
                 System.Assert.isInstanceOfType( ex, fflib_SecurityUtils.CrudException.class, 'Expected an CrudException, got ' + ex.getTypeName() );
             }
             {
@@ -217,14 +230,14 @@ private with sharing class fflib_SecurityUtilsTest{
                         Contact.SObjectType,
                         new List<String>{
                             'LastName',
-                            'Email',
-                            'BirthDate'
+                            'eMaiL',
+                            'BirthDATE'
                         }
                     );
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNull( ex, 'Minimum Access - Salesforce profile should be able to read Contact' );
+                System.Assert.isNull( ex, 'Read only profile should be able to read Contact' );
             }
             {
                 fflib_SecurityUtils.SecurityException ex;
@@ -233,14 +246,14 @@ private with sharing class fflib_SecurityUtilsTest{
                         Lead.SObjectType,
                         new List<String>{
                             'LastName',
-                            'FirstName',
-                            'Company'
+                            'FirstNAMe',
+                            'cOMPANY'
                         }
                     );
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNotNull( ex, 'Minimum Access - Salesforce profile should not be able to update Lead' );
+                System.Assert.isNotNull( ex, 'Read only profile should not be able to update Lead' );
                 System.Assert.isInstanceOfType( ex, fflib_SecurityUtils.CrudException.class, 'Expected an CrudException, got ' + ex.getTypeName() );
             }
 
@@ -251,23 +264,23 @@ private with sharing class fflib_SecurityUtilsTest{
                     new List<String>{
                         'Name',
                         'Type',
-                        'OwnerId'
+                        'ownerId'
                     }
                 );
                 fflib_SecurityUtils.checkRead(
                     Contact.SObjectType,
                     new List<String>{
                         'LastName',
-                        'AccountId',
-                        'OwnerId'
+                        'accountId',
+                        'ownerId'
                     }
                 );
                 fflib_SecurityUtils.checkUpdate(
                     Lead.SObjectType,
                     new List<String>{
                         'LastName',
-                        'FirstName',
-                        'Company'
+                        'FirstNAMe',
+                        'cOMPANY'
                     }
                 );
             }
@@ -276,7 +289,7 @@ private with sharing class fflib_SecurityUtilsTest{
 
     @IsTest
     private static void sysadmin_objectAndField_access(){
-        User testUser = setupTestUser( 'System Administrator' );
+        User testUser = setupTestUser( false, false );
         System.runAs( testUser ){
             fflib_SecurityUtils.checkInsert(
                 Account.SObjectType,
@@ -307,7 +320,7 @@ private with sharing class fflib_SecurityUtilsTest{
 
     @IsTest
     private static void no_read_field_access(){
-        User testUser = setupTestUser( 'Minimum Access - Salesforce' );
+        User testUser = setupTestUser( true, false );
         System.runAs( testUser ){
             {
                 fflib_SecurityUtils.SecurityException ex;
@@ -316,7 +329,7 @@ private with sharing class fflib_SecurityUtilsTest{
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNotNull( ex, 'Minimum Access - Salesforce profile should not be able to insert Account.Name' );
+                System.Assert.isNotNull( ex, 'Read only profile should not be able to insert Account.Name' );
                 System.Assert.isInstanceOfType( ex, fflib_SecurityUtils.FlsException.class, 'Expected an FlsException, got ' + ex.getTypeName() );
             }
             {
@@ -326,7 +339,7 @@ private with sharing class fflib_SecurityUtilsTest{
                 } catch( fflib_SecurityUtils.SecurityException e ){
                     ex = e;
                 }
-                System.Assert.isNotNull( ex, 'Minimum Access - Salesforce profile should be able to read Contact.LastName' );
+                System.Assert.isNotNull( ex, 'Read only profile should not be able to read Contact.LastName' );
                 System.Assert.isInstanceOfType( ex, fflib_SecurityUtils.FlsException.class, 'Expected an FlsException, got ' + ex.getTypeName() );
             }
             {
@@ -350,7 +363,7 @@ private with sharing class fflib_SecurityUtilsTest{
 
     @IsTest
     private static void no_read_object_access(){
-        User testUser = setupTestUser( 'Minimum Access - Salesforce' );
+        User testUser = setupTestUser( true, false );
         System.runAs( testUser ){
             {
                 fflib_SecurityUtils.SecurityException ex;

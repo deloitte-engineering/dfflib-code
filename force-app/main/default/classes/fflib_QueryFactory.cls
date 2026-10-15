@@ -28,18 +28,21 @@
  * - The behavior of serializing and deserializing an fflib_QueryFactory instance is currently untested and undefined.
  * - There is no out-of-the-box support for dynamic selector-fields, often limiting the reuse of selector methods.
  */
+@NamespaceAccessible
 public virtual inherited sharing class fflib_QueryFactory{
     public enum DistanceUnit{ KILOMETERS, MILES }
     public enum FLSEnforcement{ NONE, LEGACY, USER_MODE, SYSTEM_MODE }
     public enum SortOrder{ ASCENDING, DESCENDING }
 
     // Public to allow accessibility from fflib_SObjectSelector Validator
+    @NamespaceAccessible
     public static fflib_QueryFactory lastQueryFactory;
 
     /**
      * This property is read-only and may not be set after instantiation.
      * The {@link Schema.SObjectType} token of the SObject that will be used in the FROM clause of the resultant query.
      */
+    @NamespaceAccessible
     public Schema.SObjectType table{ get; private set; }
 
     @TestVisible
@@ -50,7 +53,7 @@ public virtual inherited sharing class fflib_QueryFactory{
     private List<Ordering> order;
     private Integer limitCount;
     private Integer offsetCount;
-    private Boolean allRowsRequired = false;
+    private Boolean allRows = false;
     private Boolean forView = false, forReference = false, forUpdate = false;
 
     /**
@@ -102,6 +105,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   fieldName   Field reference to validate, potentially incl. SOQL functions, aliases and/or Cast Types
      * @return Field reference for SOQL Query, when all checks validated
      */
+    @NamespaceAccessible
     public String getFieldPath( String fieldName ){
         // Enforcing FLS using the legacy heuristic requires resolving the full field path to its respective
         // Describe result to test for isAccessible on the DescribeFieldResult
@@ -225,7 +229,7 @@ public virtual inherited sharing class fflib_QueryFactory{
         if( field == null ){
             throw new InvalidFieldException( 'Invalid field: null' );
         }
-        return field.getDescribe().getLocalName();
+        return fflib_SObjectDescribe.getFieldDescribe( field ).getLocalName();
     }
 
     /**
@@ -236,6 +240,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   obj     The object to check equality of
      * @return  Boolean containing true/false value if the provided object is/is not an instance of fflib_QueryFactory
      */
+    @NamespaceAccessible
     public Boolean equals( Object obj ){
         if( !( obj instanceof fflib_QueryFactory ) || ( ( fflib_QueryFactory ) obj ).table != this.table ||
             ( ( fflib_QueryFactory ) obj ).fields.size() != this.fields.size() ){
@@ -251,6 +256,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      *
      * @param   table   The SObject to be used in the FROM clause of the resultant query. This sets the value of {@link #table}.
      */
+    @NamespaceAccessible
     public fflib_QueryFactory( Schema.SObjectType table ){
         this.table = table;
         fields = new Set<String>();
@@ -278,6 +284,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      *
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public virtual fflib_QueryFactory assertIsAccessible(){
         fflib_SecurityUtils.checkObjectIsReadable( table );
         return this;
@@ -292,6 +299,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @return  Returns this fflib_QueryFactory instance
      * @deprecated - legacy enforceFLS boolean will be removed, for future references, please refer to {@link fflib_Database#Context}
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setEnforceFLS( Boolean enforce ){
         return setEnforceFLS( ( ( enforce == null ) ? null : ( enforce == true ) ? FLSEnforcement.LEGACY : FLSEnforcement.NONE ) );
     }
@@ -304,6 +312,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @return Returns this fflib_QueryFactory instance
      * @deprecated - legacy enforceFLS by Boolean or FLSEnforcement enum, one should move to utilise the fflib_Database.Context and AccessLevel enums for FLS enforcement
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setEnforceFLS( FLSEnforcement enforcement ){
         this.mFlsEnforcement = enforcement;
         // Ensure that any subselect query inherits same FLS enforcement settings
@@ -324,6 +333,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   doSort      Whether or not select fields should be sorted in the soql statement
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setSortSelectFields( Boolean doSort ){
         this.sortSelectFields = doSort;
         return this;
@@ -336,6 +346,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   fieldName   The API name of the field to add to the query's SELECT clause
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory selectField( String fieldName ){
         return selectFields( new Set<String>{ fieldName } );
     }
@@ -348,6 +359,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @exception   InvalidFieldException() if the field is null {@code field}
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory selectField( Schema.SObjectField field ){
         return selectFields( new Set<Schema.SObjectField>{ field } );
     }
@@ -358,6 +370,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   fieldNames  The Set of field API names to select
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory selectFields( Set<String> fieldNames ){
         return selectStringField( fieldNames.iterator() );
     }
@@ -368,6 +381,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   fieldNames  The List of field API names to select
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory selectFields( List<String> fieldNames ){
         return selectStringField( fieldNames.iterator() );
     }
@@ -386,6 +400,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @exception InvalidFieldException() if the fields are null {@code fields}
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory selectFields( Set<Schema.SObjectField> fieldNames ){
         return selectSObjectFields( fieldNames.iterator() );
     }
@@ -397,6 +412,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @exception InvalidFieldException() if the fields are null {@code fields}
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory selectFields( List<Schema.SObjectField> fieldNames ){
         return selectSObjectFields( fieldNames.iterator() );
     }
@@ -419,6 +435,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @see #selectFieldSet(Schema.FieldSet,Boolean)
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory selectFieldSet( Schema.FieldSet fieldSet ){
         return selectFieldSet( fieldSet, true );
     }
@@ -431,6 +448,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @exception InvalidFieldSetException() if the fieldset is invalid for table {@code fields}
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory selectFieldSet( Schema.FieldSet fieldSet, Boolean allowCrossObject ){
         if( fieldSet.getSObjectType() != table ){
             throw new InvalidFieldSetException( 'Field set "' + fieldSet.getName() + '" is not for SObject type "' + table + '"' );
@@ -469,6 +487,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   typeOfMapping   Mapping which describes what fields to get for what object type.
      * @return  This query factory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory selectFieldsTypeOf( String field, Map<Schema.SObjectType, Set<Schema.SObjectField>> typeOfMapping ){
         String selectTypeOfClause = 'TYPEOF ' + field;
         for( Schema.SObjectType sObjType : typeOfMapping.keySet() ){
@@ -490,6 +509,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   conditionExpression     Sets the 'WHERE' clause to the string provided. Do not include the 'WHERE'
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setCondition( String conditionExpression ){
         this.conditionExpression = conditionExpression;
         return this;
@@ -500,6 +520,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * 
      * @return  The current value of the 'WHERE' clause, if any, as set by {@link #setCondition}
      */
+    @NamespaceAccessible
     public String getCondition(){
         return this.conditionExpression;
     }
@@ -516,6 +537,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   havingExpression     Sets the 'HAVING' clause to the string provided. Do not include the 'HAVING'
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setHaving( String havingExpression ){
         this.havingExpression = havingExpression;
 
@@ -532,6 +554,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   limitCount  If not null causes a 'LIMIT' clause to be added to the resulting query
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setLimit( Integer limitCount ){
         this.limitCount = limitCount;
         return this;
@@ -542,6 +565,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * 
      * @return  The current value of the 'LIMIT' clause, if any
      */
+    @NamespaceAccessible
     public Integer getLimit(){
         return this.limitCount;
     }
@@ -552,6 +576,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   offsetCount     If not null causes a 'OFFSET' clause to be added to the resulting query
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setOffset( Integer offsetCount ){
         this.offsetCount = offsetCount;
         return this;
@@ -562,6 +587,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * 
      * @return the current value of the 'OFFSET' clause, if any
      */
+    @NamespaceAccessible
     public Integer getOffset(){
         return this.offsetCount;
     }
@@ -569,20 +595,22 @@ public virtual inherited sharing class fflib_QueryFactory{
     /**
      * Method that sets flag to append 'ALL ROWS' results to the query
      *
-     * @param   allRowsRequired     if true results in 'ALL ROWS' being appended to the query
+     * @param   allRows     whether 'ALL ROWS' should be appended to the query
      * @return  Returns this fflib_QueryFactory instance
      */
-    public fflib_QueryFactory setAllRowsRequired( Boolean allRowsRequired ){
-        this.allRowsRequired = allRowsRequired;
+    @NamespaceAccessible
+    public fflib_QueryFactory setAllRows( Boolean allRows ){
+        this.allRows = allRows;
         return this;
     }
 
     /**
      * Method that returns the current value of the flag for the 'ALL ROWS' clause
-     * @returns the current value of the 'ALL ROWS' clause, if any.
+     * @return  the current value of the 'ALL ROWS' clause, if any.
      */
-    public Boolean getAllRowsRequired(){
-        return this.allRowsRequired;
+    @NamespaceAccessible
+    public Boolean getAllRows(){
+        return this.allRows;
     }
 
     /**
@@ -594,16 +622,20 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   preserveOrderings    Opt. Boolean to keep default orderby fields, like when getOrderBy() method is overridden in selector implementation
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setGroupByField( SObjectField groupByField ){
         return this.setGroupByField( groupByField, false );
     }
+    @NamespaceAccessible
     public fflib_QueryFactory setGroupByField( SObjectField groupByField, Boolean preserveOrderings ){
-        return this.setGroupByField( groupByField.getDescribe().getName(), preserveOrderings );
+        return this.setGroupByField( fflib_SObjectDescribe.getFieldDescribe( groupByField ).getName(), preserveOrderings );
     }
 
+    @NamespaceAccessible
     public fflib_QueryFactory setGroupByField( String groupByField ){
         return this.setGroupByField( groupByField, false );
     }
+    @NamespaceAccessible
     public fflib_QueryFactory setGroupByField( String groupByField, Boolean preserveOrderings ){
         this.groupByFieldName = groupByField;
         if( preserveOrderings == false ){
@@ -618,6 +650,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      *
      * @return  The current value of the 'GROUP BY' clause field name, if any
      */
+    @NamespaceAccessible
     public String getGroupByField(){
         return this.groupByFieldName;
     }
@@ -628,6 +661,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   orderingObject  An instance of {@link fflib_QueryFactory.Ordering} to be added to the query's 'ORDER BY' clause
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory addOrdering( Ordering orderingObject ){
         this.order.add( orderingObject );
         return this;
@@ -640,6 +674,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      *                          (for instance defaults) and be added to the query's 'ORDER BY' clause
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setOrdering( Ordering orderingObject ){
         this.order = new List<Ordering>{ orderingObject };
         return this;
@@ -651,6 +686,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @return  The list of orderings that will be used as the query's 'ORDER BY' clause. You may remove elements from
      *          the returned list, or otherwise mutate it, to remove previously added orderings
      */
+    @NamespaceAccessible
     public List<Ordering> getOrderings(){
         return this.order;
     }
@@ -660,6 +696,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      *
      * @return  Set of selected fields
      */
+    @NamespaceAccessible
     public Set<String> getSelectedFields(){
         return this.fields;
     }
@@ -677,6 +714,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   forView    If true, the resulting query will include 'FOR VIEW'
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setForView( Boolean forView ){
         this.forView = forView;
         return this;
@@ -695,6 +733,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   forReference   If true, the resulting query will include 'FOR REFERENCE'
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setForReference( Boolean forReference ){
         this.forReference = forReference;
         return this;
@@ -717,6 +756,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      *                     from modifying them until the next DML operation or rollback.
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setForUpdate( Boolean forUpdate ){
         this.forUpdate = forUpdate;
         return this;
@@ -731,6 +771,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   related     The related object type
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory subselectQuery( SObjectType related ){
         System.debug( LoggingLevel.WARN, 'fflib_QueryFactory.subselectQuery(Schema.SObjectType) is deprecated and will be ' +
             'removed in a future release. Use fflib_QueryFactory.subselectQuery(String) or fflib_QueryFactory.subselectQuery(ChildRelationship) instead.' );
@@ -747,6 +788,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   assertIsAccessible      Indicates whether to check if the user has access to the subquery object
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory subselectQuery( SObjectType related, Boolean assertIsAccessible ){
         System.debug( LoggingLevel.WARN, 'fflib_QueryFactory.subselectQuery(Schema.SObjectType, Boolean) is deprecated and will be ' +
             'removed in a future release. Use fflib_QueryFactory.subselectQuery(String, Boolean) or fflib_QueryFactory.subselectQuery(ChildRelationship, Boolean) instead.' );
@@ -761,6 +803,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   relationshipName    The relationshipName to be added as a subquery
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory subselectQuery( String relationshipName ){
         return subselectQuery( relationshipName, false );
     }
@@ -774,6 +817,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   assertIsAccessible      Indicates whether to check if the user has access to the subquery object
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory subselectQuery( String relationshipName, Boolean assertIsAccessible ){
         Schema.ChildRelationship relationship = getChildRelationship( relationshipName );
         if( relationship != null ){
@@ -781,7 +825,7 @@ public virtual inherited sharing class fflib_QueryFactory{
         }
 
         throw new InvalidSubqueryRelationshipException( 'Invalid call to subselectQuery with relationshipName = '
-            + relationshipName + '.  Relationship does not exist for ' + table.getDescribe().getName() );
+            + relationshipName + '.  Relationship does not exist for ' + fflib_SObjectDescribe.getDescribe( table ).getDescribeName() );
     }
 
     /**
@@ -792,6 +836,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   relationship    The ChildRelationship to be added as a subquery
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory subselectQuery( Schema.ChildRelationship relationship ){
         return subselectQuery( relationship, false );
     }
@@ -805,6 +850,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   assertIsAccessible  Indicates whether to check if the user has access to the subquery object
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory subselectQuery( Schema.ChildRelationship relationship, Boolean assertIsAccessible ){
         return setSubselectQuery( relationship, assertIsAccessible );
     }
@@ -848,6 +894,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      *
      * @returns The list of subquery instances of fflib_QueryFactory which will be added to the SOQL as relationship/child/sub-queries
      */
+    @NamespaceAccessible
     public List<fflib_QueryFactory> getSubselectQueries(){
         if( subSelectQueryMap != null ){
             return subSelectQueryMap.values();
@@ -862,7 +909,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @return  Returns the Schema.ChildRelationship from the table of the object type
      */
     private Schema.ChildRelationship getChildRelationship( SObjectType objType ){
-        for( Schema.ChildRelationship childRow : table.getDescribe().getChildRelationships() ){
+        for( Schema.ChildRelationship childRow : fflib_SObjectDescribe.getDescribe( table ).getDescribe().getChildRelationships() ){
             // Occasionally on some standard objects (Like Contact child of Contact) do not have a relationship name
             // If there is no relationship name, we cannot query on it, so throw an exception
             if( childRow.getChildSObject() == objType && childRow.getRelationshipName() != null ){
@@ -880,7 +927,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @return  Returns the Schema.ChildRelationship from the table of the relationship name passed
      */
     private Schema.ChildRelationship getChildRelationship( String relationshipName ){
-        for( Schema.ChildRelationship childRow : table.getDescribe().getChildRelationships() ){
+        for( Schema.ChildRelationship childRow : fflib_SObjectDescribe.getDescribe( table ).getDescribe().getChildRelationships() ){
             if( childRow.getRelationshipName() == relationshipName ){
                 return childRow;
             }
@@ -902,6 +949,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   nullsLast   Whether to sort null values last (NULLS LAST keyword included)
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory addOrdering( String fieldName, SortOrder direction, Boolean nullsLast ){
         order.add(
             new Ordering( getFieldPath( fieldName ), direction, nullsLast )
@@ -922,6 +970,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param    nullsLast   Whether to sort null values last (NULLS LAST keyword included)
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory addOrdering( SObjectField field, SortOrder direction, Boolean nullsLast ){
         order.add(
             new Ordering( getFieldTokenPath( field ), direction, nullsLast )
@@ -943,6 +992,7 @@ public virtual inherited sharing class fflib_QueryFactory{
 	 * @param   direction   The direction to be sorted on (ASCENDING or DESCENDING)
 	 * @return  Returns this fflib_QueryFactory instance
 	 */
+    @NamespaceAccessible
     public fflib_QueryFactory addOrdering( String fieldName, SortOrder direction ){
         order.add(
             new Ordering( getFieldPath( fieldName ), direction )
@@ -964,6 +1014,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   direction   The direction to be sorted on (ASCENDING or DESCENDING)
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory addOrdering( SObjectField field, SortOrder direction ){
         order.add(
             new Ordering( getFieldTokenPath( field ), direction )
@@ -974,6 +1025,7 @@ public virtual inherited sharing class fflib_QueryFactory{
     /**
      * Method that empties the default ordering by name/id by fflib
      */
+    @NamespaceAccessible
     public void emptyOrdering(){
         this.order = new List<Ordering>();
     }
@@ -991,6 +1043,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   nullsLast   Whether to sort null values last (NULLS LAST keyword included)
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setOrdering( String fieldName, SortOrder direction, Boolean nullsLast ){
         Ordering orderingObject = new Ordering( getFieldPath( fieldName ), direction, nullsLast );
         return setOrdering( orderingObject );
@@ -1009,6 +1062,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   nullsLast   Whether to sort null values last (NULLS LAST keyword included)
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setOrdering( SObjectField field, SortOrder direction, Boolean nullsLast ){
         Ordering orderingObject = new Ordering( getFieldTokenPath( field ), direction, nullsLast );
         return setOrdering( orderingObject );
@@ -1026,6 +1080,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   direction   The direction to be sorted on (ASCENDING or DESCENDING)
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setOrdering( String fieldName, SortOrder direction ){
         Ordering orderingObject = new Ordering( getFieldPath( fieldName ), direction );
         return setOrdering( orderingObject );
@@ -1043,6 +1098,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   direction   The direction to be sorted on (ASCENDING or DESCENDING)
      * @return  Returns this fflib_QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory setOrdering( SObjectField field, SortOrder direction ){
         Ordering orderingObject = new Ordering( getFieldTokenPath( field ), direction );
         return setOrdering( orderingObject );
@@ -1058,6 +1114,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @param   unit    The distance unit — {@link DistanceUnit#KILOMETERS} ('km') or {@link DistanceUnit#MILES} ('mi')
      * @return  A {@code DISTANCE( fieldName, GEOLOCATION(:latitude, :longitude), 'unit' )} expression string
      */
+    @NamespaceAccessible
     public String getDistanceString( SObjectField field, DistanceUnit unit ){
         return String.format(
             'DISTANCE( {0}, GEOLOCATION(:latitude, :longitude), {1} )',
@@ -1074,76 +1131,77 @@ public virtual inherited sharing class fflib_QueryFactory{
      *
      * @return  String representing the query to be used with Database.query()
      */
+    @NamespaceAccessible
     public String toSOQL(){
         String result = 'SELECT ';
         // If no fields have been added, just add the Id field so that the query or subquery will not just fail
-        if( fields.size() == 0 ){
+        if( this.fields.size() == 0 ){
             if( mFlsEnforcement == FLSEnforcement.LEGACY ){
-                fflib_SecurityUtils.checkFieldIsReadable( table, 'Id' );
+                fflib_SecurityUtils.checkFieldIsReadable( this.table, 'Id' );
             }
             result += 'Id';
         } else{
-            List<String> fieldsToQuery = new List<String>( fields );
-            if( sortSelectFields ){
+            List<String> fieldsToQuery = new List<String>( this.fields );
+            if( this.sortSelectFields ){
                 fieldsToQuery.sort();
             }
 
             result += String.join( fieldsToQuery, ', ' );
         }
 
-        if( subSelectQueryMap != null && !subSelectQueryMap.isEmpty() ){
-            for( fflib_QueryFactory childRow : subSelectQueryMap.values() ){
+        if( this.subSelectQueryMap != null && !this.subSelectQueryMap.isEmpty() ){
+            for( fflib_QueryFactory childRow : this.subSelectQueryMap.values() ){
                 result += ', (' + childRow.toSOQL() + ') ';
             }
         }
 
-        result += ' FROM ' + ( relationship != null ? relationship.getRelationshipName() : table.getDescribe().getName() );
-        if( conditionExpression != null ){
-            result += ' WHERE ' + conditionExpression;
+        result += ' FROM ' + ( this.relationship != null ? this.relationship.getRelationshipName() : fflib_SObjectDescribe.getDescribe( this.table ).getDescribeName() );
+        if( this.conditionExpression != null ){
+            result += ' WHERE ' + this.conditionExpression;
         }
 
-        if( String.isNotBlank( groupByFieldName ) ){
-            result += ' GROUP BY ' + groupByFieldName;
+        if( String.isNotBlank( this.groupByFieldName ) ){
+            result += ' GROUP BY ' + this.groupByFieldName;
 
             // GROUP BY must exist for HAVING to be valid, set immediately after GROUP BY clause
-            if( havingExpression != null ){
-                result += ' HAVING ' + havingExpression;
+            if( this.havingExpression != null ){
+                result += ' HAVING ' + this.havingExpression;
             }
-        } else if( havingExpression != null ){
-            throw new fflib.InvalidImplementationException('A \'HAVING\' clause was set on this query without a \'GROUP BY\' clause. ' +
+        } else if( this.havingExpression != null ){
+            throw new dfflib_Utils.InvalidImplementationException('A \'HAVING\' clause was set on this query without a \'GROUP BY\' clause. ' +
                 'Please set a \'GROUP BY\' clause for the \'HAVING\' clause to be valid.' );
         }
 
-        if( order.size() > 0 ){
+        if( this.order.size() > 0 ){
             result += ' ORDER BY ';
-            for( Ordering orderingObject : order ){
+            for( Ordering orderingObject : this.order ){
                 result += orderingObject.toSOQL() + ', ';
             }
 
             result = result.substring( 0, result.length() - 2 );
         }
 
-        if( limitCount != null ){
-            result += ' LIMIT ' + limitCount;
+        if( this.limitCount != null ){
+            result += ' LIMIT ' + this.limitCount;
         }
 
-        if( offsetCount != null ){
-            result += ' OFFSET ' + offsetCount;
+        if( this.offsetCount != null ){
+            result += ' OFFSET ' + this.offsetCount;
         }
 
-        if( allRowsRequired ){
+        if( this.allRows ){
             result += ' ALL ROWS';
         }
 
-        if( forView && forReference ){
-            throw new fflib.InvalidImplementationException( 'A query cannot be set to use both FOR VIEW and FOR REFERENCE clauses. Please choose one or the other.' );
-        } else if( forView ){
+        if( this.forView && this.forReference ){
+            throw new dfflib_Utils.InvalidImplementationException( 'A query cannot be set to use both FOR VIEW and FOR REFERENCE clauses. Please choose one or the other.' );
+        } else if( this.forView ){
             result += ' FOR VIEW';
-        } else if( forReference ){
+        } else if( this.forReference ){
             result += ' FOR REFERENCE';
         }
 
-        if( forUpdate ){
+        if( this.forUpdate ){
             result += ' FOR UPDATE';
         }
 
@@ -1158,13 +1216,14 @@ public virtual inherited sharing class fflib_QueryFactory{
      *
      * @return  A deep clone of this fflib_QueryFactory
      */
+    @NamespaceAccessible
     public fflib_QueryFactory deepClone(){
 
         fflib_QueryFactory clone = new fflib_QueryFactory( this.table )
             .setLimit( this.getLimit() )
             .setOffset( this.getOffset() )
             .setCondition( this.getCondition() )
-            .setAllRowsRequired( this.getAllRowsRequired() )
+            .setAllRows( this.getAllRows() )
             .setGroupByField( this.getGroupByField() )
             .setHaving( this.havingExpression )
             .setForView( this.forView )
@@ -1188,11 +1247,13 @@ public virtual inherited sharing class fflib_QueryFactory{
         return clone;
     }
 
+    @NamespaceAccessible
     public class Ordering{
         private SortOrder direction;
         private Boolean nullsLast;
         private String field;
 
+        @NamespaceAccessible
         public Ordering( String sobjType, String fieldName, SortOrder direction ){
             this(
                 fflib_SObjectDescribe.getDescribe( sobjType ).getField( fieldName ),
@@ -1204,10 +1265,12 @@ public virtual inherited sharing class fflib_QueryFactory{
          * Construct a new ordering instance for use with {@link fflib_QueryFactory#addOrdering}
          * Once constructed it's properties may not be modified.
          */
+        @NamespaceAccessible
         public Ordering( Schema.SObjectField field, SortOrder direction ){
             this( fflib_QueryFactory.getFieldTokenPath( field ), direction, false ); // SOQL docs state NULLS FIRST is default behavior
         }
 
+        @NamespaceAccessible
         public Ordering( Schema.SObjectField field, SortOrder direction, Boolean nullsLast ){
             this( fflib_QueryFactory.getFieldTokenPath( field ), direction, nullsLast );
         }
@@ -1224,24 +1287,29 @@ public virtual inherited sharing class fflib_QueryFactory{
             this.nullsLast = nullsLast;
         }
 
+        @NamespaceAccessible
         public String getField(){
             return this.field;
         }
 
+        @NamespaceAccessible
         public SortOrder getDirection(){
             return direction;
         }
 
+        @NamespaceAccessible
         public String toSOQL(){
             return field + ' ' + ( direction == SortOrder.ASCENDING ? 'ASC' : 'DESC' ) + ( nullsLast ? ' NULLS LAST ' : ' NULLS FIRST ' );
         }
     }
 
 
+    @NamespaceAccessible
     public class InvalidFieldException extends Exception{
         private String fieldName;
         private Schema.SObjectType objectType;
 
+        @NamespaceAccessible
         public InvalidFieldException( String fieldName, Schema.SObjectType objectType ){
             this.objectType = objectType;
             this.fieldName = fieldName;
@@ -1249,8 +1317,12 @@ public virtual inherited sharing class fflib_QueryFactory{
         }
     }
 
+    @NamespaceAccessible
     public class InvalidFieldSetException extends Exception{}
+    @NamespaceAccessible
     public class NonReferenceFieldException extends Exception{}
+    @NamespaceAccessible
     public class PolymorphicLookupException extends Exception{}
+    @NamespaceAccessible
     public class InvalidSubqueryRelationshipException extends Exception{}
 }

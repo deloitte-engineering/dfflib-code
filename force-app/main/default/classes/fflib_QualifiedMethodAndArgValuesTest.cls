@@ -5,7 +5,7 @@
  * See LICENSE in the repository root for the full license text.
  */
 /**
- * Unit test class for fflib_QualifiedMethodAndArgValues class.
+ * Unit test class for fflib_QualifiedMethodAndArgValues class
  */
 @IsTest( isParallel = true )
 private with sharing class fflib_QualifiedMethodAndArgValuesTest{

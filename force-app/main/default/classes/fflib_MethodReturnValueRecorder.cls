@@ -4,10 +4,15 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+/**
+ * @group Core
+ */
+@NamespaceAccessible
+@SuppressWarnings('PMD.AvoidBooleanMethodParameters, PMD.ClassNamingConventions, PMD.PropertyNamingConventions, PMD.ApexDoc')
 public with sharing class fflib_MethodReturnValueRecorder{
-    public Boolean Stubbing{ get; set; }
+    public Boolean stubbing { get; set; }
 
-    public List<Exception> DoThrowWhenExceptions{ get; set; }
+    public List<Exception> doThrowWhenExceptions { get; set; }
 
     /**
      * Map of matchers by method.
@@ -17,12 +22,12 @@ public with sharing class fflib_MethodReturnValueRecorder{
      */
     private Map<fflib_QualifiedMethod, List<fflib_MatchersReturnValue>> matcherReturnValuesByMethod;
 
-    public fflib_MethodReturnValue MethodReturnValue{ get; private set; }
+    public fflib_MethodReturnValue methodReturnValue { get; private set; }
 
     public fflib_MethodReturnValueRecorder(){
         matcherReturnValuesByMethod = new Map<fflib_QualifiedMethod, List<fflib_MatchersReturnValue>>();
 
-        MethodReturnValue = null;
+        this.methodReturnValue = null;
     }
 
     /**
@@ -32,7 +37,7 @@ public with sharing class fflib_MethodReturnValueRecorder{
      * @return  The MethodReturnValue instance.
      */
     public fflib_MethodReturnValue prepareMethodReturnValue( fflib_InvocationOnMock invocation ){
-        MethodReturnValue = new fflib_MethodReturnValue();
+        this.methodReturnValue = new fflib_MethodReturnValue();
 
         List<fflib_MatchersReturnValue> matcherReturnValues = matcherReturnValuesByMethod.get( invocation.getMethod() );
         if( matcherReturnValues == null ){
@@ -54,9 +59,9 @@ public with sharing class fflib_MethodReturnValueRecorder{
         }
 
         List<fflib_IMatcher> matchers = fflib_Match.getAndClearMatchers( argValues.size() );
-        matcherReturnValues.add( new fflib_MatchersReturnValue( matchers, MethodReturnValue ) );
+        matcherReturnValues.add( new fflib_MatchersReturnValue( matchers, this.methodReturnValue ) );
 
-        return MethodReturnValue;
+        return this.methodReturnValue;
     }
 
     /**
@@ -71,7 +76,7 @@ public with sharing class fflib_MethodReturnValueRecorder{
             for( Integer i = matchersForMethods.size() - 1; i >= 0; i-- ){
                 fflib_MatchersReturnValue matchersReturnValue = ( fflib_MatchersReturnValue ) matchersForMethods.get( i );
                 if( fflib_Match.matchesAllArgs( invocation.getMethodArgValues(), matchersReturnValue.matchers ) ){
-                    return matchersReturnValue.returnValue;
+                    return matchersReturnValue.ReturnValue;
                 }
             }
         }
@@ -85,6 +90,6 @@ public with sharing class fflib_MethodReturnValueRecorder{
      * @param   exps    The list of exception to throw.
      */
     public void prepareDoThrowWhenExceptions( List<Exception> exps ){
-        DoThrowWhenExceptions = exps;
+        this.doThrowWhenExceptions = exps;
     }
 }

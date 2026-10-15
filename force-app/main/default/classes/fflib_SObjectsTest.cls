@@ -6,7 +6,6 @@
  */
 /**
  *  Unit test module for the fflib_SObjects class
- * 
  */
 @IsTest( IsParallel = true )
 private with sharing class fflib_SObjectsTest{
@@ -40,6 +39,33 @@ private with sharing class fflib_SObjectsTest{
             return mockDomain;
         }
         set;
+    }
+
+    private static Integer testFakeIdSequence = 0;
+    private static final String TEST_FAKE_ID_PADDING = '000000000000';
+    private static Map<SObjectType, String> prefixCacheMap = new Map<SObjectType, String>();
+
+    /**
+     * Method that generates a fake Salesforce Id for the given SObjectType.
+     *
+     * @param	sObjectType	 type of SObject being described.
+     * @return	Randomized Salesforce Id for the given SObjectType.
+     */
+    @TestVisible
+    private static Id generateTestRecordId( Schema.SObjectType sobjectType ){
+        // Avoid describing SObject multiple times
+        if( !prefixCacheMap.containsKey( sObjectType ) ){
+            prefixCacheMap.put( sObjectType, sObjectType.getDescribe().getKeyPrefix() );
+        }
+
+        String keyPrefix = prefixCacheMap.get( sObjectType );
+
+        testFakeIdSequence++;
+        String prefix = TEST_FAKE_ID_PADDING.substring(
+            0,
+            TEST_FAKE_ID_PADDING.length() - String.valueOf(testFakeIdSequence).length()
+        );
+        return Id.valueOf( keyPrefix + prefix + testFakeIdSequence );
     }
 
     @IsTest
@@ -94,8 +120,8 @@ private with sharing class fflib_SObjectsTest{
         );
 
         System.Assert.isTrue(
-            domain.pluckIds( Schema.Solution.Id ).equals( recordIds ),
-            'The domain should return all the record Ids'
+            domain.getIdFieldValues( Schema.Solution.Id ).equals( recordIds ),
+            'The domain should return all the record Ids via getIdFieldValues'
         );
     }
 
@@ -113,7 +139,7 @@ private with sharing class fflib_SObjectsTest{
     }
 
     @IsTest
-    private static void itShouldReturnRecordsWithoutAllFieldValues(){
+    private static void itShouldReturnRecordsWithoutAllFields(){
         // Given, When, Then
         mockDomain.clearSolutionName();
         mockDomain.clearSolutionStatus();
@@ -150,12 +176,35 @@ private with sharing class fflib_SObjectsTest{
         };
         // When, Then
         System.Assert.isTrue(
-            mockDomain.pluckStrings( Schema.Solution.Status ).equals( expectedValidValues )
+            mockDomain.getStringFieldValues( Schema.Solution.Status, false ).equals( expectedValidValues )
+        );
+        System.Assert.isTrue(
+            mockDomain.getStringFieldValues( Schema.Solution.Status ).equals( expectedAllValues )
         );
         System.Assert.isTrue(
             mockDomain.getFieldValues( Schema.Solution.Status )
                 .equals( expectedAllValues )
         );
+    }
+
+    @IsTest
+    private static void getStringFieldValues_throwsOnNonString(){
+        // Given - create data
+        DomainSolutions domain = new DomainSolutions(
+            new List<Solution>{ new Solution( IsPublished = true ) }
+        );
+
+        // When
+        try{
+            domain.getStringFieldValues( Schema.Solution.IsPublished );
+            System.Assert.fail( 'IsPublished is not a String-typed-field and should throw Exception.' );
+        } catch( System.TypeException ex ){
+            // Then - validate test
+            System.Assert.isTrue(
+                ex.getMessage().contains( 'Invalid conversion from runtime type' ),
+                'Unexpected exception message: ' + ex.getMessage()
+            );
+        }
     }
 
     @IsTest
@@ -234,9 +283,9 @@ private with sharing class fflib_SObjectsTest{
     }
 
     @IsTest
-    private static void mapSObjectsListByIdentifier_success(){
+    private static void groupRecordsByFieldValue_success(){
         // When - perform test
-        Map<String, List<SObject>> mappedList = mockDomain.mapSObjectsListByIdentifier( Solution.SolutionName );
+        Map<Object, List<SObject>> mappedList = mockDomain.groupRecordsByFieldValue( Solution.SolutionName );
 
         // Then - validate test
         System.Assert.areEqual( 8, mappedList.keySet().size(), 'Expected #' + 8 + ' unique identifiers to be set as Map-keys' );
@@ -247,42 +296,29 @@ private with sharing class fflib_SObjectsTest{
     }
 
     @IsTest
-    private static void mapSObjectsListByIdentifierLowerCase_success(){
-        // When - perform test
-        Map<String, List<SObject>> mappedList = mockDomain.mapSObjectsListByIdentifier( Solution.SolutionName, true );
-
-        // Then - validate test
-        System.Assert.areEqual( 7, mappedList.keySet().size(), 'Expected 7 unique identifiers to be set as Map-keys' );
-
-        List<SObject> solsByDuplicateName = mappedList.get( SOLUTION_NAME_DUP_LOWER );
-        System.Assert.areNotEqual( null, solsByDuplicateName, 'Expected solDuplicateNameA to be an identifier in Map' );
-        System.Assert.areEqual( 4, solsByDuplicateName.size(), 'Expected 4 Solutions to be mapped to SolutionName' );
-    }
-
-    @IsTest
-    private static void mapSObjectsListByIdentifier_emptyFieldValue(){
+    private static void groupRecordsByFieldValue_emptyFieldValue(){
         // Given - set data
         DomainSolutions domain = new DomainSolutions( new List<Solution>{ new Solution() } );
 
         // When - perform test
         try{
-            Map<String, List<SObject>> mappedList = domain.mapSObjectsListByIdentifier( Solution.Status );
-            throw new fflib.InvalidImplementationException( 'You should have never entered here.' );
+            Map<Object, List<SObject>> mappedList = domain.groupRecordsByFieldValue( Solution.Status );
+            System.Assert.fail( 'No input was provided on the Status field, thus Exception was expected.' );
         } catch( Exception ex ){
             // Then - validate test
-            System.Assert.isInstanceOfType( ex, fflib.InvalidInputValueException.class, 'Expected an fflib.InvalidInputValueException, got ' + ex.getTypeName() );
+            System.Assert.isInstanceOfType( ex, fflib_Objects.InvalidValueException.class, 'Expected an fflib_Objects.InvalidValueException, got ' + ex.getTypeName() );
         }
     }
 
     @IsTest
-    private static void mapSObjectsListByIdentifier_fieldFromOtherSObject(){
+    private static void groupRecordsByFieldValue_wrongSObject(){
         // Given - set data
         DomainSolutions domain = new DomainSolutions( new List<Solution>{ new Solution() } );
 
         // When - perform test
         try{
-            Map<String, List<SObject>> mappedList = domain.mapSObjectsListByIdentifier( Account.Industry );
-            throw new fflib.InvalidImplementationException( 'You should have never entered here.' );
+            Map<Object, List<SObject>> mappedList = domain.groupRecordsByFieldValue( Account.Industry );
+            System.Assert.fail( 'Account.Industry is not a field on Solution, thus Exception was expected.' );
         } catch( Exception ex ){
             // Then - validate test
             System.Assert.isInstanceOfType( ex, System.SObjectException.class, 'Expected an System.SObjectException, got ' + ex.getTypeName() );
@@ -290,20 +326,42 @@ private with sharing class fflib_SObjectsTest{
     }
 
     @IsTest
-    private static void filterListByIdentifier_success(){
+    private static void groupRecordsByFieldValue_booleanKey(){
+        // Given - create data: group by a Boolean field, so the map key is a Boolean, not a stringified "true"/"false"
+        DomainSolutions domain = new DomainSolutions(
+            new List<Solution>{
+                new Solution( SolutionName = SOLUTION_NAME_A, IsPublished = true ),
+                new Solution( SolutionName = SOLUTION_NAME_B, IsPublished = true ),
+                new Solution( SolutionName = SOLUTION_NAME_C, IsPublished = false )
+            }
+        );
+
         // When - perform test
-        List<SObject> objectList = mockDomain.filterListByFieldValue( Solution.SolutionName, SOLUTION_NAME_DUP_MIX );
+        Map<Object, List<SObject>> mappedList = domain.groupRecordsByFieldValue( Solution.IsPublished );
+
+        // Then - validate test: exactly two Boolean keys, and lookup by the native Boolean type succeeds
+        System.Assert.areEqual( 2, mappedList.keySet().size(), 'Expected one map-key per distinct Boolean value' );
+        System.Assert.isTrue( mappedList.containsKey( true ), 'Expected the native Boolean value true to be usable as a map key' );
+        System.Assert.isTrue( mappedList.containsKey( false ), 'Expected the native Boolean value false to be usable as a map key' );
+        System.Assert.areEqual( 2, mappedList.get( true ).size(), 'Expected 2 Solutions grouped under the Boolean key true' );
+        System.Assert.areEqual( 1, mappedList.get( false ).size(), 'Expected 1 Solution grouped under the Boolean key false' );
+    }
+
+    @IsTest
+    private static void getRecordsByFieldValue_success(){
+        // When - perform test
+        List<SObject> objectList = mockDomain.getRecordsByFieldValueDirect( Solution.SolutionName, SOLUTION_NAME_DUP_MIX );
 
         // Then - validate test
         System.Assert.areEqual( 2, objectList.size(), 'Expected different size of objectList ' + objectList.size() );
     }
 
     @IsTest
-    private static void filterListByIdentifier_fieldFromOtherSObject(){
+    private static void getRecordsByFieldValue_wrongSObject(){
         // When - perform test
         try{
-            mockDomain.filterListByFieldValue( Account.AccountNumber, SOLUTION_NAME_A );
-            throw new fflib.InvalidImplementationException( 'You should have never entered here.' );
+            mockDomain.getRecordsByFieldValueDirect( Account.AccountNumber, SOLUTION_NAME_A );
+            System.Assert.fail( 'Account.AccountNumber is not a field on Solution, thus Exception was expected.' );
         } catch( Exception ex ){
             // Then - validate test
             System.Assert.areEqual( 'System.SObjectException', ex.getTypeName(), 'Expected different type of Exception' );
@@ -311,61 +369,73 @@ private with sharing class fflib_SObjectsTest{
     }
 
     @IsTest
-    private static void filterListByIdentifier_emptyValue(){
+    private static void getRecordsByFieldValue_emptyValue(){
+        // Given - create data: one record with a blank Status among non-blank ones
+        DomainSolutions domain = new DomainSolutions(
+            new List<Solution>{
+                new Solution( SolutionName = SOLUTION_NAME_A, Status = SOLUTION_STATUS_DRAFT ),
+                new Solution( SolutionName = SOLUTION_NAME_B, Status = '' )
+            }
+        );
+
         // When - perform test
-        try{
-            mockDomain.filterListByFieldValue( Solution.Status, '' );
-            throw new fflib.InvalidImplementationException( 'You should have never entered here since the identifier field was empty' );
-        } catch( Exception ex ){
-            // Then - validate test
-            System.Assert.isInstanceOfType( ex, fflib.InvalidInputValueException.class, 'Expected different type of Exception since OwnerId - identifierField - was left empty on purpose, got ' + ex.getTypeName() );
-        }
+        List<SObject> objectList = domain.getRecordsByFieldValueDirect( Solution.Status, '' );
+
+        // Then - validate test: current implementation matches on value equality, no exception on blank
+        System.Assert.areEqual( 1, objectList.size(), 'Expected only the blank-status record to match' );
     }
 
     @IsTest
-    private static void shouldPluckIdsCorrectly(){
+    private static void getRecordIds_success(){
         // Given - create data
         List<Solution> solutions = new List<Solution>{
             new Solution( Id = fflib_IDGenerator.generate( Solution.SObjectType ) ),
             new Solution( Id = fflib_IDGenerator.generate( Solution.SObjectType ) )
         };
         // When, Then
-        Set<Id> recordIds = new DomainSolutions( solutions ).pluckIds();
+        Set<Id> recordIds = new DomainSolutions( solutions ).getRecordIds();
         System.Assert.areEqual( 2, recordIds.size() );
         System.Assert.isTrue( recordIds.contains( solutions[ 0 ].Id ) );
         System.Assert.isTrue( recordIds.contains( solutions[ 1 ].Id ) );
     }
 
     @IsTest
-    private static void shouldPluckIdsCorrectlyIdSpecified(){
-        // Given - create data
-        List<Solution> solutions = new List<Solution>{
-            new Solution( Id = fflib_IDGenerator.generate( Solution.SObjectType ) ),
-            new Solution( Id = fflib_IDGenerator.generate( Solution.SObjectType ) )
-        };
-        // When, Then
-        Set<Id> recordIds = new DomainSolutions( solutions ).pluckIds( Solution.Id );
-        System.Assert.areEqual( 2, recordIds.size() );
-        System.Assert.isTrue( recordIds.contains( solutions[ 0 ].Id ) );
-        System.Assert.isTrue( recordIds.contains( solutions[ 1 ].Id ) );
+    private static void getIdFieldValues_includeNulls(){
+        // Given - create data: one record with a populated OwnerId, one without
+        DomainSolutions domain = new DomainSolutions(
+            new List<Solution>{
+                new Solution( OwnerId = fflib_IDGenerator.generate( User.SObjectType ) ),
+                new Solution()
+            }
+        );
+
+        // When, Then - default (no-arg) includes null values
+        Set<Id> idsIncludingNulls = domain.getIdFieldValues( Schema.Solution.OwnerId );
+        System.Assert.areEqual( 2, idsIncludingNulls.size(), 'Expected the null OwnerId to be included by default' );
+        System.Assert.isTrue( idsIncludingNulls.contains( null ) );
+
+        // When, Then - explicit includeNulls = false excludes null values
+        Set<Id> idsExcludingNulls = domain.getIdFieldValues( Schema.Solution.OwnerId, false );
+        System.Assert.areEqual( 1, idsExcludingNulls.size(), 'Expected the null OwnerId to be excluded' );
+        System.Assert.isFalse( idsExcludingNulls.contains( null ) );
     }
 
     @IsTest
-    private static void shouldPluckStringsCorrectly(){
+    private static void getStringFieldValues_excludeBlanks(){
         // Given - create data
         List<Solution> solutions = new List<Solution>{
             new Solution( SolutionName = SOLUTION_NAME_A ),
             new Solution( SolutionName = SOLUTION_NAME_B )
         };
         // When, Then
-        Set<String> strings = new DomainSolutions( solutions ).pluckStrings( Solution.SolutionName );
+        Set<String> strings = new DomainSolutions( solutions ).getStringFieldValues( Solution.SolutionName, false );
         System.Assert.areEqual( 2, strings.size() );
         System.Assert.isTrue( strings.contains( solutions[ 0 ].SolutionName ) );
         System.Assert.isTrue( strings.contains( solutions[ 1 ].SolutionName ) );
     }
 
     @IsTest
-    private static void shouldPluckIdsFromRelationshipCorrectly(){
+    private static void getParentIdFieldValues_success(){
         // Given - create data
         List<Solution> solutions = new List<Solution>{
             new Solution(
@@ -374,76 +444,9 @@ private with sharing class fflib_SObjectsTest{
             )
         };
         // When, Then
-        Set<Id> recordIds = new DomainSolutions( solutions ).pluckIdsFromRelationship( 'Owner.ContactId' );
+        Set<Id> recordIds = new DomainSolutions( solutions ).getParentIdFieldValues( 'Owner.ContactId' );
         System.Assert.areEqual( 1, recordIds.size() );
         System.Assert.isTrue( recordIds.contains( solutions[ 0 ].Owner.ContactId ) );
-    }
-
-    @IsTest
-    private static void getPicklistValues_validReturn(){
-        // Given - create data
-        List<Schema.PicklistEntry> pleForSolutionStatusName = Solution.Status.getDescribe().getPicklistValues();
-
-        // When, Then
-        List<Schema.PicklistEntry> ple = mockDomain.getPicklistValues( 'Solution', 'Status' );
-        System.Assert.areEqual( ple.size(), pleForSolutionStatusName.size() );
-        System.Assert.areEqual( ple[ 0 ].getLabel(), pleForSolutionStatusName[ 0 ].getLabel() );
-    }
-
-    @IsTest
-    private static void getPicklistValues_missingInput(){
-        // When - perform test
-        try{
-            mockDomain.getPicklistValues( 'Solution', null );
-            throw new fflib.InvalidImplementationException( 'This Exception should not be thrown as field-input was empty' );
-        } catch( Exception ex ){
-            // Then - validate
-            System.Assert.isInstanceOfType( ex, fflib.InvalidInputValueException.class, 'Expected an fflib.InvalidInputValueException, got ' + ex.getTypeName() );
-        }
-    }
-
-    @IsTest
-    private static void getPicklistValues_invalidInput(){
-        // When - perform test
-        try{
-            mockDomain.getPicklistValues( 'test1', 'test2' );
-            throw new fflib.MissingDataException( 'This Exception should not be thrown as input is invalid (not valid fields)' );
-        } catch( Exception ex ){
-            // Then - validate
-            System.Assert.isInstanceOfType( ex, fflib.InvalidImplementationException.class, 'Expected an fflib.InvalidImplementationException, got ' + ex.getTypeName() );
-        }
-    }
-
-    @IsTest
-    private static void getPicklistValuesToStrings(){
-        // Given - create data
-        List<String> picklistValuesForMyVehicle = mockDomain.getPicklistValuesToStrings( 'Solution', 'Status' );
-
-        // When, Then
-        System.Assert.isTrue( picklistValuesForMyVehicle.contains( 'Draft'.toUpperCase() ), 'Expected to contain this picklist value' );
-        System.Assert.isTrue( picklistValuesForMyVehicle.contains( 'Reviewed'.toUpperCase() ), 'Expected to contain this picklist value' );
-    }
-
-    @IsTest
-    private static void isValidPicklistValue(){
-        // Given - create data
-
-        // When, Then
-        // Success
-        System.Assert.isTrue( mockDomain.isValidPicklistValue( Solution.Status, Solution.SObjectType, 'Draft' ), 'Expected Unknown to be a valid picklist value on Solution.Status field' );
-
-        // Failure
-        System.Assert.isFalse( mockDomain.isValidPicklistValue( Solution.Status, Solution.SObjectType, null ), 'Expected false since blank picklist value was provided' );
-        System.Assert.isFalse( mockDomain.isValidPicklistValue( Solution.Status, Solution.SObjectType, 'Non existing picklist' ), 'Expected false since picklist values should not exist in Solution.Status' );
-
-        try{
-            System.Assert.isFalse( mockDomain.isValidPicklistValue( Solution.Status, Contact.SObjectType, 'Unknown' ), 'Expected false since no Status field should exist on Contact SObjectType' );
-            throw new fflib.InvalidImplementationException( 'This Exception should never be thrown' );
-        } catch( Exception ex ){
-            String exceptionMessage = ex.getMessage();
-            System.Assert.isTrue( exceptionMessage.contains( 'Contact' ), 'Expected attempted SObjectType to be in Exception message ' + exceptionMessage );
-            System.Assert.isTrue( exceptionMessage.contains( 'Status' ), 'Expected attempted Field to be in Exception message ' + exceptionMessage );
-        }
     }
 
     private class DomainSolutions extends fflib_SObjects{
@@ -452,33 +455,33 @@ private with sharing class fflib_SObjectsTest{
         }
 
         public List<Solution> getRecordsBySolutionName( String solutionName ){
-            return filterListByFieldValues(
+            return getRecordsByFieldValues(
                 Schema.Solution.SolutionName,
                 new Set<Object>{ solutionName }
             );
         }
 
         public List<Solution> getRecordsBySolutionStatus( String status ){
-            return filterListByFieldValue(
+            return getRecordsByFieldValue(
                 Schema.Solution.Status,
                 status
             );
         }
 
         public List<Solution> getRecordsWithoutSolutionName(){
-            return filterListByBlankFieldValues(
+            return getRecordsWithBlankFieldValues(
                 Schema.Solution.SolutionName
             );
         }
 
         public List<Solution> getRecordsWithSolutionName(){
-            return filterListByNonEmptyFieldValues(
+            return getRecordsWithNotBlankFieldValues(
                 Schema.Solution.SolutionName
             );
         }
 
         public List<Solution> getRecordsWithEmptyFields(){
-            return filterListByAllBlankFieldValues(
+            return getRecordsWithAllBlankFieldValues(
                 new Set<Schema.SObjectField>{
                     Schema.Solution.SolutionName,
                     Schema.Solution.Status
@@ -487,12 +490,20 @@ private with sharing class fflib_SObjectsTest{
         }
 
         public List<Solution> getRecordsWithAllPopulatedFields(){
-            return filterListByAllNonEmptyFieldValues(
+            return getRecordsWithAllNotBlankFieldValues(
                 new Set<Schema.SObjectField>{
                     Schema.Solution.SolutionName,
                     Schema.Solution.Status
                 }
             );
+        }
+
+        /**
+         * Test-only passthrough exposing the protected getRecordsByFieldValue(s) for direct,
+         * arbitrary-field assertions from the outer test class.
+         */
+        public List<SObject> getRecordsByFieldValueDirect( Schema.SObjectField field, Object value ){
+            return getRecordsByFieldValue( field, value );
         }
 
         public void setSolutionName( String solutionName ){

@@ -4,16 +4,20 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+@NamespaceAccessible
+@SuppressWarnings('PMD.ExcessiveParameterList, PMD.CognitiveComplexity, PMD.ClassNamingConventions, PMD.ApexDoc')
 public with sharing class fflib_QualifiedMethod{
     public final Object mockInstance;
     public final String typeName;
     public final String methodName;
     public final List<Type> methodArgTypes;
 
+    @NamespaceAccessible
     public fflib_QualifiedMethod( String typeName, String methodName, List<Type> methodArgTypes ){
         this( typeName, methodName, methodArgTypes, null );
     }
 
+    @NamespaceAccessible
     public fflib_QualifiedMethod( String typeName, String methodName, List<Type> methodArgTypes, Object mockInstance ){
         this.mockInstance = mockInstance;
         this.typeName = typeName;
@@ -35,7 +39,7 @@ public with sharing class fflib_QualifiedMethod{
         fflib_QualifiedMethod that = other instanceof fflib_QualifiedMethod ? ( fflib_QualifiedMethod ) other : null;
 
         return that != null
-            && ( this.mockInstance === that.mockInstance || !fflib_ApexMocksConfig.HasIndependentMocks )
+            && ( this.mockInstance === that.mockInstance || !fflib_ApexMocksConfig.hasIndependentMocks )
             && this.typeName == that.typeName
             && this.methodName == that.methodName
             && this.methodArgTypes == that.methodArgTypes;
@@ -50,7 +54,7 @@ public with sharing class fflib_QualifiedMethod{
         Integer prime = 31;
         Integer result = 1;
 
-        if( fflib_ApexMocksConfig.HasIndependentMocks ){
+        if( fflib_ApexMocksConfig.hasIndependentMocks ){
             result = prime * result + ( ( mockInstance == null ) ? 0 : mockInstance.hashCode() );
         }
         result = prime * result + ( ( methodArgTypes == null ) ? 0 : methodArgTypes.hashCode() );

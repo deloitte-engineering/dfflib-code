@@ -5,6 +5,7 @@
  * See LICENSE in the repository root for the full license text.
  */
 @IsTest( isParallel = true )
+@SuppressWarnings('PMD.ClassNamingConventions, PMD.ApexUnitTestClassShouldHaveRunAs, PMD.ApexDoc')
 private with sharing class fflib_MatchTest{
 
     @IsTest

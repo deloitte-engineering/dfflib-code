@@ -13,7 +13,7 @@ private with sharing class fflib_SystemTest{
             fflib_System.assertEquals( 'Test String', 'Test String' );
             System.Assert.fail( 'Expected fflib_ApexMocks.ApexMocksException to be thrown. This assertion should never be triggered' );
         } catch( fflib_ApexMocks.ApexMocksException e ){
-            System.Assert.areEqual( 'System.Assert.areEqual() expects you to register exactly 1 fflib_IMatcher (typically through the helpers in fflib_Match).', e.getMessage() );
+            System.Assert.areEqual( 'fflib_System.assertEquals expects you to register exactly 1 fflib_IMatcher (typically through the helpers in fflib_Match).', e.getMessage() );
         }
     }
 
@@ -29,7 +29,7 @@ private with sharing class fflib_SystemTest{
             fflib_System.assertEquals( fflib_Match.stringStartsWith( 'Test S' ), 'Test String' );
             System.Assert.fail( 'Expected fflib_ApexMocks.ApexMocksException to be thrown. This assertion should never be triggered' );
         } catch( fflib_ApexMocks.ApexMocksException e ){
-            System.Assert.areEqual( 'System.Assert.areEqual() expects you to register exactly 1 fflib_IMatcher (typically through the helpers in fflib_Match).', e.getMessage() );
+            System.Assert.areEqual( 'fflib_System.assertEquals expects you to register exactly 1 fflib_IMatcher (typically through the helpers in fflib_Match).', e.getMessage() );
         }
     }
 
@@ -69,7 +69,7 @@ private with sharing class fflib_SystemTest{
             fflib_System.assertEquals( 'Test String', 'Test String', 'My Custom Message' );
             System.Assert.fail( 'Expected fflib_ApexMocks.ApexMocksException to be thrown. This assertion should never be triggered' );
         } catch( fflib_ApexMocks.ApexMocksException e ){
-            System.Assert.areEqual( 'System.Assert.areEqual() expects you to register exactly 1 fflib_IMatcher (typically through the helpers in fflib_Match).', e.getMessage() );
+            System.Assert.areEqual( 'fflib_System.assertEquals expects you to register exactly 1 fflib_IMatcher (typically through the helpers in fflib_Match).', e.getMessage() );
         }
     }
 
@@ -85,7 +85,7 @@ private with sharing class fflib_SystemTest{
             fflib_System.assertEquals( fflib_Match.stringStartsWith( 'Test S' ), 'Test String', 'My Custom Message' );
             System.Assert.fail( 'Expected fflib_ApexMocks.ApexMocksException to be thrown. This assertion should never be triggered' );
         } catch( fflib_ApexMocks.ApexMocksException e ){
-            System.Assert.areEqual( 'System.Assert.areEqual() expects you to register exactly 1 fflib_IMatcher (typically through the helpers in fflib_Match).', e.getMessage() );
+            System.Assert.areEqual( 'fflib_System.assertEquals expects you to register exactly 1 fflib_IMatcher (typically through the helpers in fflib_Match).', e.getMessage() );
         }
     }
 

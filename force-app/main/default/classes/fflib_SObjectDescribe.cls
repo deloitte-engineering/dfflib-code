@@ -16,8 +16,10 @@
  * This allows both upgrading old code to APIv29 by making use of these as a nearly drop in replacement, as well as keeping
  * namespace detection logic encapsulated.
 **/
+@NamespaceAccessible
 public inherited sharing class fflib_SObjectDescribe{
     // Internal implementation details
+    @TestVisible
     private Schema.SObjectType token;
     private Schema.SObjectField nameField;
     private Schema.DescribeSObjectResult describe{ // Lazy load - keep this lightweight until we need more data
@@ -62,18 +64,15 @@ public inherited sharing class fflib_SObjectDescribe{
         if( token == null ){
             throw new InvalidDescribeException( 'Invalid SObject type: null' );
         }
-        String lowerCaseTokenString = String.valueOf( token ).toLowerCase();
-        if( instanceCache.containsKey( lowerCaseTokenString ) ){
-            throw new DuplicateDescribeException( token + ' is already in the describe cache' );
-        }
         this.token = token;
-        instanceCache.put( lowerCaseTokenString, this );
+        instanceCache.put( String.valueOf( token ).toLowerCase(), this );
     }
 
     // Public instance methods
     /**
      * Returns the Schema.SObjectType this fflib_SObjectDescribe instance is based on.
      */
+    @NamespaceAccessible
     public Schema.SObjectType getSObjectType(){
         return token;
     }
@@ -84,6 +83,7 @@ public inherited sharing class fflib_SObjectDescribe{
      * @param   name    Name of field to return details for
      * @return  SObjectField matching the provided name
      */
+    @NamespaceAccessible
     public Schema.SObjectField getField( String name ){
         return this.getField( name, true );
     }
@@ -97,11 +97,15 @@ public inherited sharing class fflib_SObjectDescribe{
      * @param   implyNamespace Whether or not namespace should be implied
      * @retun   SObjectField matching the provided name
      */
+    @NamespaceAccessible
     public Schema.SObjectField getField( String fieldName, Boolean implyNamespace ){
         Schema.SObjectField result = wrappedFields.get(
             ( fieldName.endsWithIgnoreCase( '__r' )
                 ? ( fieldName.removeEndIgnoreCase( '__r' ) + '__c' ) // Resolve custom field cross-object (__r) syntax
-                : fieldName ),
+                : ( ( fieldName.endsWithIgnoreCase( '__pr' ) 
+                        ? fieldName.removeEndIgnoreCase( '__pr' ) + '__c' 
+                        : fieldName )
+                ) ),
             implyNamespace
         );
         if( result == null ){
@@ -113,10 +117,11 @@ public inherited sharing class fflib_SObjectDescribe{
     /**
      * Returns the field where isNameField() is true (if any); otherwise returns null
      */
+    @NamespaceAccessible
     public Schema.SObjectField getNameField(){
         if( nameField == null ){
             for( Schema.SObjectField field : wrappedFields.values() ){
-                if( field.getDescribe().isNameField() ){
+                if( getFieldDescribe( field ).isNameField() ){
                     nameField = field;
                     break;
                 }
@@ -128,16 +133,16 @@ public inherited sharing class fflib_SObjectDescribe{
     /**
      * Returns the raw Schema.DescribeSObjectResult an fflib_SObjectDescribe instance wraps.
      */
+    @NamespaceAccessible
     public Schema.DescribeSObjectResult getDescribe(){
         return describe;
     }
 
     /**
-     * Returns the Name of the SObjectDescribe instance
-     * Use-case: simplified conversion from SObjectType to String of SObjectType (e.g. frequently used in fflib_SObjectUnitOfWork);
-     * Before: fflib_SObjectDescribe.getDescribe(Account.SObjectType).getDescribe().getName();
-     * After: fflib_SObjectDescribe.getDescribe(Account.SObjectType).getDescribeName();
+     * Returns the SObject API name this describe wraps.
+     * Equivalent to getDescribe().getName(), provided to centralize the method chain and reduce repetitive code.
      */
+    @NamespaceAccessible
     public String getDescribeName(){
         return describe.getName();
     }
@@ -146,12 +151,15 @@ public inherited sharing class fflib_SObjectDescribe{
      * This method returns the raw data and provides no namespace handling.
      * Due to this, __use of this method is discouraged__ in favor of getFields().
      */
+    @NamespaceAccessible
     public Map<String, Schema.SObjectField> getFieldsMap(){
         return fields;
     }
+    @NamespaceAccessible
     public FieldsMap getFields(){
         return wrappedFields;
     }
+    @NamespaceAccessible
     public Map<String, Schema.FieldSet> getFieldSetsMap(){
         return fieldSets;
     }
@@ -190,6 +198,7 @@ public inherited sharing class fflib_SObjectDescribe{
         set;
     }
 
+    @NamespaceAccessible
     public static fflib_SObjectDescribe getDescribe( String sObjectName ){
         if( String.isBlank( sObjectName ) ){
             return null;
@@ -202,6 +211,7 @@ public inherited sharing class fflib_SObjectDescribe{
         return result;
     }
 
+    @NamespaceAccessible
     public static fflib_SObjectDescribe getDescribe( Schema.SObjectType token ){
         if( token == null ){
             return null;
@@ -213,17 +223,15 @@ public inherited sharing class fflib_SObjectDescribe{
         return result;
     }
 
+    @NamespaceAccessible
     public static fflib_SObjectDescribe getDescribe( Schema.DescribeSObjectResult nativeDescribe ){
         if( nativeDescribe == null ){
             return null;
         }
-        fflib_SObjectDescribe result = instanceCache.get( nativeDescribe.getName().toLowerCase() );
-        if( result == null ){
-            result = new fflib_SObjectDescribe( nativeDescribe.getSobjectType() );
-        }
-        return result;
+        return instanceCache.get( nativeDescribe.getName().toLowerCase() ) ?? new fflib_SObjectDescribe( nativeDescribe.getSobjectType() );
     }
 
+    @NamespaceAccessible
     public static fflib_SObjectDescribe getDescribe( SObject instance ){
         if( instance == null ){
             return null;
@@ -232,11 +240,48 @@ public inherited sharing class fflib_SObjectDescribe{
     }
 
     /**
+     * This is used to cache Schema.DescribeFieldResult instances as they're requested,
+     * to prevent repeatedly hitting field-level describe limits when the same field is described multiple times
+     * (e.g. across a list of records sharing the same field, or across multiple relationship registrations).
+     */
+    private static Map<Schema.SObjectField, Schema.DescribeFieldResult> fieldDescribeCache{
+        get{
+            if( fieldDescribeCache == null ){
+                fieldDescribeCache = new Map<Schema.SObjectField, Schema.DescribeFieldResult>();
+            }
+            return fieldDescribeCache;
+        }
+        set;
+    }
+
+    /**
+     * Returns the Schema.DescribeFieldResult for the given field, with caching built in to avoid repeatedly
+     * hitting describe limits when the same field is described multiple times.
+     *
+     * @param   field   The SObjectField to describe
+     * @return  The (possibly cached) DescribeFieldResult for the field, or null when field is null
+     */
+    @NamespaceAccessible
+    public static Schema.DescribeFieldResult getFieldDescribe( Schema.SObjectField field ){
+        if( field == null ){
+            return null;
+        }
+        Schema.DescribeFieldResult result = fieldDescribeCache.get( field );
+        if( result == null ){
+            result = field.getDescribe();
+            fieldDescribeCache.put( field, result );
+        }
+        return result;
+    }
+
+    /**
      * Returns the same results as the native method, just with caching built in to avoid limits
      */
+    @NamespaceAccessible
     public static Map<String, SObjectType> getRawGlobalDescribe(){
         return rawGlobalDescribe;
     }
+    @NamespaceAccessible
     public static GlobalDescribeMap getGlobalDescribe(){
         return wrappedGlobalDescribe;
     }
@@ -245,9 +290,62 @@ public inherited sharing class fflib_SObjectDescribe{
      * Useful when working in heap space constrained environments.
      * Existing references to SObjectDescribe instances will continue to work.
      */
+    @NamespaceAccessible
     public static void flushCache(){
         rawGlobalDescribe = null;
+        wrappedGlobalDescribe = null;
         instanceCache = null;
+        fieldDescribeCache = null;
+    }
+
+    /**
+     * Method to retrieve a list of Schema.PicklistEntry with label and (api) value for a picklist field.
+     * Note, no Exception is thrown for non-picklist fields; the platform returns an empty list.
+     *
+     * @param selectedField  The SObjectField of the picklist (multi-select) field
+     * @return List containing the picklist entry describes, or an empty list if the field is not a picklist
+     * @throws dfflib_Utils.InvalidInputValueException when the provided SObjectField is null
+     */
+    @NamespaceAccessible
+    public static List<Schema.PicklistEntry> getPicklistValues( Schema.SObjectField selectedField ){
+        dfflib_Utils.verifyNotNull( selectedField, 'selectedField' );
+
+        return selectedField.getDescribe().getPicklistValues();
+    }
+
+    /**
+     * Method to retrieve a list of Strings with the label values of a picklist field.
+     * NOTE: returns LABELS, unmodified (not upper-cased) -- use isValidPicklistValue / getPicklistValues(...).getValue() for API-value comparisons.
+     *
+     * @param selectedField  The SObjectField of the picklist (multi-select) field
+     * @return List containing the picklist LABEL values as strings
+     */
+    @NamespaceAccessible
+    public static List<String> getPicklistLabels( Schema.SObjectField selectedField ){
+        List<String> result = new List<String>();
+        for( Schema.PicklistEntry entry : getPicklistValues( selectedField ) ){
+            result.add( entry.getLabel() );
+        }
+        return result;
+    }
+
+    /**
+     * @param sObjField The Picklist field in which the provided value should be checked
+     * @param value     The value which is checked (with ignore case)
+     * @return True when the value is a valid entry for the provided picklist field, false otherwise or when value was blank
+     */
+    @NamespaceAccessible
+    public static Boolean isValidPicklistValue( Schema.SObjectField sObjField, String value ){
+        if( String.isBlank( value ) ){
+            return false;
+        }
+
+        for( Schema.PicklistEntry entry : getPicklistValues( sObjField ) ){
+            if( entry.getValue().equalsIgnoreCase( value ) ){
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -366,7 +464,6 @@ public inherited sharing class fflib_SObjectDescribe{
         }
     }
 
-    public abstract class DescribeException extends Exception{}
-    public class DuplicateDescribeException extends DescribeException{}
-    public class InvalidDescribeException extends DescribeException{}
+    @NamespaceAccessible
+    public class InvalidDescribeException extends Exception{}
 }

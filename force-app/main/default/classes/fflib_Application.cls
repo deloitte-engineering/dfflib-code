@@ -7,7 +7,11 @@
 /**
  * Class provides inner classes implementing factories for the main components of the Apex Enterprise Patterns, Service, Unit Of Work, Selector and Domain.
  * It constructs the factory implementations using a custom metadata-driven approach, removing the need of supplying all compatible SObjectTypes and class implementation on compile time
+ *
+ * @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
+ * @created    February 2022
  */
+@NamespaceAccessible
 public with sharing virtual class fflib_Application{
     // Inner instantiation of the application config class, allowing easy mocking injection in test classes
     public static fflib_ApplicationConfig appConfig{
@@ -23,17 +27,20 @@ public with sharing virtual class fflib_Application{
     /**
      * Class implements Unit of Work 2.0 factory
      */
+    @NamespaceAccessible
     public virtual class UnitOfWorkFactory{
         private fflib_ISObjectUnitOfWork m_mockUow;
 
         /**
          * Constructs a Unit Of Work factory
          */
+        @NamespaceAccessible
         public UnitOfWorkFactory(){}
 
         /**
          * Constructor for a metadata-driven fflib_ISObjectUnitOfWork
          */
+        @NamespaceAccessible
         public fflib_ISObjectUnitOfWork newInstance(){
             return m_mockUow ?? new fflib_SObjectUnitOfWork().setConfigs( appConfig.getUnitOfWorkConfigs() );
         }
@@ -46,6 +53,7 @@ public with sharing virtual class fflib_Application{
          * @param   sObjTypes   Ordered list of SObjectTypes to be allowed in the new UOW instance
          * @return  UnitOfWorkInterface to allow a fluent interface
          */
+        @NamespaceAccessible
         public fflib_ISObjectUnitOfWork newInstance( List<SObjectType> sObjTypes ){
             return m_mockUow ?? new fflib_SObjectUnitOfWork( sObjTypes );
         }
@@ -56,6 +64,7 @@ public with sharing virtual class fflib_Application{
          * @param   securityContext     Security context to be set on new UOW instance
          * @return  UnitOfWorkInterface to allow a fluent interface
          */
+        @NamespaceAccessible
         public fflib_ISObjectUnitOfWork newInstance( fflib_Database.Context securityContext ){
             return m_mockUow ?? new fflib_SObjectUnitOfWork( securityContext ).setConfigs( appConfig.getUnitOfWorkConfigs() );
         }
@@ -67,6 +76,7 @@ public with sharing virtual class fflib_Application{
          * @param   securityContext     Security context to be set on new UOW instance
          * @return UnitOfWorkInterface to allow a fluent interface
          */
+        @NamespaceAccessible
         public fflib_ISObjectUnitOfWork newInstance( List<SObjectType> sObjTypes, fflib_Database.Context securityContext ){
             return m_mockUow ?? new fflib_SObjectUnitOfWork( sObjTypes, securityContext );
         }
@@ -85,8 +95,9 @@ public with sharing virtual class fflib_Application{
          * @return The mocked and applied UnitOfWork class which can be stubbed within `mocks.startStubbing()` and `mocks.stopStubbing()`
          */
         @TestVisible
-        private fflib_ISObjectUnitOfWork defineMock( fflib_ApexMocks mocks ){
-            fflib_ISObjectUnitOfWork uowMock = new fflib_SObjectMocks.SObjectUnitOfWork( mocks );
+        @NamespaceAccessible
+        protected fflib_ISObjectUnitOfWork defineMock( fflib_ApexMocks mocks ){
+            fflib_ISObjectUnitOfWork uowMock = ( fflib_ISObjectUnitOfWork ) mocks.mock( fflib_ISObjectUnitOfWork.class );
             m_mockUow = uowMock;
             return uowMock;
         }
@@ -95,15 +106,17 @@ public with sharing virtual class fflib_Application{
     /**
      * Simple Service Factory implementation.
      */
+    @NamespaceAccessible
     public virtual class ServiceFactory{
         protected Map<Type, Type> m_serviceInterfaceTypeByServiceImplType; // Map of interfaces to Service classes
         protected Map<Type, Object> m_serviceInterfaceTypeByMockService; // Map of interfaces to mock instances of Service classes
 
         /**
          * Constructs a simple Service Factory, using a Map of Apex Interfaces to Apex Classes implementing the interface
-         *	Note that this will not check the Apex Classes given actually implement the interfaces
-         *	as this information is not presently available via the Apex runtime
+         * Note that this will not check the Apex Classes given actually implement the interfaces
+         * as this information is not presently available via the Apex runtime
          */
+        @NamespaceAccessible
         public ServiceFactory(){
             m_serviceInterfaceTypeByMockService = new Map<Type, Object>();
             m_serviceInterfaceTypeByServiceImplType = m_serviceInterfaceTypeByServiceImplType ?? new Map<Type, Type>();
@@ -111,13 +124,14 @@ public with sharing virtual class fflib_Application{
 
         /**
          * Constructs a new instance of the Apex class associated with the given Apex interface
-         *	Will return any mock implementation of the interface provided via setMock
-         *	Note that this method will not check the configured Apex class actually implements the interface.
+         * Will return any mock implementation of the interface provided via setMock
+         * Note that this method will not check the configured Apex class actually implements the interface.
          *
          * @param   serviceInterfaceType    Apex interface type
          * @exception   Is thrown if there is no registered Apex class for the interface type
          * @return  New instance of the Apex class associated with the given Apex interface (or any mock implementation if provided)
          */
+        @NamespaceAccessible
         public virtual Object newInstance( Type serviceInterfaceType ){
             // Mock implementation?
             if( m_serviceInterfaceTypeByMockService.containsKey( serviceInterfaceType ) ){
@@ -151,8 +165,9 @@ public with sharing virtual class fflib_Application{
          * @deprecated Deprecated method as this can be replaced by `defineMock( fflib_ApexMocks mocks, Type classToMock );`
          *      or `defineMock( fflib_ApexMocks mocks, Type classToMock, Type serviceInterfaceType );`
          */
+        @NamespaceAccessible
         @TestVisible
-        private virtual void setMock( Type serviceInterfaceType, Object serviceImpl ){
+        protected virtual void setMock( Type serviceInterfaceType, Object serviceImpl ){
             System.debug( System.LoggingLevel.INFO, '*** fflib - Note you can use the simplified `defineMock( fflib_ApexMocks mocks, Type classToMock );`' );
             m_serviceInterfaceTypeByMockService.put( serviceInterfaceType, serviceImpl );
         }
@@ -162,8 +177,9 @@ public with sharing virtual class fflib_Application{
          * @param classToMock Service class type to be mocked and map the service class to
          * @return The mocked and applied service class which can be stubbed within `mocks.startStubbing()` and `mocks.stopStubbing()`
          */
+        @NamespaceAccessible
         @TestVisible
-        private virtual Object defineMock( fflib_ApexMocks mocks, Type classToMock ){
+        protected virtual Object defineMock( fflib_ApexMocks mocks, Type classToMock ){
             Object mockedService = mocks.mock( classToMock );
             m_serviceInterfaceTypeByMockService.put( classToMock, mockedService );
             return mockedService;
@@ -175,8 +191,9 @@ public with sharing virtual class fflib_Application{
          * @param serviceInterfaceType Optional Interface service class type to allow mapping mocked classes correctly if `IService` is applicable
          * @return The mocked and applied service class which can be stubbed within `mocks.startStubbing()` and `mocks.stopStubbing()`
          */
+        @NamespaceAccessible
         @TestVisible
-        private virtual Object defineMock( fflib_ApexMocks mocks, Type classToMock, Type serviceInterfaceType ){
+        protected virtual Object defineMock( fflib_ApexMocks mocks, Type classToMock, Type serviceInterfaceType ){
             Object mockedService = mocks.mock( classToMock );
             m_serviceInterfaceTypeByMockService.put( serviceInterfaceType, mockedService );
             return mockedService;
@@ -186,6 +203,7 @@ public with sharing virtual class fflib_Application{
     /**
      * Class implements a Selector class factory
      */
+    @NamespaceAccessible
     public virtual class SelectorFactory{
         protected Map<SObjectType, Type> m_sObjectBySelectorType; // Map of SObjectType's to Selector Apex Classes
         protected Map<SObjectType, fflib_ISObjectSelector> m_sObjectByMockSelector; // Map of SObjectType's to Selector Apex Class Interfaces for mocking
@@ -194,6 +212,7 @@ public with sharing virtual class fflib_Application{
          * Constructs a Selector Factory linking SObjectType's with Apex Classes implement the fflib_ISObjectSelector interface
          * Note that the factory does not check the given Apex Classes implement the interface currently this is not possible in Apex
          */
+        @NamespaceAccessible
         public SelectorFactory(){
             m_sObjectByMockSelector = new Map<SObjectType, fflib_ISObjectSelector>();
             m_sObjectBySelectorType = m_sObjectBySelectorType ?? new Map<SObjectType, Type>();
@@ -206,6 +225,7 @@ public with sharing virtual class fflib_Application{
          * @param   sObjectType     An SObjectType token, e.g. Account.SObjectType
          * @return  New instance of the associated Apex Class or if provided, the Mock implementation
          */
+        @NamespaceAccessible
         public virtual fflib_ISObjectSelector newInstance( SObjectType sObjectType ){
             System.debug( LoggingLevel.INFO, 'fflib - No fflib_Database.Context was specified, therefore defaulting to (legacy) INHERIT' );
             return this.newInstance( sObjectType, fflib_Database.Context.INHERIT );
@@ -219,6 +239,7 @@ public with sharing virtual class fflib_Application{
          * @param   context             Database context for the selector implementation
          * @return  New instance of the associated Apex Class or if provided, the Mock implementation
          */
+        @NamespaceAccessible
         public virtual fflib_ISObjectSelector newInstance( SObjectType sObjectType, fflib_Database.Context context ){
             // Mock implementation?
             if( m_sObjectByMockSelector.containsKey( sObjectType ) ){
@@ -255,6 +276,7 @@ public with sharing virtual class fflib_Application{
          * @exception   Is thrown if the record Ids are not all the same or the SObjectType is not registered
          * @return  List<SObject> containing the given SObject records
          */
+        @NamespaceAccessible
         public List<SObject> selectById( Set<Id> recordIds ){
             // No point creating an empty Domain class, nor can we determine the SObjectType anyway
             if( recordIds == null || recordIds.size() == 0 ){
@@ -275,9 +297,9 @@ public with sharing virtual class fflib_Application{
 
         /**
          * Helper method to query related records to those provided, for example
-         *	if passed a list of Opportunity records and the Account Id field will
-         *	construct internally a list of Account Ids and call the registered
-         *	Account selector to query the related Account records, e.g.
+         * if passed a list of Opportunity records and the Account Id field will
+         * construct internally a list of Account Ids and call the registered
+         * Account selector to query the related Account records, e.g.
          *
          *     List<Account> accounts =
          *        (List<Account>) fflib.Selector.selectByRelationship(myOpps, Opportunity.AccountId);
@@ -286,6 +308,7 @@ public with sharing virtual class fflib_Application{
          * @param   relationshipField   Field in the passed records that contains the relationship records to query, e.g. Opportunity.AccountId
          * @return  List<SObject> containing the given SObject records
          */
+        @NamespaceAccessible
         public List<SObject> selectByRelationship( List<SObject> relatedRecords, SObjectField relationshipField ){
             Set<Id> relatedIds = new Set<Id>();
             for( SObject relatedRecord : relatedRecords ){
@@ -302,8 +325,9 @@ public with sharing virtual class fflib_Application{
          * @param selectorInstance Instance of SObjectSelector class to mock, note sObjectType() should be mocked already
          * @deprecated Deprecated method as this can be replaced by `defineMock( fflib_ApexMocks mocks, Type classToMock, SObjectType sType );`
          */
+        @NamespaceAccessible
         @TestVisible
-        private virtual void setMock( fflib_ISObjectSelector selectorInstance ){
+        protected virtual void setMock( fflib_ISObjectSelector selectorInstance ){
             System.debug( System.LoggingLevel.INFO, '*** fflib - Please note your mocked class should have `sObjectType()` stubbed, or use `defineMock( fflib_ApexMocks mocks, Type classToMock, SObjectType sType );`' );
             setMock( selectorInstance.sObjectType(), selectorInstance );
         }
@@ -313,8 +337,9 @@ public with sharing virtual class fflib_Application{
          * @param selectorInstance Instance of SObjectSelector class to mock, note sObjectType() should be mocked already
          * @deprecated Deprecated method as this can be replaced by `defineMock( fflib_ApexMocks mocks, Type classToMock, SObjectType sType );`
          */
+        @NamespaceAccessible
         @TestVisible
-        private virtual void setMock( SObjectType sType, fflib_ISObjectSelector selectorInstance ){
+        protected virtual void setMock( SObjectType sType, fflib_ISObjectSelector selectorInstance ){
             System.debug( System.LoggingLevel.INFO, '*** fflib - Note you can use the simplified `defineMock( fflib_ApexMocks mocks, Type classToMock, SObjectType sType );`' );
             m_sObjectByMockSelector.put( sType, selectorInstance );
         }
@@ -325,8 +350,9 @@ public with sharing virtual class fflib_Application{
          * @param sType SObjectType to which the mocked selector should be mapped
          * @return The mocked and applied selector class which can be stubbed within `mocks.startStubbing()` and `mocks.stopStubbing()`
          */
+        @NamespaceAccessible
         @TestVisible
-        private virtual fflib_ISObjectSelector defineMock( fflib_IApexMocks mocks, Type classToMock, SObjectType sType ){
+        protected virtual fflib_ISObjectSelector defineMock( fflib_ApexMocks mocks, Type classToMock, SObjectType sType ){
             fflib_ISObjectSelector mockedSelector = ( fflib_ISObjectSelector ) mocks.mock( classToMock );
             m_sObjectByMockSelector.put( sType, mockedSelector );
             return mockedSelector;
@@ -336,6 +362,7 @@ public with sharing virtual class fflib_Application{
     /**
      * Class implements a Domain class factory
      */
+    @NamespaceAccessible
     public virtual class DomainFactory{
         protected fflib_Application.SelectorFactory m_selectorFactory;
         protected Map<SObjectType, Type> m_sObjectByDomainConstructorType; // Map of Domain classes by SObjectType
@@ -343,12 +370,13 @@ public with sharing virtual class fflib_Application{
 
         /**
          * Constructs a Domain factory, using an instance of the Selector Factory
-         *	and a map of Apex classes implementing fflib_ISObjectDomain by SObjectType
-         *	Note this will not check the Apex classes provided actually implement the interfaces
-         *	since this is not possible in the Apex runtime at present
+         * and a map of Apex classes implementing fflib_ISObjectDomain by SObjectType
+         * Note this will not check the Apex classes provided actually implement the interfaces
+         * since this is not possible in the Apex runtime at present
          *
-         * @param	selectorFactory     e.g. Application.Selector
+         * @param    selectorFactory     e.g. Application.Selector
          */
+        @NamespaceAccessible
         public DomainFactory( fflib_Application.SelectorFactory selectorFactory ){
             m_selectorFactory = selectorFactory;
             m_sObjectByDomainConstructorType = m_sObjectByDomainConstructorType ?? new Map<SObjectType, Type>();
@@ -364,18 +392,20 @@ public with sharing virtual class fflib_Application{
          * @exception   Throws an exception via the Selector Factory if the Ids are not all of the same SObjectType
          * @return  fflib_ISObjectDomain instance
          */
+        @NamespaceAccessible
         public virtual fflib_ISObjectDomain newInstance( Set<Id> recordIds ){
             return newInstance( m_selectorFactory.selectById( recordIds ) );
         }
 
         /**
          * Dynamically constructs an instance of the Domain class for the given records
-         *	Will return a Mock implementation if one has been provided via setMock
+         * Will return a Mock implementation if one has been provided via setMock
          *
          * @param   records     A concrete list (e.g. List<Account> vs List<SObject>) of records
          * @exception   Throws an exception if the SObjectType cannot be determined from the list or the constructor for Domain class was not registered for the SObjectType
          * @return  fflib_ISObjectDomain instance
          */
+        @NamespaceAccessible
         public virtual fflib_ISObjectDomain newInstance( List<SObject> records ){
             SObjectType domainSObjectType = records.getSObjectType();
             if( domainSObjectType == null ){
@@ -412,14 +442,15 @@ public with sharing virtual class fflib_Application{
 
         /**
          * Dynamically constructs an instance of the Domain class for the given records and SObjectType
-         *	Will return a Mock implementation if one has been provided via setMock
+         * Will return a Mock implementation if one has been provided via setMock
          *
-         * @param	records				A list records
-         * @param	domainSObjectType	SObjectType for list of records
+         * @param       records              A list records
+         * @param       domainSObjectType    SObjectType for list of records
          * @exception   Throws an exception if the SObjectType is not specified or if constructor for Domain class was not registered for the SObjectType
-         * @return  fflib_ISObjectDomain instance
-         * @remark	Will support List<SObject> but all records in the list will be assumed to be of the type specified in sObjectType
+         * @return      fflib_ISObjectDomain instance
+         * @remark    Will support List<SObject> but all records in the list will be assumed to be of the type specified in sObjectType
          */
+        @NamespaceAccessible
         public virtual fflib_ISObjectDomain newInstance( List<SObject> records, SObjectType domainSObjectType ){
             if( domainSObjectType == null ){
                 throw new DeveloperException( 'Must specify sObjectType' );
@@ -445,8 +476,9 @@ public with sharing virtual class fflib_Application{
          * @param mockDomain Instance of SObjectDomain class to mock, note sObjectType() should be mocked already
          * @deprecated Deprecated method as this can be replaced by `defineMock( fflib_ApexMocks mocks, Type classToMock, SObjectType sType );`
          */
+        @NamespaceAccessible
         @TestVisible
-        private virtual void setMock( fflib_ISObjectDomain mockDomain ){
+        protected virtual void setMock( fflib_ISObjectDomain mockDomain ){
             System.debug( System.LoggingLevel.INFO, '*** fflib - Note your mocked class should have `sObjectType()` stubbed, or use `defineMock( fflib_ApexMocks mocks, Type classToMock, SObjectType sType );`' );
             setMock( mockDomain.sObjectType(), mockDomain );
         }
@@ -456,8 +488,9 @@ public with sharing virtual class fflib_Application{
          * @param mockDomain Instance of SObjectDomain class to mock
          * @deprecated Deprecated method as this can be replaced by `defineMock( fflib_ApexMocks mocks, Type classToMock, SObjectType sType );`
          */
+        @NamespaceAccessible
         @TestVisible
-        private virtual void setMock( SObjectType sType, fflib_ISObjectDomain mockDomain ){
+        protected virtual void setMock( SObjectType sType, fflib_ISObjectDomain mockDomain ){
             System.debug( System.LoggingLevel.INFO, '*** fflib - Note you can use the simplified `defineMock( fflib_ApexMocks mocks, Type classToMock, SObjectType sType );`' );
             m_sObjectByMockDomain.put( sType, mockDomain );
         }
@@ -468,18 +501,21 @@ public with sharing virtual class fflib_Application{
          * @param sType SObjectType to which the mocked domain should be mapped
          * @return The mocked and applied domain class which can be stubbed within `mocks.startStubbing()` and `mocks.stopStubbing()`
          */
+        @NamespaceAccessible
         @TestVisible
-        private virtual fflib_ISObjectDomain defineMock( fflib_IApexMocks mocks, Type classToMock, SObjectType sType ){
+        protected virtual fflib_ISObjectDomain defineMock( fflib_ApexMocks mocks, Type classToMock, SObjectType sType ){
             fflib_ISObjectDomain mockedDomain = ( fflib_ISObjectDomain ) mocks.mock( classToMock );
             m_sObjectByMockDomain.put( sType, mockedDomain );
             return mockedDomain;
         }
     }
 
+    @NamespaceAccessible
     public class ApplicationException extends Exception{}
 
     /**
      * Exception representing a developer coding error, not intended for end user eyes
      */
+    @NamespaceAccessible
     public class DeveloperException extends Exception{}
 }

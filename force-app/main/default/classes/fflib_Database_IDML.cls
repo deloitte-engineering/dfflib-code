@@ -5,6 +5,9 @@
  */
 /**
  * Class that defines an interface to the DML proxy servicing the Unit of Work implementation to be compatible with apex-mock framework
+ *
+ *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
+ *  @created    February 2023
  */
 public interface fflib_Database_IDML{
     /**
@@ -23,6 +26,18 @@ public interface fflib_Database_IDML{
     List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Database.DMLOptions options, AccessLevel accessLevel );
     List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Boolean allOrNone, AccessLevel accessLevel );
     List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, AccessLevel accessLevel );
+
+    /**
+     * Method template for executing DML Upsert actions (by external Id field) on the behalf of the callee (aka Unit of Work instance).
+     *
+     * @param   action          DML action to be executed - dUPSERT or dUPSERT_PRIO. For more information, check {@link fflib_SObjectUnitOfWork.DMLActions}
+     * @param   objList         List<SObject> for which the Database.upsert() operation should be registered with
+     * @param   externalIdField The SObjectField (marked External Id, idLookup, or the standard Id field) to upsert by
+     * @param   allOrNone       Specifies whether the operation allows partial success
+     * @param   accessLevel     AccessLevel specified for the Database operations to execute in
+     * @return  List<Database.UpsertResult> SaveResults from the Database.upsert() operation
+     */
+    List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel );
 
     /**
      * Method template for executing non-SObject specific Database operations such as Email or Approval Process submissions

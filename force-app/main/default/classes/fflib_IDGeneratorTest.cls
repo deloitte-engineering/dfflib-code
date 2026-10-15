@@ -5,7 +5,7 @@
  * See LICENSE in the repository root for the full license text.
  */
 @IsTest( isParallel = true )
-@SuppressWarnings( 'PMD.AvoidHardcodingId' )
+@SuppressWarnings( 'PMD.AvoidHardcodingId, PMD.ClassNamingConventions, PMD.ApexUnitTestClassShouldHaveRunAs' )
 private with sharing class fflib_IDGeneratorTest{
 
     @IsTest

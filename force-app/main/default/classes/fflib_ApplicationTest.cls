@@ -10,6 +10,9 @@
  *  (https://developer.salesforce.com/docs/atlas.en-us.apexref.meta/apexref/apex_methods_system_type.htm#apex_System_Type_forName_2)
  *  The usage of Type.forName methods to retrieve the type of an Apex class, which can be a built-in or a user-defined class can only be used to retrieve the type of public and global classes, and not private classes
  *  (even if the context user has access)
+ *
+ *  @author     Rafael Fernandes dos Santos (rfernandesdossantos@deloitte.nl)
+ *  @created    February 2022
  */
 @IsTest( isParallel = true )
 private with sharing class fflib_ApplicationTest{
@@ -63,8 +66,9 @@ private with sharing class fflib_ApplicationTest{
         System.Assert.isInstanceOfType( unitOfWorkTestFactory.newInstance(), fflib_SObjectUnitOfWork.class );
 
         // Mocking behaviour
-        unitOfWorkTestFactory.setMock( new fflib_SObjectMocks.SObjectUnitOfWork( new fflib_ApexMocks() ) );
-        System.Assert.isInstanceOfType( unitOfWorkTestFactory.newInstance(), fflib_SObjectMocks.SObjectUnitOfWork.class );
+        fflib_ISObjectUnitOfWork uowMock = ( fflib_ISObjectUnitOfWork ) new fflib_ApexMocks().mock( fflib_ISObjectUnitOfWork.class );
+        unitOfWorkTestFactory.setMock( uowMock );
+        System.Assert.areEqual( uowMock, unitOfWorkTestFactory.newInstance() );
     }
 
     @IsTest
@@ -73,8 +77,9 @@ private with sharing class fflib_ApplicationTest{
         System.Assert.isInstanceOfType( unitOfWorkTestFactory.newInstance( new List<SObjectType>{ Account.SObjectType } ), fflib_SObjectUnitOfWork.class );
 
         // Mocking behaviour
-        unitOfWorkTestFactory.setMock( new fflib_SObjectMocks.SObjectUnitOfWork( new fflib_ApexMocks() ) );
-        System.Assert.isInstanceOfType( unitOfWorkTestFactory.newInstance( new List<SObjectType>{ Account.SObjectType } ), fflib_SObjectMocks.SObjectUnitOfWork.class );
+        fflib_ISObjectUnitOfWork uowMock = ( fflib_ISObjectUnitOfWork ) new fflib_ApexMocks().mock( fflib_ISObjectUnitOfWork.class );
+        unitOfWorkTestFactory.setMock( uowMock );
+        System.Assert.areEqual( uowMock, unitOfWorkTestFactory.newInstance( new List<SObjectType>{ Account.SObjectType } ) );
     }
 
     @IsTest
@@ -116,9 +121,8 @@ private with sharing class fflib_ApplicationTest{
         // When - perform test
         fflib_ISObjectUnitOfWork uowMock = unitOfWorkTestFactory.defineMock( mocks );
 
-        // Then - validate returned uowMock is a mocked instance of fflib_SObjectMocks, and was set to ensure any sequential newInstance() returns that mock
+        // Then - validate returned uowMock is a mocked instance, and was set to ensure any sequential newInstance() returns that mock
         System.Assert.isNotNull( uowMock, 'Expecting an initiated mocked UOW to be returned; allowing to stub/redefine methods' );
-        System.Assert.isInstanceOfType( uowMock, fflib_SObjectMocks.SObjectUnitOfWork.class );
         System.Assert.areEqual( uowMock, unitOfWorkTestFactory.newInstance(), 'Expected the mocked UOW to be returned for new instances, given the setting of mock' );
     }
 
@@ -343,7 +347,7 @@ private with sharing class fflib_ApplicationTest{
         // Create mocks
         fflib_ApexMocks mocks = new fflib_ApexMocks();
         fflib_ApplicationConfig appConfigMock = ( fflib_ApplicationConfig ) mocks.mock( fflib_ApplicationConfig.class );
-        fflib_ISObjectSelector selectorMock = new fflib_SObjectMocks.SObjectSelector( mocks );
+        fflib_ISObjectSelector selectorMock = ( fflib_ISObjectSelector ) mocks.mock( fflib_ISObjectSelector.class );
 
         // Given - create data
         Id testAccountId = fflib_IDGenerator.generate( Account.SObjectType );
@@ -369,7 +373,7 @@ private with sharing class fflib_ApplicationTest{
         List<Account> assertAccounts = selectorTestFactory.selectById( accountIds );
 
         // Then - validate
-        System.Assert.isInstanceOfType( selectorTestFactory.newInstance( Account.SObjectType ), fflib_SObjectMocks.SObjectSelector.class );
+        System.Assert.areEqual( selectorMock, selectorTestFactory.newInstance( Account.SObjectType ) );
         System.Assert.areEqual( 1, assertAccounts.size() );
         System.Assert.areEqual( testAccountId, assertAccounts[ 0 ].Id );
         System.Assert.areEqual( 'Test Account', assertAccounts[ 0 ].Name );
@@ -383,7 +387,7 @@ private with sharing class fflib_ApplicationTest{
         // Create mocks
         fflib_ApexMocks mocks = new fflib_ApexMocks();
         fflib_ApplicationConfig appConfigMock = ( fflib_ApplicationConfig ) mocks.mock( fflib_ApplicationConfig.class );
-        fflib_ISObjectSelector selectorMock = new fflib_SObjectMocks.SObjectSelector( mocks );
+        fflib_ISObjectSelector selectorMock = ( fflib_ISObjectSelector ) mocks.mock( fflib_ISObjectSelector.class );
 
         // Given - create data
         Id testAccountId = fflib_IDGenerator.generate( Account.SObjectType );
@@ -421,7 +425,7 @@ private with sharing class fflib_ApplicationTest{
         List<Account> assertAccounts = selectorTestFactory.selectByRelationship( opportunitiesList, Opportunity.AccountId );
 
         // Then - validate
-        System.Assert.isInstanceOfType( selectorTestFactory.newInstance( Account.SObjectType ), fflib_SObjectMocks.SObjectSelector.class );
+        System.Assert.areEqual( selectorMock, selectorTestFactory.newInstance( Account.SObjectType ) );
         System.Assert.areEqual( 1, assertAccounts.size() );
         System.Assert.areEqual( testAccountId, assertAccounts[ 0 ].Id );
         System.Assert.areEqual( 'Test Account', assertAccounts[ 0 ].Name );
@@ -433,14 +437,12 @@ private with sharing class fflib_ApplicationTest{
     @IsTest
     private static void selectorFactory_defineMock(){
         fflib_ApexMocks mocks = new fflib_ApexMocks();
-        fflib_SObjectMocks.SObjectSelector stubbedSelector = new fflib_SObjectMocks.SObjectSelector( mocks );
-        fflib_IApexMocks fakeMocks = ( fflib_IApexMocks ) new FakeMocks( stubbedSelector );
 
         // When - perform test
-        fflib_ISObjectSelector selectorMock = selectorTestFactory.defineMock( fakeMocks, AccountsSelector.class, Account.SObjectType );
+        fflib_ISObjectSelector selectorMock = selectorTestFactory.defineMock( mocks, fflib_ISObjectSelector.class, Account.SObjectType );
 
-        // Then - validate returned domainMock to be stubbedDomain, and was set to ensure any sequential newInstance() returns that mock
-        System.Assert.areEqual( stubbedSelector, selectorMock, 'Expected returned selectorMock to be the \'overridden\' SObjectMocks instance. Thus, confirming mocks.mock() being called' );
+        // Then - validate returned selectorMock to be a stubbed instance, and was set to ensure any sequential newInstance() returns that mock
+        System.Assert.isNotNull( selectorMock, 'Expected a stubbed instance to be returned; confirming mocks.mock() being called' );
         System.Assert.areEqual( selectorMock, selectorTestFactory.newInstance( Account.SObjectType ), 'Expected the mocked Selector class to be returned for new instances on Account. Thus, confirming selectorMock was set for Account SObjectType' );
     }
 
@@ -555,7 +557,7 @@ private with sharing class fflib_ApplicationTest{
         // Create mocks
         fflib_ApexMocks mocks = new fflib_ApexMocks();
         fflib_ApplicationConfig appConfigMock = ( fflib_ApplicationConfig ) mocks.mock( fflib_ApplicationConfig.class );
-        fflib_ISObjectDomain domainMock = new fflib_SObjectMocks.SObjectDomain( mocks );
+        fflib_ISObjectDomain domainMock = ( fflib_ISObjectDomain ) mocks.mock( fflib_ISObjectDomain.class );
 
         // Given - create data
         String testAccountName = 'Test Account';
@@ -580,7 +582,7 @@ private with sharing class fflib_ApplicationTest{
                 } );
 
         // Then - validate
-        System.Assert.isInstanceOfType( domainObjectAcct, fflib_SObjectMocks.SObjectDomain.class );
+        System.Assert.areEqual( domainMock, domainObjectAcct );
 
         // When - perform test - should pick-up mocked implementation from mock mapping config
         domainObjectAcct =
@@ -593,7 +595,7 @@ private with sharing class fflib_ApplicationTest{
                 , Account.SObjectType );
 
         // Then - validate
-        System.Assert.isInstanceOfType( domainObjectAcct, fflib_SObjectMocks.SObjectDomain.class );
+        System.Assert.areEqual( domainMock, domainObjectAcct );
         ( ( fflib_ApplicationConfig ) mocks.verify( appConfigMock, 0 ) ).getDomainConfig( accountSObjTypeText );
     }
 
@@ -602,7 +604,7 @@ private with sharing class fflib_ApplicationTest{
         // Create mocks
         fflib_ApexMocks mocks = new fflib_ApexMocks();
         fflib_ApplicationConfig appConfigMock = ( fflib_ApplicationConfig ) mocks.mock( fflib_ApplicationConfig.class );
-        fflib_ISObjectSelector selectorMock = new fflib_SObjectMocks.SObjectSelector( mocks );
+        fflib_ISObjectSelector selectorMock = ( fflib_ISObjectSelector ) mocks.mock( fflib_ISObjectSelector.class );
 
         // Given - create data
         String testAccountName = 'Test Account';
@@ -710,31 +712,13 @@ private with sharing class fflib_ApplicationTest{
     @IsTest
     private static void domainFactory_defineMock(){
         fflib_ApexMocks mocks = new fflib_ApexMocks();
-        fflib_SObjectMocks.SObjectDomain stubbedDomain = new fflib_SObjectMocks.SObjectDomain( mocks );
-        fflib_IApexMocks fakeMocks = ( fflib_IApexMocks ) new FakeMocks( stubbedDomain );
 
         // When - perform test
-        fflib_ISObjectDomain domainMock = domainTestFactory.defineMock( fakeMocks, AccountsDomain.class, Account.SObjectType );
+        fflib_ISObjectDomain domainMock = domainTestFactory.defineMock( mocks, fflib_ISObjectDomain.class, Account.SObjectType );
 
-        // Then - validate returned domainMock to be stubbedDomain, and was set to ensure any sequential newInstance() returns that mock
-        System.Assert.areEqual( stubbedDomain, domainMock, 'Expected returned domainMock to be the \'overridden\' SObjectMocks instance. Thus, confirming mocks.mock() being called' );
+        // Then - validate returned domainMock to be a stubbed instance, and was set to ensure any sequential newInstance() returns that mock
+        System.Assert.isNotNull( domainMock, 'Expected a stubbed instance to be returned; confirming mocks.mock() being called' );
         System.Assert.areEqual( domainMock, domainTestFactory.newInstance( new List<Account>() ), 'Expected the mocked Domain class to be returned for new instances on Account. Thus, confirming domainMock was set for Account SObjectType' );
-    }
-
-    /**
-     * Implementation to allow overriding mocks.mock() and prevent need for root-class selectors and domains
-     * Inner-classes (dummy Domain and Selector) can't be stubbed, thus mocks.mock > Test.createStub would fail.
-     * Therefore this class allows to override mocks.mock() method (used in defineMOck()) and return a desired output
-     */
-    public class FakeMocks implements fflib_IApexMocks{
-        Object stubbedClassInstance;
-
-        public FakeMocks( Object stubbedClassInstance ){
-            this.stubbedClassInstance = stubbedClassInstance;
-        }
-        public Object mock( Type classToMock ){
-            return this.stubbedClassInstance;
-        }
     }
 
     /**

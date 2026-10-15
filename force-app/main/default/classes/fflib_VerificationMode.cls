@@ -5,9 +5,11 @@
  * See LICENSE in the repository root for the full license text.
  */
 /**
- * This class implements the verification modes with Mockito syntax style
- * It can be used in the classic verify and in the ordered verify
+ * This class implements the verification modes with Mockito syntax style.
+ * It can be used in the classic verify and in the ordered verify.
  */
+@NamespaceAccessible
+@SuppressWarnings('PMD.ClassNamingConventions, PMD.FieldNamingConventions, PMD.PropertyNamingConventions, PMD.ApexDoc')
 public with sharing class fflib_VerificationMode{
     public Integer verifyMin{ get; set; }
     public Integer verifyMax{ get; set; }
@@ -18,6 +20,7 @@ public with sharing class fflib_VerificationMode{
         TIMES, ATLEAST, ATMOST, BETWEEN, ATLEASTONCE, CALLS
     }
 
+    @NamespaceAccessible
     public fflib_VerificationMode(){
         verifyMin = 1;
         verifyMax = null;
@@ -26,7 +29,7 @@ public with sharing class fflib_VerificationMode{
     }
 
     /**
-     * Sets how many times the method is expected to be called
+     * Sets how many times the method is expected to be called.
      * For InOrder verification we copy Mockito behavior which is as follows;
      * <ul>
      * <li>Consume the specified number of matching invocations, ignoring non-matching invocations in between</li>
@@ -34,10 +37,10 @@ public with sharing class fflib_VerificationMode{
      * </ul>
      * For example if you had a(); a(); b(); a();
      * then inOrder.verify(myMock, 2)).a(); or inOrder.verify(myMock, 3)).a(); would pass but not inOrder.verify(myMock, 1)).a();
-     *
-     * @param   times   The number of times you expect the method to have been called
-     * @return  The fflib_VerificationMode object instance with the proper settings
+     * @param times The number of times you expect the method to have been called.
+     * @return The fflib_VerificationMode object instance with the proper settings.
      */
+    @NamespaceAccessible
     public fflib_VerificationMode times( Integer times ){
         this.method = modeName.TIMES;
         this.verifyMin = this.verifyMax = times;
@@ -46,22 +49,22 @@ public with sharing class fflib_VerificationMode{
 
     /**
      * Sets a custom assert message for the verify.
-     *
-     * @param   customAssertMessage     The custom message for the assert in case the assert is false. The custom message is queued to the default message
-     * @return  The fflib_VerificationMode object instance with the proper settings
+     * @param customAssertMessage The custom message for the assert in case the assert is false. The custom message is queued to the default message.
+     * @return The fflib_VerificationMode object instance with the proper settings.
      */
+    @NamespaceAccessible
     public fflib_VerificationMode description( String customAssertMessage ){
         this.customAssertMessage = customAssertMessage;
         return this;
     }
 
     /**
-     * Sets the minimum number of times the method is expected to be called
-     * With the InOrder verification it performs a greedy verification, which means it would consume all the instances of the method verified
-     *
-     * @param   atLeastTimes    The minimum number of times you expect the method to have been called
-     * @return  The fflib_VerificationMode object instance with the proper settings
+     * Sets the minimum number of times the method is expected to be called.
+     * With the InOrder verification it performs a greedy verification, which means it would consume all the instances of the method verified.
+     * @param atLeastTimes The minimum number of times you expect the method to have been called.
+     * @return The fflib_VerificationMode object instance with the proper settings.
      */
+    @NamespaceAccessible
     public fflib_VerificationMode atLeast( Integer atLeastTimes ){
         this.method = modeName.ATLEAST;
         this.verifyMin = atLeastTimes;
@@ -71,10 +74,10 @@ public with sharing class fflib_VerificationMode{
 
     /**
      * Sets the maximum number of times the method is expected to be called. Not available in the InOrder verification.
-     *
-     * @param   atMostTimes     The maximum number of times the method is expected to be called.
-     * @return  The fflib_VerificationMode object instance with the proper settings.
+     * @param atMostTimes The maximum number of times the method is expected to be called.
+     * @return The fflib_VerificationMode object instance with the proper settings.
      */
+    @NamespaceAccessible
     public fflib_VerificationMode atMost( Integer atMostTimes ){
         this.method = modeName.ATMOST;
         this.verifyMax = atMostTimes;
@@ -84,10 +87,10 @@ public with sharing class fflib_VerificationMode{
 
     /**
      * Sets that the method is called at least once.
-     * With the InOrder verification it performs a greedy verification, which means it would consume all the instances of the method verified
-     *
-     * @return  The fflib_VerificationMode object instance with the proper settings
+     * With the InOrder verification it performs a greedy verification, which means it would consume all the instances of the method verified.
+     * @return The fflib_VerificationMode object instance with the proper settings.
      */
+    @NamespaceAccessible
     public fflib_VerificationMode atLeastOnce(){
         this.method = modeName.ATLEASTONCE;
         this.verifyMin = 1;
@@ -97,11 +100,11 @@ public with sharing class fflib_VerificationMode{
 
     /**
      * Sets the range of how many times the method is expected to be called. Not available in the InOrder verification.
-     *
-     * @param   atLeastTimes    The minimum number of times you expect the method to have been called
-     * @param   atMostTimes     The maximum number of times the method is expected to be called
-     * @return  The fflib_VerificationMode object instance with the proper settings
+     * @param atLeastTimes The minimum number of times you expect the method to have been called.
+     * @param atMostTimes The maximum number of times the method is expected to be called.
+     * @return The fflib_VerificationMode object instance with the proper settings.
      */
+    @NamespaceAccessible
     public fflib_VerificationMode between( Integer atLeastTimes, Integer atMostTimes ){
         this.method = modeName.BETWEEN;
         this.verifyMin = atLeastTimes;
@@ -112,9 +115,9 @@ public with sharing class fflib_VerificationMode{
 
     /**
      * Sets that the method is not expected to be called.
-     *
-     * @return  The fflib_VerificationMode object instance with the proper settings
+     * @return The fflib_VerificationMode object instance with the proper settings.
      */
+    @NamespaceAccessible
     public fflib_VerificationMode never(){
         this.verifyMin = fflib_ApexMocks.NEVER;
         this.verifyMax = fflib_ApexMocks.NEVER;
@@ -124,11 +127,11 @@ public with sharing class fflib_VerificationMode{
 
     /**
      * Sets how many times the method is expected to be called for an InOrder verifier. Available Only with the InOrder verification.
-     * A verification mode using calls will not fail if the method is called more times than expected
-     *
-     * @param   callingTimes    The number of times you expect the method to have been called in the InOrder verifying (no greedy verify)
-     * @return  The fflib_VerificationMode object instance with the proper settings
+     * A verification mode using calls will not fail if the method is called more times than expected.
+     * @param callingTimes The number of times you expect the method to have been called in the InOrder verifying (no greedy verify).
+     * @return The fflib_VerificationMode object instance with the proper settings.
      */
+    @NamespaceAccessible
     public fflib_VerificationMode calls( Integer callingTimes ){
         this.method = modeName.CALLS;
         this.verifyMin = callingTimes;

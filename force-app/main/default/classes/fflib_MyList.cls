@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
-@IsTest
+@IsTest( isParallel=true )
+@SuppressWarnings('PMD.EmptyStatementBlock, PMD.ExcessiveParameterList, PMD.ClassNamingConventions, PMD.ApexDoc')
 public with sharing class fflib_MyList implements IList{
     public interface IList{
         void add( String value );

@@ -6,9 +6,11 @@
  */
 /**
  * This class implements the actual verification.
+ * @group Core
  */
+@NamespaceAccessible
+@SuppressWarnings('PMD.ExcessiveParameterList, PMD.ClassNamingConventions')
 public abstract class fflib_MethodVerifier{
-
     /**
      * Verify a method was called on a mock object.
      *
