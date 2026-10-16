@@ -162,7 +162,7 @@ public virtual inherited sharing class fflib_QueryFactory{
                 if( String.isBlank( castObjTypeString ) ){
                     throw new PolymorphicLookupException( 'Cannot have an empty type cast' );
                 } else{
-                    castObjType = fflib_SObjectDescribe.getDescribe( castObjTypeString ).getSObjectType();
+                    castObjType = Schema.getGlobalDescribe().get( castObjTypeString.toLowerCase() );
                 }
             }
 
@@ -229,7 +229,7 @@ public virtual inherited sharing class fflib_QueryFactory{
         if( field == null ){
             throw new InvalidFieldException( 'Invalid field: null' );
         }
-        return fflib_SObjectDescribe.getFieldDescribe( field ).getLocalName();
+        return field.getDescribe().getLocalName();
     }
 
     /**
@@ -628,7 +628,7 @@ public virtual inherited sharing class fflib_QueryFactory{
     }
     @NamespaceAccessible
     public fflib_QueryFactory setGroupByField( SObjectField groupByField, Boolean preserveOrderings ){
-        return this.setGroupByField( fflib_SObjectDescribe.getFieldDescribe( groupByField ).getName(), preserveOrderings );
+        return this.setGroupByField( groupByField.getDescribe().getName(), preserveOrderings );
     }
 
     @NamespaceAccessible
@@ -825,7 +825,7 @@ public virtual inherited sharing class fflib_QueryFactory{
         }
 
         throw new InvalidSubqueryRelationshipException( 'Invalid call to subselectQuery with relationshipName = '
-            + relationshipName + '.  Relationship does not exist for ' + fflib_SObjectDescribe.getDescribe( table ).getDescribeName() );
+            + relationshipName + '.  Relationship does not exist for ' + table.getDescribe().getName() );
     }
 
     /**
@@ -909,7 +909,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @return  Returns the Schema.ChildRelationship from the table of the object type
      */
     private Schema.ChildRelationship getChildRelationship( SObjectType objType ){
-        for( Schema.ChildRelationship childRow : fflib_SObjectDescribe.getDescribe( table ).getDescribe().getChildRelationships() ){
+        for( Schema.ChildRelationship childRow : table.getDescribe().getChildRelationships() ){
             // Occasionally on some standard objects (Like Contact child of Contact) do not have a relationship name
             // If there is no relationship name, we cannot query on it, so throw an exception
             if( childRow.getChildSObject() == objType && childRow.getRelationshipName() != null ){
@@ -927,7 +927,7 @@ public virtual inherited sharing class fflib_QueryFactory{
      * @return  Returns the Schema.ChildRelationship from the table of the relationship name passed
      */
     private Schema.ChildRelationship getChildRelationship( String relationshipName ){
-        for( Schema.ChildRelationship childRow : fflib_SObjectDescribe.getDescribe( table ).getDescribe().getChildRelationships() ){
+        for( Schema.ChildRelationship childRow : table.getDescribe().getChildRelationships() ){
             if( childRow.getRelationshipName() == relationshipName ){
                 return childRow;
             }
@@ -1155,7 +1155,7 @@ public virtual inherited sharing class fflib_QueryFactory{
             }
         }
 
-        result += ' FROM ' + ( this.relationship != null ? this.relationship.getRelationshipName() : fflib_SObjectDescribe.getDescribe( this.table ).getDescribeName() );
+        result += ' FROM ' + ( this.relationship != null ? this.relationship.getRelationshipName() : this.table.getDescribe().getName() );
         if( this.conditionExpression != null ){
             result += ' WHERE ' + this.conditionExpression;
         }

@@ -42,7 +42,7 @@ public virtual with sharing class fflib_SObjects extends fflib_Objects implement
     public fflib_SObjects( List<SObject> records, Schema.SObjectType sObjectType ){
         super( records );
         // Capture SObjectType describe for this domain class
-        sObjectDescribe = fflib_SObjectDescribe.getDescribe( sObjectType ).getDescribe();
+        sObjectDescribe = sObjectType.getDescribe();
     }
 
     private Integer numRecords { get {

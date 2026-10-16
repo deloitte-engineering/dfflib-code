@@ -1527,7 +1527,7 @@ public with sharing class UT_SObjectFactory{
          * used to locate an existing record which matches the same value.
          */
         public virtual SObject query(){
-            SObjectField field = fflib_SObjectDescribe.getDescribe( record.getSObjectType() ).getNameField();
+            SObjectField field = fflib_SObjectDescribe.getNameField( record.getSObjectType() );
             String nameField = UT_SObjectFactoryUtils.getFieldName( field );
             return query( new FindByFieldValueLocator( nameField ) );
         }

@@ -34,7 +34,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
     private Boolean CURRENCY_ISO_CODE_ENABLED{
         get{
             if( CURRENCY_ISO_CODE_ENABLED == null ){
-                CURRENCY_ISO_CODE_ENABLED = describeWrapper.getFieldsMap().keySet().contains( 'currencyisocode' );
+                CURRENCY_ISO_CODE_ENABLED = sObjectFieldsMap.containsKey( 'currencyisocode' );
             }
             return CURRENCY_ISO_CODE_ENABLED;
         }
@@ -75,14 +75,27 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
     private Boolean m_sortSelectFields = false;
 
     /**
-     * Describe helper
+     * Native describe of the SObject this selector represents, lazy loaded once per selector instance
      */
-    private fflib_SObjectDescribe describeWrapper{
+    private Schema.DescribeSObjectResult sObjectDescribe{
         get{
-            if( describeWrapper == null ){
-                describeWrapper = fflib_SObjectDescribe.getDescribe( getSObjectType() );
+            if( sObjectDescribe == null ){
+                sObjectDescribe = getSObjectType().getDescribe();
             }
-            return describeWrapper;
+            return sObjectDescribe;
+        }
+        set;
+    }
+
+    /**
+     * Native fields map of the SObject this selector represents, lazy loaded once per selector instance
+     */
+    private Map<String, Schema.SObjectField> sObjectFieldsMap{
+        get{
+            if( sObjectFieldsMap == null ){
+                sObjectFieldsMap = sObjectDescribe.fields.getMap();
+            }
+            return sObjectFieldsMap;
         }
         set;
     }
@@ -288,19 +301,12 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
     @NamespaceAccessible
     public virtual String getOrderBy(){
         if( m_orderBy == null ){
-            Schema.SObjectField nameField = describeWrapper.getNameField();
-            Schema.DescribeFieldResult nameFieldDescribe = nameField != null ? fflib_SObjectDescribe.getFieldDescribe( nameField ) : null;
+            Schema.SObjectField nameField = fflib_SObjectDescribe.getNameField( getSObjectType() );
+            Schema.DescribeFieldResult nameFieldDescribe = nameField != null ? nameField.getDescribe() : null;
             if( nameFieldDescribe != null && !nameFieldDescribe.isEncrypted() ){
                 m_orderBy = nameFieldDescribe.getName();
             } else{
-                m_orderBy = DEFAULT_SORT_FIELD;
-                try{
-                    if( describeWrapper.getField( m_orderBy ) == null ){
-                        m_orderBy = SF_ID_FIELD;
-                    }
-                } catch( fflib_QueryFactory.InvalidFieldException ex ){
-                    m_orderBy = SF_ID_FIELD;
-                }
+                m_orderBy = sObjectFieldsMap.containsKey( DEFAULT_SORT_FIELD ) ? DEFAULT_SORT_FIELD : SF_ID_FIELD;
             }
         }
         return m_orderBy;
@@ -447,7 +453,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      */
     @NamespaceAccessible
     public String getSObjectName(){
-        return describeWrapper.getDescribeName();
+        return sObjectDescribe.getName();
     }
 
     /**
@@ -630,7 +636,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
     public void configureQueryFactoryFields( fflib_QueryFactory queryFactory, String relationshipFieldPath ){
         // Add fields from selector prefixing the relationship path
         for( SObjectField field : getSObjectFieldList() ){
-            queryFactory.selectField( relationshipFieldPath + '.' + fflib_SObjectDescribe.getFieldDescribe( field ).getName() );
+            queryFactory.selectField( relationshipFieldPath + '.' + field.getDescribe().getName() );
         }
         for( String field : getRelatedFieldSet() ){
             queryFactory.selectField( relationshipFieldPath + '.' + field );
@@ -748,7 +754,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
                 queryFactory.assertIsAccessible();
             } catch( fflib_SecurityUtils.CrudException e ){
                 // Marshal exception into DomainException for backwards compatibility
-                throw new fflib_SObjectDomain.DomainException( 'Permission to access an ' + fflib_SObjectDescribe.getDescribe( getSObjectType() ).getDescribeName() + ' denied.' );
+                throw new fflib_SObjectDomain.DomainException( 'Permission to access an ' + getSObjectName() + ' denied.' );
             }
         }
 

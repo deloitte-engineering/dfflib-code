@@ -239,7 +239,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * @param   sObjType    Type of SObject
      */
     private void checkDMLActionAllowedForSObjectType( DMLActions action, Schema.SObjectType sObjType ){
-        String sObjectTypeName = fflib_SObjectDescribe.getDescribe( sObjType ).getDescribeName();
+        String sObjectTypeName = sObjType.getDescribe().getName();
         Boolean isPlatformEventSObject = isPlatformEvent( sObjectTypeName );
         Boolean isPlatformEventAction = ACTIONS_EVENTS.contains( action );
 
@@ -476,7 +476,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
         dfflib_Utils.verifyNotNull( externalIdField, 'externalIdField' );
 
         Schema.SObjectType sObjType = record.getSObjectType();
-        Schema.DescribeFieldResult externalIdDescribe = fflib_SObjectDescribe.getFieldDescribe( externalIdField );
+        Schema.DescribeFieldResult externalIdDescribe = externalIdField.getDescribe();
         if( !externalIdDescribe.isExternalId() && externalIdDescribe.getName() != 'Id' ){
             throw new UnitOfWorkException( 'The provided Field can\'t be used for upserts as it doesn\'t have the ExternalId characteristic ' + externalIdDescribe.getName() );
         } else if( externalIdDescribe.getSObjectType() != sObjType ){
@@ -1954,7 +1954,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
                 throw new UnitOfWorkException( 'Invalid argument: relatedToField or externalIdField is not provided.' );
             }
 
-            Schema.DescribeFieldResult relatedToFieldDescribe = fflib_SObjectDescribe.getFieldDescribe( relatedToField );
+            Schema.DescribeFieldResult relatedToFieldDescribe = relatedToField.getDescribe();
             String relationshipName = relatedToFieldDescribe.getRelationshipName();
             if( String.isBlank( relationshipName ) ){
                 throw new UnitOfWorkException( 'Invalid argument: relatedToField. Field supplied is not a relationship field.' );
@@ -1963,9 +1963,9 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
             List<Schema.SObjectType> relatedObjects = relatedToFieldDescribe.getReferenceTo();
             Schema.SObjectType relatedObject = relatedObjects[ 0 ];
 
-            Schema.DescribeFieldResult externalIdFieldDescribe = fflib_SObjectDescribe.getFieldDescribe( externalIdField );
+            Schema.DescribeFieldResult externalIdFieldDescribe = externalIdField.getDescribe();
             String externalIdFieldName = externalIdFieldDescribe.getName();
-            Boolean relatedHasExternalIdField = fflib_SObjectDescribe.getDescribe( relatedObject ).getFieldsMap().containsKey( externalIdFieldName.toLowerCase() );
+            Boolean relatedHasExternalIdField = relatedObject.getDescribe().fields.getMap().containsKey( externalIdFieldName.toLowerCase() );
             Boolean externalIdFieldIsValid = externalIdFieldDescribe.isExternalId();
 
             if( !relatedHasExternalIdField ){
@@ -2000,7 +2000,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
                 return;
             }
             SObject relationshipObject = this.parentSObjectType.newSObject();
-            relationshipObject.put( fflib_SObjectDescribe.getFieldDescribe( parentExternalIdField ).getName(), this.externalIdValue );
+            relationshipObject.put( parentExternalIdField.getDescribe().getName(), this.externalIdValue );
             this.record.putSObject( this.relationshipName, relationshipObject );
             this.isResolved = true;
         }

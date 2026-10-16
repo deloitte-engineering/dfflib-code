@@ -32,7 +32,7 @@ public with sharing class UT_SObjectFactoryUtils{
         List<String> fieldNames = fieldNamesByObjectType.get( sObjectType );
 
         if( fieldNames == null ){
-            Map<String, SObjectField> fieldMap = fflib_SObjectDescribe.getDescribe( sObjectType ).getFieldsMap();
+            Map<String, SObjectField> fieldMap = sObjectType.getDescribe().fields.getMap();
             fieldNames = new List<String>( fieldMap.keySet() );
             fieldNamesByObjectType.put( sObjectType, fieldNames );
         }
@@ -89,7 +89,7 @@ public with sharing class UT_SObjectFactoryUtils{
 
         // If we have a cache miss then attempt to find the relationship field
         if( token == null ){
-            DescribeSObjectResult parentDescribe = fflib_SObjectDescribe.getDescribe( parentType ).getDescribe();
+            DescribeSObjectResult parentDescribe = parentType.getDescribe();
             List<Schema.ChildRelationship> childRelationships = parentDescribe.getChildRelationships();
 
             for( Schema.ChildRelationship childRelationship : childRelationships ){
@@ -125,7 +125,7 @@ public with sharing class UT_SObjectFactoryUtils{
 
         // If we have a cache miss then attempt to find the relationship name
         if( name == null ){
-            DescribeSObjectResult parentDescribe = fflib_SObjectDescribe.getDescribe( sType ).getDescribe();
+            DescribeSObjectResult parentDescribe = sType.getDescribe();
             List<Schema.ChildRelationship> relationships = parentDescribe.getChildRelationships();
 
             for( Schema.ChildRelationship relationship : relationships ){

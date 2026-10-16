@@ -290,7 +290,7 @@ private with sharing class fflib_QueryFactoryTest{
         qf.addOrdering( new fflib_QueryFactory.Ordering( 'Contact', 'name', fflib_QueryFactory.SortOrder.ASCENDING ) )
             .addOrdering(
                 new fflib_QueryFactory.Ordering(
-                    fflib_SObjectDescribe.getDescribe( 'Contact' ).getField( 'CreatedDATE' ),
+                    Contact.CreatedDate,
                     fflib_QueryFactory.SortOrder.DESCENDING,
                     true
                 )

@@ -149,10 +149,44 @@ private with sharing class fflib_SObjectDescribeTest{
     }
 
     @IsTest
+    private static void getNameField_staticBasics(){
+        Schema.SObjectField nameField = fflib_SObjectDescribe.getNameField( Account.SObjectType );
+        System.Assert.areEqual( Account.Name, nameField, 'Expected Account.Name to be returned as name field' );
+        System.Assert.areEqual( Contact.Name, fflib_SObjectDescribe.getNameField( Contact.SObjectType ), 'Expected compound Contact.Name to be returned as name field' );
+    }
+
+    @IsTest
+    private static void getNameField_staticNullInput(){
+        Schema.SObjectType nullType = null;
+        System.Assert.isNull( fflib_SObjectDescribe.getNameField( nullType ), 'Expected null input to result in null output' );
+    }
+
+    @IsTest
     private static void getField_invalidLookupField(){
         fflib_SObjectDescribe d = fflib_SObjectDescribe.getDescribe( Account.SObjectType );
         Schema.SObjectField fakeField = d.getField( 'FakeLookup__r' );
         System.Assert.isNull( fakeField, 'Expected no field details to be returned' );
+    }
+
+    /**
+     * Covers getField's relationship-notation handling: the normal path, the custom cross-object
+     * "__r" and person-account "__pr" suffix resolution, and the standard-lookup "+Id" fallback.
+     */
+    @IsTest
+    private static void getField_variousInputs(){
+        fflib_SObjectDescribe contactDescribe = fflib_SObjectDescribe.getDescribe( Contact.SObjectType );
+
+        // Shorthand getField(name) is equivalent to getField(name, true)
+        System.Assert.areEqual( contactDescribe.getField( 'LastName', true ), contactDescribe.getField( 'LastName' ), 'Expected shorthand to imply namespace' );
+
+        // Standard lookup field accessed via cross-object short name falls back to the '+Id' lookup branch
+        System.Assert.areEqual( Contact.SObjectType.fields.ReportsToId, contactDescribe.getField( 'ReportsTo' ), 'Expected ReportsTo to resolve to ReportsToId' );
+
+        // Custom field cross-object (__r) syntax resolves to __c; field is absent so result is null, but the branch is exercised
+        System.Assert.isNull( contactDescribe.getField( 'NonExistentField__r' ), 'Expected null for non-existing __r field' );
+
+        // Person account cross-object (__pr) syntax resolves to __pc; field is absent so result is null, but the branch is exercised
+        System.Assert.isNull( contactDescribe.getField( 'NonExistentField__pr' ), 'Expected null for non-existing __pr field' );
     }
 
     @IsTest
@@ -168,24 +202,6 @@ private with sharing class fflib_SObjectDescribeTest{
         Map<String, Schema.SObjectType> systemGd = Schema.getGlobalDescribe();
         Map<String, Schema.SObjectType> cachedGd = fflib_SObjectDescribe.getRawGlobalDescribe();
         System.Assert.isTrue( systemGd.keySet().containsAll( cachedGd.keySet() ) );
-    }
-
-    @IsTest
-    private static void getFieldDescribe_basicsAndCache(){
-        Schema.DescribeFieldResult nameDescribe = fflib_SObjectDescribe.getFieldDescribe( Account.Name );
-        System.Assert.areEqual( 'Name', nameDescribe.getName(), 'Expected correct field describe to be returned' );
-
-        Schema.DescribeFieldResult nameDescribeRepeat = fflib_SObjectDescribe.getFieldDescribe( Account.Name );
-        System.Assert.isTrue( nameDescribe === nameDescribeRepeat, 'Expected cached DescribeFieldResult instance to be returned on repeat calls for the same field' );
-
-        Schema.DescribeFieldResult idDescribe = fflib_SObjectDescribe.getFieldDescribe( Account.Id );
-        System.Assert.areEqual( 'Id', idDescribe.getName(), 'Expected correct field describe for a different field on the same SObjectType' );
-        System.Assert.isTrue( nameDescribe !== idDescribe, 'Expected different fields to yield different cached DescribeFieldResult instances' );
-    }
-
-    @IsTest
-    private static void getFieldDescribe_nullInput(){
-        System.Assert.isNull( fflib_SObjectDescribe.getFieldDescribe( null ), 'Expected null input to result in null output' );
     }
 
     @IsTest
