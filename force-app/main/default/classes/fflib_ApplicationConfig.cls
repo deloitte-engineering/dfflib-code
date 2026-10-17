@@ -1,5 +1,5 @@
 /**
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -7,7 +7,6 @@
  *  Class that serves as a config provider to the fflib_Application main class.
  *  Note this class intentionally performs queries outside a Selector layer context,
  *  allowing proper mocking injection using apex-mocks framework without the need for self-referencing custom metadata records
- *
  */
 public with sharing class fflib_ApplicationConfig implements IApplicationConfig{
 

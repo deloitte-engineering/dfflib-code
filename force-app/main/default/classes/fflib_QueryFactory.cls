@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -60,7 +60,7 @@ public virtual inherited sharing class fflib_QueryFactory{
 	 * Integrate checking for READ Field Level Security within the selectField(s) methods
 	 * This can optionally be enforced (or not) by calling the setEnforceFLS method prior to calling
 	 * one of the selectField or selectFieldset methods.
-	**/
+	 */
     @TestVisible
     private FLSEnforcement mFlsEnforcement;
 

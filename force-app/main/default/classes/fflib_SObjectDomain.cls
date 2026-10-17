@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -16,7 +16,6 @@
  * "cases and slants of behavior, and it's this complexity that objects were designed to work with..." 
  * Martin Fowler, EAA Patterns
  * http://martinfowler.com/eaaCatalog/domainModel.html
- *
  */
 @NamespaceAccessible
 public virtual with sharing class fflib_SObjectDomain extends fflib_SObjects implements fflib_ISObjectDomain{

@@ -1,13 +1,12 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
 /**
  * An invocation on a mock.
  * A place holder for mock, the method that was called and the arguments that were passed.
- * @group Core
  */
 @NamespaceAccessible
 @SuppressWarnings('PMD.ClassNamingConventions')

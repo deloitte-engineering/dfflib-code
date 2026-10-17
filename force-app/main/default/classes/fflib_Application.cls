@@ -1,13 +1,12 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
 /**
  * Class provides inner classes implementing factories for the main components of the Apex Enterprise Patterns, Service, Unit Of Work, Selector and Domain.
  * It constructs the factory implementations using a custom metadata-driven approach, removing the need of supplying all compatible SObjectTypes and class implementation on compile time
- *
  */
 @NamespaceAccessible
 public with sharing virtual class fflib_Application{

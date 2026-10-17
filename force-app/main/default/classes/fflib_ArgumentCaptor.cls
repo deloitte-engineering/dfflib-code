@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -9,7 +9,6 @@
  * According to Mockito's syntax the type is passed in the captor construction,
  * however Apex cannot perform the auto casting that Java can.
  * To be consistent with Mockito, the captor does not perform any checks on the type of the argument.
- * @group Core
  */
 @NamespaceAccessible
 @SuppressWarnings('PMD.ClassNamingConventions, PMD.ApexDoc')

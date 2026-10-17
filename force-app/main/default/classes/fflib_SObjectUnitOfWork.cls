@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -11,7 +11,6 @@
  *  - Simplified and extended processing of Relationships within the same transaction
  *
  *  Inspiration based on Apex-Commons repository from FinancialForce.com, Inc
- *
  */
 /**
  * Provides an implementation of the Enterprise Application Architecture Unit Of Work, as defined by Martin Fowler
@@ -837,7 +836,7 @@ public virtual inherited sharing class fflib_SObjectUnitOfWork implements fflib_
      * within the same transaction are inserted/Updated to enable standard required to be populated correctly.
      *
      * @param record An existing record to be deleted
-     **/
+     */
     @NamespaceAccessible
     public void registerPriorityDeleted( SObject record ){
         validateRecordForDMLAction( record, DMLActions.dDELETE_PRIO );

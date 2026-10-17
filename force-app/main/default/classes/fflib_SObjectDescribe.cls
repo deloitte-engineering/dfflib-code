@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -15,7 +15,7 @@
  * and allow an older API style of omitting the namespace when working with fields or global describe maps.
  * This allows both upgrading old code to APIv29 by making use of these as a nearly drop in replacement, as well as keeping
  * namespace detection logic encapsulated.
-**/
+ */
 @NamespaceAccessible
 public inherited sharing class fflib_SObjectDescribe{
     // Internal implementation details

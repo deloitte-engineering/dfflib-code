@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -8,7 +8,6 @@
 /**
  * 'Classic' invocation verifier - checks that a method was called with the given arguments the expected number of times.
  * The order of method calls is not important.
- * @group Core
  */
 @NamespaceAccessible
 @SuppressWarnings('PMD.ClassNamingConventions')

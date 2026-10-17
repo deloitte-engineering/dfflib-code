@@ -1,11 +1,10 @@
 /**
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
 /**
  * Allows aggregate results to be used to mock when testing
- *
  */
 public with sharing class fflib_AggregateResult {
 

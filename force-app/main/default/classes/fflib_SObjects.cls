@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -25,7 +25,7 @@ public virtual with sharing class fflib_SObjects extends fflib_Objects implement
 
     /**
      * Useful during unit testing to assert at a more granular and robust level for errors raised during the various trigger events
-     **/
+     */
     @NamespaceAccessible
     public static ErrorFactory errorFactory{ get; private set; }
 
@@ -137,7 +137,7 @@ public virtual with sharing class fflib_SObjects extends fflib_Objects implement
      * @param record
      *
      * @return Returns the Error message
-     **/
+     */
     @NamespaceAccessible
     protected virtual String error( String message, SObject record ){
         return fflib_SObjects.errorFactory.error( this, message, record );
@@ -151,7 +151,7 @@ public virtual with sharing class fflib_SObjects extends fflib_Objects implement
      * @param field
      *
      * @return Returns the Error message
-     **/
+     */
     @NamespaceAccessible
     protected virtual String error( String message, SObject record, Schema.SObjectField field ){
         return fflib_SObjects.errorFactory.error( this, message, record, field );
@@ -528,7 +528,7 @@ public virtual with sharing class fflib_SObjects extends fflib_Objects implement
 
     /**
      * Ensures logging of errors in the Domain context for later assertions in tests
-     **/
+     */
     @NamespaceAccessible
     public virtual class ErrorFactory{
         private List<Error> errorList = new List<Error>();
@@ -579,7 +579,7 @@ public virtual with sharing class fflib_SObjects extends fflib_Objects implement
 
     /**
      * Ensures logging of errors in the Domain context for later assertions in tests
-     **/
+     */
     @NamespaceAccessible
     public virtual class FieldError extends ObjectError{
         @NamespaceAccessible
@@ -591,7 +591,7 @@ public virtual with sharing class fflib_SObjects extends fflib_Objects implement
 
     /**
      * Ensures logging of errors in the Domain context for later assertions in tests
-     **/
+     */
     @NamespaceAccessible
     public virtual class ObjectError extends Error{
         @NamespaceAccessible
@@ -603,7 +603,7 @@ public virtual with sharing class fflib_SObjects extends fflib_Objects implement
 
     /**
      * Ensures logging of errors in the Domain context for later assertions in tests
-     **/
+     */
     @NamespaceAccessible
     public abstract class Error{
         @NamespaceAccessible

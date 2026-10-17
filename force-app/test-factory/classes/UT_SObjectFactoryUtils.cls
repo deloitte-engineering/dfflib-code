@@ -1,11 +1,10 @@
 /**
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
 /**
  * Common utilities for the unit test class factory classes.
- *
  */
 @IsTest
 public with sharing class UT_SObjectFactoryUtils{

@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -236,7 +236,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param enforceFLS                Enforce Field Level Security
      * @param sortSelectFields          Set to false if selecting many columns to skip sorting select fields and improve performance
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
-     **/
+     */
     @NamespaceAccessible
     public fflib_SObjectSelector( Boolean includeFieldSetFields, Boolean enforceCRUD, Boolean enforceFLS, Boolean sortSelectFields ){
         this( includeFieldSetFields, enforceCRUD, enforceFLS, sortSelectFields, false );

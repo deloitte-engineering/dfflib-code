@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -1123,7 +1123,7 @@ public with sharing class fflib_MatcherDefinitions{
     /**
      * helper for the sObjectWith, sObjectsWith matchers
      * Compares to see if the field values in toMatch exist in the sobj
-    **/
+     */
     private static Boolean sObjectMatches( SObject sobj, Map<Schema.SObjectField, Object> toMatch ){
         for( Schema.SObjectField f : toMatch.keySet() ){
             Object valueToMatch = toMatch.get( f );

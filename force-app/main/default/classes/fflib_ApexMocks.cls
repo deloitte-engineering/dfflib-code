@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -9,8 +9,6 @@
  * the behavior of each method of the stubbed class in the handleMethodCall() method.
  * After creating a stubbed object, each invoked method on the stubbed object will call StubProvider.handleMethodCall(),
  * which performs the behavior that has been specified for each method.
- *
- * @group Core
  */
 @NamespaceAccessible
 @SuppressWarnings('PMD.AvoidBooleanMethodParameters, PMD.ExcessiveParameterList, PMD.CyclomaticComplexity, PMD.CognitiveComplexity, PMD.ExcessivePublicCount, PMD.ClassNamingConventions, PMD.PropertyNamingConventions, PMD.ApexDoc')

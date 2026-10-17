@@ -1,12 +1,11 @@
 /**
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
 /**
  *  Class that serves as a hub providing access to DML- and QueryProxy interfaces.
  *  It centralises database security modes to be used for setting sharing context and enforcement of CRUD/FLS on the respective interface implementation.
- *
  */
 public inherited sharing class fflib_Database{
 

@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -165,7 +165,7 @@ public interface fflib_ISObjectUnitOfWork{
      * within the same transaction are inserted/Updated to enable standard required to be populated correctly.
      *
      * @param record An existing record
-     **/
+     */
     void registerPriorityDeleted( SObject record );
     void registerPriorityDeleted( List<SObject> record );
 
