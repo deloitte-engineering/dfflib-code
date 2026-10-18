@@ -18,10 +18,10 @@
 #
 # Job pipeline (needs: chain; !cancelled() so a skipped job never skips the next):
 #   file-labels ──► conventional-label ──► community-label
-#   file-labels        every event, non-bot authors.
+#   file-labels        every event, every author.
 #                      actions/labeler REPLACES the label set (setLabels), so it
 #                      must run before the jobs that add labels.
-#   conventional-label every event, non-bot authors. One label from the PR title
+#   conventional-label every event, every author. One label from the PR title
 #                      type.
 #   community-label    opened only (the first run for a PR, never replaced).
 #                      'community' for external contributors.
@@ -47,7 +47,6 @@ jobs:
   file-labels:
     name: add-files-changed-labelling
     runs-on: ubuntu-24.04
-    if: github.event.pull_request.user.type != 'Bot'
     permissions:
       contents: read
       pull-requests: write
@@ -79,7 +78,7 @@ jobs:
     name: Apply Conventional Label
     needs: file-labels
     runs-on: ubuntu-24.04
-    if: ${{ !cancelled() && github.event.pull_request.user.type != 'Bot' }}
+    if: ${{ !cancelled() }}
     permissions:
       pull-requests: write
     steps:
