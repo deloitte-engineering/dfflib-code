@@ -14,13 +14,13 @@
 #
 
 # Default owners for everything in the repo.
-*                                @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+*                                @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
 
 # D'fflib framework layer classes (source + metadata).
-/force-app/main/default/classes/ @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+/force-app/main/default/classes/ @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
 
 # Unit Test Factory classes (source + metadata).
-/force-app/test-factory/classes/ @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+/force-app/test-factory/classes/ @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
 
 # Documentation.
-*.md                             @deloitte-nl/fflib-team @rfernandesdossantos @rvandenassum @MariusSnijder
+*.md                             @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
