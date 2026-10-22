@@ -1,19 +1,20 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+@NamespaceAccessible
+@SuppressWarnings('PMD.ClassNamingConventions, PMD.ApexDoc')
 public class fflib_Match{
-
     private static List<fflib_IMatcher> matchers = new List<fflib_IMatcher>();
 
     /**
      * Matching
      * True when comparing method arg values to matchers, false when comparing absolute arg values.
      */
-    public static Boolean Matching = false;
-
+    public static Boolean matching = false;
+    
     /**
      * Used internally by the mocking framework, you shouldn't need to call this method directly.
      * Copies the registered matchers, and then switches matching mode off.
@@ -21,8 +22,9 @@ public class fflib_Match{
      * @param   expectedSize	The expected number of matchers to be returned. If this does not match, the actual value an expectation is thrown.
      * @return	List<fflib_IMatcher> The registered matchers, collected while in matching mode.
      */
+    @NamespaceAccessible
     public static List<fflib_IMatcher> getAndClearMatchers( Integer expectedSize ){
-        Matching = false;
+        matching = false;
 
         List<fflib_IMatcher> retval = matchers.clone();
         matchers.clear();
@@ -46,6 +48,7 @@ public class fflib_Match{
      * @throws	fflib_ApexMocks.ApexMocksException	Thrown when methodArgValues is null/empty, targetMatchers is null, or their sizes don't match
      * @return	Boolean True if all arg values satisfy all of the supplied matchers.
      */
+    @NamespaceAccessible
     public static Boolean matchesAllArgs( fflib_MethodArgValues methodArg, List<fflib_IMatcher> targetMatchers ){
         validateArgs( methodArg, targetMatchers );
 
@@ -94,6 +97,7 @@ public class fflib_Match{
      * @param   matcher		The matcher that needs to be compared
      * @return	Object Always returns null. This can then be cast into the correct arg type so that the right method is called on the mock objects.
      */
+    @NamespaceAccessible
     public static Object matches( fflib_IMatcher matcher ){
         Matching = true;
         matchers.add( matcher );
@@ -125,8 +129,7 @@ public class fflib_Match{
      * @param   o1	A dummy object returned by registering another matcher
      * @param   o2	A dummy object returned by registering another matcher
      * @param   o3	A dummy object returned by registering another matcher
-     * @return  A dummy object of the correct type, so that when called inline as part of a method call,
-     * the correct method is invoked. (You may need to cast down to your specific object type).
+     * @return  A dummy object of the correct type, so that when called inline as part of a method call, the correct method is invoked. (You may need to cast down to your specific object type)
      */
     public static Object allOf( Object o1, Object o2, Object o3 ){
         return allOf( new List<Object>{ o1, o2, o3 } );

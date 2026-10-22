@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -15,16 +15,12 @@ private with sharing class fflib_SObjectDescribeTest{
         try{
             new fflib_SObjectDescribe( null );
             System.Assert.fail( 'Expected InvalidDescribeException for null SObjectType' );
-        } catch( fflib_SObjectDescribe.InvalidDescribeException e ){
-            System.Assert.areEqual( 'Invalid SObject type: null', e.getMessage(), 'Expected other Exception message' );
+        } catch( fflib_SObjectDescribe.InvalidDescribeException ex ){
+            System.Assert.areEqual( 'Invalid SObject type: null', ex.getMessage(), 'Expected other Exception message' );
         }
-        try{
-            new fflib_SObjectDescribe( Account.SObjectType );
-            new fflib_SObjectDescribe( Account.SObjectType );
-            System.Assert.fail( 'Expected DuplicateDescribeException for duplicate Token initiation' );
-        } catch( fflib_SObjectDescribe.DuplicateDescribeException e ){
-            System.Assert.areEqual( 'Account is already in the describe cache', e.getMessage(), 'Expected other Exception message' );
-        }
+
+        fflib_SObjectDescribe descr = new fflib_SObjectDescribe( Account.SObjectType );
+        System.Assert.areEqual( Account.SObjectType, descr.token, 'Expected token to be set by constructor' );
     }
 
     /**
@@ -114,8 +110,13 @@ private with sharing class fflib_SObjectDescribeTest{
         fflib_SObjectDescribe d = fflib_SObjectDescribe.getDescribe( 'Account' );
         fflib_SObjectDescribe d2 = fflib_SObjectDescribe.getDescribe( Account.SObjectType );
         fflib_SObjectDescribe d3 = fflib_SObjectDescribe.getDescribe( Schema.SObjectType.Account );
+        fflib_SObjectDescribe d4 = fflib_SObjectDescribe.getDescribe( Account.SObjectType.getDescribe() );
+        fflib_SObjectDescribe d5 = fflib_SObjectDescribe.getDescribe( new Account() );
         System.Assert.areEqual( 'Account', d.getDescribe().getName() );
-        System.Assert.isTrue( ( d === d2 && d2 === d3 ), 'All three getDescribe calls should return the same cached instance.' );
+        System.Assert.areEqual( d, d2, 'Expected getDescribe by String vs. Account.SObjectType to return the same cached instance.' );
+        System.Assert.areEqual( d, d3, 'Expected getDescribe by String vs. Schema.SObjectType.Account to return the same cached instance.' );
+        System.Assert.areEqual( d, d4, 'Expected getDescribe by String vs. Account.SObjectType.getDescribe() to return the same cached instance.' );
+        System.Assert.areEqual( d, d5, 'Expected getDescribe by String vs. new Account() to return the same cached instance.' );
     }
 
     @IsTest
@@ -148,16 +149,44 @@ private with sharing class fflib_SObjectDescribeTest{
     }
 
     @IsTest
+    private static void getNameField_staticBasics(){
+        Schema.SObjectField nameField = fflib_SObjectDescribe.getNameField( Account.SObjectType );
+        System.Assert.areEqual( Account.Name, nameField, 'Expected Account.Name to be returned as name field' );
+        System.Assert.areEqual( Contact.Name, fflib_SObjectDescribe.getNameField( Contact.SObjectType ), 'Expected compound Contact.Name to be returned as name field' );
+    }
+
+    @IsTest
+    private static void getNameField_staticNullInput(){
+        Schema.SObjectType nullType = null;
+        System.Assert.isNull( fflib_SObjectDescribe.getNameField( nullType ), 'Expected null input to result in null output' );
+    }
+
+    @IsTest
     private static void getField_invalidLookupField(){
         fflib_SObjectDescribe d = fflib_SObjectDescribe.getDescribe( Account.SObjectType );
         Schema.SObjectField fakeField = d.getField( 'FakeLookup__r' );
         System.Assert.isNull( fakeField, 'Expected no field details to be returned' );
     }
 
+    /**
+     * Covers getField's relationship-notation handling: the normal path, the custom cross-object
+     * "__r" and person-account "__pr" suffix resolution, and the standard-lookup "+Id" fallback.
+     */
     @IsTest
-    private static void getDescribeName(){
-        String objDescribeName = fflib_SObjectDescribe.getDescribe( Account.SObjectType ).getDescribeName();
-        System.Assert.areEqual( 'Account', objDescribeName, 'Expected Object Describe Name' );
+    private static void getField_variousInputs(){
+        fflib_SObjectDescribe contactDescribe = fflib_SObjectDescribe.getDescribe( Contact.SObjectType );
+
+        // Shorthand getField(name) is equivalent to getField(name, true)
+        System.Assert.areEqual( contactDescribe.getField( 'LastName', true ), contactDescribe.getField( 'LastName' ), 'Expected shorthand to imply namespace' );
+
+        // Standard lookup field accessed via cross-object short name falls back to the '+Id' lookup branch
+        System.Assert.areEqual( Contact.SObjectType.fields.ReportsToId, contactDescribe.getField( 'ReportsTo' ), 'Expected ReportsTo to resolve to ReportsToId' );
+
+        // Custom field cross-object (__r) syntax resolves to __c; field is absent so result is null, but the branch is exercised
+        System.Assert.isNull( contactDescribe.getField( 'NonExistentField__r' ), 'Expected null for non-existing __r field' );
+
+        // Person account cross-object (__pr) syntax resolves to __pc; field is absent so result is null, but the branch is exercised
+        System.Assert.isNull( contactDescribe.getField( 'NonExistentField__pr' ), 'Expected null for non-existing __pr field' );
     }
 
     @IsTest
@@ -176,16 +205,52 @@ private with sharing class fflib_SObjectDescribeTest{
     }
 
     @IsTest
-    private static void getDescribe_NativeDescribe(){
-        // Test method to test the nativeDescribe initiator
-        fflib_SObjectDescribe d = fflib_SObjectDescribe.getDescribe( Account.SObjectType.getDescribe() );
-        System.Assert.areEqual( 'Account', d.getDescribeName(), 'Expected Account to be described' );
+    private static void getPicklistValues_validReturn(){
+        // Given - create data
+        List<Schema.PicklistEntry> pleForSolutionStatusName = Solution.Status.getDescribe().getPicklistValues();
+
+        // When, Then
+        List<Schema.PicklistEntry> ple = fflib_SObjectDescribe.getPicklistValues( Solution.Status );
+        System.Assert.areEqual( ple.size(), pleForSolutionStatusName.size() );
+        System.Assert.areEqual( ple[ 0 ].getLabel(), pleForSolutionStatusName[ 0 ].getLabel() );
     }
 
     @IsTest
-    private static void getDescribe_ByInstance(){
-        // Test method to test the nativeDescribe initiator
-        fflib_SObjectDescribe d = fflib_SObjectDescribe.getDescribe( new Account() );
-        System.Assert.areEqual( 'Account', d.getDescribeName(), 'Expected Account to be described' );
+    private static void getPicklistValues_missingInput(){
+        // When - perform test
+        try{
+            fflib_SObjectDescribe.getPicklistValues( null );
+            System.Assert.fail( 'This Exception should not be thrown as field-input was empty' );
+        } catch( Exception ex ){
+            // Then - validate
+            System.Assert.isInstanceOfType( ex, dfflib_Utils.InvalidInputValueException.class, 'Expected an dfflib_Utils.InvalidInputValueException, got ' + ex.getTypeName() );
+        }
+    }
+
+    @IsTest
+    private static void getPicklistValues_nonPicklistField(){
+        // When, Then - a non-picklist field returns an empty list rather than throwing
+        System.Assert.areEqual( new List<Schema.PicklistEntry>(), fflib_SObjectDescribe.getPicklistValues( Solution.SolutionName ), 'Expected an empty list for a non-picklist field' );
+    }
+
+    @IsTest
+    private static void getPicklistLabels_returnsLabels(){
+        // Given - create data
+        List<String> picklistLabels = fflib_SObjectDescribe.getPicklistLabels( Solution.Status );
+
+        // When, Then
+        System.Assert.isTrue( picklistLabels.contains( 'Draft' ), 'Expected to contain this picklist LABEL value, unmodified (no upper-casing)' );
+        System.Assert.isTrue( picklistLabels.contains( 'Reviewed' ), 'Expected to contain this picklist LABEL value, unmodified (no upper-casing)' );
+    }
+
+    @IsTest
+    private static void isValidPicklistValue(){
+        // When, Then
+        // Success
+        System.Assert.isTrue( fflib_SObjectDescribe.isValidPicklistValue( Solution.Status, 'Draft' ), 'Expected Draft to be a valid picklist value on Solution.Status field' );
+
+        // Failure
+        System.Assert.isFalse( fflib_SObjectDescribe.isValidPicklistValue( Solution.Status, null ), 'Expected false since blank picklist value was provided' );
+        System.Assert.isFalse( fflib_SObjectDescribe.isValidPicklistValue( Solution.Status, 'Non existing picklist' ), 'Expected false since picklist value should not exist in Solution.Status' );
     }
 }

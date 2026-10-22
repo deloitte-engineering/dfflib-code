@@ -1,5 +1,5 @@
 /**
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -23,6 +23,18 @@ public interface fflib_Database_IDML{
     List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Database.DMLOptions options, AccessLevel accessLevel );
     List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Boolean allOrNone, AccessLevel accessLevel );
     List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, AccessLevel accessLevel );
+
+    /**
+     * Method template for executing DML Upsert actions (by external Id field) on the behalf of the callee (aka Unit of Work instance).
+     *
+     * @param   action          DML action to be executed - dUPSERT or dUPSERT_PRIO. For more information, check {@link fflib_SObjectUnitOfWork.DMLActions}
+     * @param   objList         List<SObject> for which the Database.upsert() operation should be registered with
+     * @param   externalIdField The SObjectField (marked External Id, idLookup, or the standard Id field) to upsert by
+     * @param   allOrNone       Specifies whether the operation allows partial success
+     * @param   accessLevel     AccessLevel specified for the Database operations to execute in
+     * @return  List<Database.UpsertResult> SaveResults from the Database.upsert() operation
+     */
+    List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel );
 
     /**
      * Method template for executing non-SObject specific Database operations such as Email or Approval Process submissions

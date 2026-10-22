@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -15,11 +15,12 @@
  * and allow an older API style of omitting the namespace when working with fields or global describe maps.
  * This allows both upgrading old code to APIv29 by making use of these as a nearly drop in replacement, as well as keeping
  * namespace detection logic encapsulated.
-**/
+ */
+@NamespaceAccessible
 public inherited sharing class fflib_SObjectDescribe{
     // Internal implementation details
+    @TestVisible
     private Schema.SObjectType token;
-    private Schema.SObjectField nameField;
     private Schema.DescribeSObjectResult describe{ // Lazy load - keep this lightweight until we need more data
         get{
             if( describe == null ){
@@ -62,18 +63,15 @@ public inherited sharing class fflib_SObjectDescribe{
         if( token == null ){
             throw new InvalidDescribeException( 'Invalid SObject type: null' );
         }
-        String lowerCaseTokenString = String.valueOf( token ).toLowerCase();
-        if( instanceCache.containsKey( lowerCaseTokenString ) ){
-            throw new DuplicateDescribeException( token + ' is already in the describe cache' );
-        }
         this.token = token;
-        instanceCache.put( lowerCaseTokenString, this );
+        instanceCache.put( String.valueOf( token ).toLowerCase(), this );
     }
 
     // Public instance methods
     /**
      * Returns the Schema.SObjectType this fflib_SObjectDescribe instance is based on.
      */
+    @NamespaceAccessible
     public Schema.SObjectType getSObjectType(){
         return token;
     }
@@ -84,6 +82,7 @@ public inherited sharing class fflib_SObjectDescribe{
      * @param   name    Name of field to return details for
      * @return  SObjectField matching the provided name
      */
+    @NamespaceAccessible
     public Schema.SObjectField getField( String name ){
         return this.getField( name, true );
     }
@@ -97,13 +96,15 @@ public inherited sharing class fflib_SObjectDescribe{
      * @param   implyNamespace Whether or not namespace should be implied
      * @retun   SObjectField matching the provided name
      */
+    @NamespaceAccessible
     public Schema.SObjectField getField( String fieldName, Boolean implyNamespace ){
-        Schema.SObjectField result = wrappedFields.get(
-            ( fieldName.endsWithIgnoreCase( '__r' )
-                ? ( fieldName.removeEndIgnoreCase( '__r' ) + '__c' ) // Resolve custom field cross-object (__r) syntax
-                : fieldName ),
-            implyNamespace
-        );
+        String resolvedName = fieldName;
+        if( fieldName.endsWithIgnoreCase( '__r' ) ){
+            resolvedName = fieldName.removeEndIgnoreCase( '__r' ) + '__c'; // Resolve custom field cross-object (__r) syntax
+        } else if( fieldName.endsWithIgnoreCase( '__pr' ) ){
+            resolvedName = fieldName.removeEndIgnoreCase( '__pr' ) + '__pc'; // Resolve person account custom field (__pr) syntax to its __pc field
+        }
+        Schema.SObjectField result = wrappedFields.get( resolvedName, implyNamespace );
         if( result == null ){
             result = wrappedFields.get( fieldName + 'Id', implyNamespace ); // In case it's a standard lookup in cross-object format
         }
@@ -112,32 +113,58 @@ public inherited sharing class fflib_SObjectDescribe{
 
     /**
      * Returns the field where isNameField() is true (if any); otherwise returns null
+     *
+     * @deprecated Use the static fflib_SObjectDescribe.getNameField( Schema.SObjectType ) instead,
+     *             which resolves the name field without requiring a describe instance.
      */
+    @NamespaceAccessible
     public Schema.SObjectField getNameField(){
-        if( nameField == null ){
-            for( Schema.SObjectField field : wrappedFields.values() ){
-                if( field.getDescribe().isNameField() ){
-                    nameField = field;
-                    break;
-                }
+        return getNameField( token );
+    }
+
+    /**
+     * Returns the field where isNameField() is true for the given SObjectType.
+     * There is no native Schema equivalent, so this centralizes the loop over the native fields map.
+     *
+     * @param   sObjectType The SObjectType to retrieve the name field for
+     * @return  The name field of the SObjectType, or null when sObjectType is null or has no name field
+     */
+    @NamespaceAccessible
+    public static Schema.SObjectField getNameField( Schema.SObjectType sObjectType ){
+        if( sObjectType == null ){
+            return null;
+        }
+        List<Schema.SObjectField> sObjectFields = sObjectType.getDescribe().fields.getMap().values();
+        for( Integer i = 0, j = sObjectFields.size(); i < j; i++ ){
+            Schema.SObjectField field = sObjectFields[ i ];
+            if( field.getDescribe().isNameField() ){
+                return field;
             }
         }
-        return nameField;
+        return null;
     }
 
     /**
      * Returns the raw Schema.DescribeSObjectResult an fflib_SObjectDescribe instance wraps.
+     *
+     * @deprecated Performance: the platform caches native Schema describes - call getSObjectType().getDescribe()
+     *             directly instead. Keep using this class only when you need its manipulation convenience
+     *             elsewhere (relationship-name resolution, namespace handling, name-field lookup, picklist helpers).
      */
+    @NamespaceAccessible
     public Schema.DescribeSObjectResult getDescribe(){
         return describe;
     }
 
     /**
-     * Returns the Name of the SObjectDescribe instance
-     * Use-case: simplified conversion from SObjectType to String of SObjectType (e.g. frequently used in fflib_SObjectUnitOfWork);
-     * Before: fflib_SObjectDescribe.getDescribe(Account.SObjectType).getDescribe().getName();
-     * After: fflib_SObjectDescribe.getDescribe(Account.SObjectType).getDescribeName();
+     * Returns the SObject API name this describe wraps.
+     * Equivalent to getDescribe().getName(), provided to centralize the method chain and reduce repetitive code.
+     *
+     * @deprecated Performance: use getSObjectType().getDescribe().getName() directly - the platform caches
+     *             native Schema describes. Keep using this class only when you need its manipulation convenience
+     *             elsewhere (relationship-name resolution, namespace handling, name-field lookup, picklist helpers).
      */
+    @NamespaceAccessible
     public String getDescribeName(){
         return describe.getName();
     }
@@ -145,13 +172,27 @@ public inherited sharing class fflib_SObjectDescribe{
     /**
      * This method returns the raw data and provides no namespace handling.
      * Due to this, __use of this method is discouraged__ in favor of getFields().
+     *
+     * @deprecated Performance: use getSObjectType().getDescribe().fields.getMap() directly - the platform
+     *             caches native Schema describes. Keep using this class only when you need its manipulation
+     *             convenience elsewhere (relationship-name resolution, namespace handling, picklist helpers).
      */
+    @NamespaceAccessible
     public Map<String, Schema.SObjectField> getFieldsMap(){
         return fields;
     }
+    @NamespaceAccessible
     public FieldsMap getFields(){
         return wrappedFields;
     }
+    /**
+     * Returns the raw field sets of the described SObject, keyed by developer name, with no namespace handling.
+     *
+     * @deprecated Performance: use getSObjectType().getDescribe().fieldSets.getMap() directly - the platform
+     *             caches native Schema describes. Keep using this class only when you need its manipulation
+     *             convenience elsewhere (relationship-name resolution, namespace handling, picklist helpers).
+     */
+    @NamespaceAccessible
     public Map<String, Schema.FieldSet> getFieldSetsMap(){
         return fieldSets;
     }
@@ -190,6 +231,13 @@ public inherited sharing class fflib_SObjectDescribe{
         set;
     }
 
+    /**
+     * @deprecated Prefer getDescribe( Schema.SObjectType ) or getDescribe( SObject ) instead.
+     *             Resolving by String requires a name-to-type lookup in the global describe map,
+     *             which the SObjectType-based overloads skip entirely. SObjectType references also give the
+     *             Apex compiler a real dependency edge to the referenced object, which this overload cannot.
+     */
+    @NamespaceAccessible
     public static fflib_SObjectDescribe getDescribe( String sObjectName ){
         if( String.isBlank( sObjectName ) ){
             return null;
@@ -202,6 +250,7 @@ public inherited sharing class fflib_SObjectDescribe{
         return result;
     }
 
+    @NamespaceAccessible
     public static fflib_SObjectDescribe getDescribe( Schema.SObjectType token ){
         if( token == null ){
             return null;
@@ -213,17 +262,15 @@ public inherited sharing class fflib_SObjectDescribe{
         return result;
     }
 
+    @NamespaceAccessible
     public static fflib_SObjectDescribe getDescribe( Schema.DescribeSObjectResult nativeDescribe ){
         if( nativeDescribe == null ){
             return null;
         }
-        fflib_SObjectDescribe result = instanceCache.get( nativeDescribe.getName().toLowerCase() );
-        if( result == null ){
-            result = new fflib_SObjectDescribe( nativeDescribe.getSobjectType() );
-        }
-        return result;
+        return instanceCache.get( nativeDescribe.getName().toLowerCase() ) ?? new fflib_SObjectDescribe( nativeDescribe.getSobjectType() );
     }
 
+    @NamespaceAccessible
     public static fflib_SObjectDescribe getDescribe( SObject instance ){
         if( instance == null ){
             return null;
@@ -234,9 +281,11 @@ public inherited sharing class fflib_SObjectDescribe{
     /**
      * Returns the same results as the native method, just with caching built in to avoid limits
      */
+    @NamespaceAccessible
     public static Map<String, SObjectType> getRawGlobalDescribe(){
         return rawGlobalDescribe;
     }
+    @NamespaceAccessible
     public static GlobalDescribeMap getGlobalDescribe(){
         return wrappedGlobalDescribe;
     }
@@ -245,9 +294,61 @@ public inherited sharing class fflib_SObjectDescribe{
      * Useful when working in heap space constrained environments.
      * Existing references to SObjectDescribe instances will continue to work.
      */
+    @NamespaceAccessible
     public static void flushCache(){
         rawGlobalDescribe = null;
+        wrappedGlobalDescribe = null;
         instanceCache = null;
+    }
+
+    /**
+     * Method to retrieve a list of Schema.PicklistEntry with label and (api) value for a picklist field.
+     * Note, no Exception is thrown for non-picklist fields; the platform returns an empty list.
+     *
+     * @param selectedField  The SObjectField of the picklist (multi-select) field
+     * @return List containing the picklist entry describes, or an empty list if the field is not a picklist
+     * @throws dfflib_Utils.InvalidInputValueException when the provided SObjectField is null
+     */
+    @NamespaceAccessible
+    public static List<Schema.PicklistEntry> getPicklistValues( Schema.SObjectField selectedField ){
+        dfflib_Utils.verifyNotNull( selectedField, 'selectedField' );
+
+        return selectedField.getDescribe().getPicklistValues();
+    }
+
+    /**
+     * Method to retrieve a list of Strings with the label values of a picklist field.
+     * NOTE: returns LABELS, unmodified (not upper-cased) -- use isValidPicklistValue / getPicklistValues(...).getValue() for API-value comparisons.
+     *
+     * @param selectedField  The SObjectField of the picklist (multi-select) field
+     * @return List containing the picklist LABEL values as strings
+     */
+    @NamespaceAccessible
+    public static List<String> getPicklistLabels( Schema.SObjectField selectedField ){
+        List<String> result = new List<String>();
+        for( Schema.PicklistEntry entry : getPicklistValues( selectedField ) ){
+            result.add( entry.getLabel() );
+        }
+        return result;
+    }
+
+    /**
+     * @param sObjField The Picklist field in which the provided value should be checked
+     * @param value     The value which is checked (with ignore case)
+     * @return True when the value is a valid entry for the provided picklist field, false otherwise or when value was blank
+     */
+    @NamespaceAccessible
+    public static Boolean isValidPicklistValue( Schema.SObjectField sObjField, String value ){
+        if( String.isBlank( value ) ){
+            return false;
+        }
+
+        for( Schema.PicklistEntry entry : getPicklistValues( sObjField ) ){
+            if( entry.getValue().equalsIgnoreCase( value ) ){
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -366,7 +467,6 @@ public inherited sharing class fflib_SObjectDescribe{
         }
     }
 
-    public abstract class DescribeException extends Exception{}
-    public class DuplicateDescribeException extends DescribeException{}
-    public class InvalidDescribeException extends DescribeException{}
+    @NamespaceAccessible
+    public class InvalidDescribeException extends Exception{}
 }

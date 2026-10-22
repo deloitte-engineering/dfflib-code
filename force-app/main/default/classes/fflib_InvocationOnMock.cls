@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -8,6 +8,8 @@
  * An invocation on a mock.
  * A place holder for mock, the method that was called and the arguments that were passed.
  */
+@NamespaceAccessible
+@SuppressWarnings('PMD.ClassNamingConventions')
 public with sharing class fflib_InvocationOnMock{
     private fflib_QualifiedMethod qm;
     private fflib_MethodArgValues methodArg;
@@ -20,6 +22,7 @@ public with sharing class fflib_InvocationOnMock{
      * @param	args				The fflib_MethodArgValues instance to be stored.
      * @param	mockInstance		The mock instance to be stored.
      */
+    @NamespaceAccessible
     public fflib_InvocationOnMock( fflib_QualifiedMethod qm, fflib_MethodArgValues args, Object mockInstance ){
         this.qm = qm;
         this.methodArg = args;
@@ -33,6 +36,7 @@ public with sharing class fflib_InvocationOnMock{
      * @throws	ApexMocksException in case the index is out of range.
      * @return	The argument at the given index.
      */
+    @NamespaceAccessible
     public Object getArgument( Integer index ){
         validateIndex( index );
         return methodArg.argValues[ index ];
@@ -43,6 +47,7 @@ public with sharing class fflib_InvocationOnMock{
      *
      * @return	The list of arguments.
      */
+    @NamespaceAccessible
     public List<Object> getArguments(){
         return methodArg.argValues;
     }
@@ -52,6 +57,7 @@ public with sharing class fflib_InvocationOnMock{
      *
      * @return	The fflib_MethodArgValues instance that represents the arguments passed to the method.
      */
+    @NamespaceAccessible
     public fflib_MethodArgValues getMethodArgValues(){
         return methodArg;
     }
@@ -61,6 +67,7 @@ public with sharing class fflib_InvocationOnMock{
      *
      * @return	The method stored in the invocation.
      */
+    @NamespaceAccessible
     public fflib_QualifiedMethod getMethod(){
         return qm;
     }
@@ -70,6 +77,7 @@ public with sharing class fflib_InvocationOnMock{
      *
      * @return	The mock object on which the invocation occurs.
      */
+    @NamespaceAccessible
     public Object getMock(){
         return mockInstance;
     }

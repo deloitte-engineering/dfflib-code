@@ -1,12 +1,14 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
 /**
  * Contains counterparts for helper methods in the native System class.
  */
+@NamespaceAccessible
+@SuppressWarnings('PMD.ClassNamingConventions')
 public class fflib_System{
 
     /**
@@ -16,6 +18,7 @@ public class fflib_System{
      * @param   ignoredRetVal   Dummy value, returned on registering an fflib_IMatcher.
      * @param   value           The object instance upon which we are checking equality.
      */
+    @NamespaceAccessible
     public static void assertEquals( Object ignoredRetVal, Object value ){
         assertEquals( ignoredRetVal, value, null );
     }
@@ -28,13 +31,14 @@ public class fflib_System{
      * @param   value                   The object instance upon which we are checking equality.
      * @param   customAssertMessage     Provides context or additional information for the assertion.
      */
+    @NamespaceAccessible
     public static void assertEquals( Object ignoredRetVal, Object value, String customAssertMessage ){
         fflib_IMatcher matcher = null;
         try{
             List<fflib_IMatcher> matchers = fflib_Match.getAndClearMatchers( 1 );
             matcher = matchers[ 0 ];
         } catch( fflib_ApexMocks.ApexMocksException e ){
-            throw new fflib_ApexMocks.ApexMocksException( 'System.Assert.areEqual() expects you to register exactly 1 fflib_IMatcher (typically through the helpers in fflib_Match).' );
+            throw new fflib_ApexMocks.ApexMocksException( 'fflib_System.assertEquals expects you to register exactly 1 fflib_IMatcher (typically through the helpers in fflib_Match).' );
         }
 
         if( !matcher.matches( value ) ){

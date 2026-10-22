@@ -1,13 +1,15 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
 /**
  * Class defining a method return value.
  */
-@IsTest
+@IsTest( isParallel=true )
+@NamespaceAccessible
+@SuppressWarnings('PMD.ClassNamingConventions, PMD.FieldNamingConventions, PMD.PropertyNamingConventions, PMD.ApexDoc')
 public with sharing class fflib_MethodReturnValue{
     private StandardAnswer basicAnswer = new StandardAnswer();
 
@@ -15,7 +17,7 @@ public with sharing class fflib_MethodReturnValue{
      * Instance of the implementation of the Answer interface that implements the answer,
      * if an answer isn't explicitly set the standard answer will be used, which just returns the stubbed return value.
      */
-    public fflib_Answer Answer{ get; set; }
+    public fflib_Answer answer { get; set; }
 
     /**
      * Setup a stubbed return value.
@@ -23,6 +25,7 @@ public with sharing class fflib_MethodReturnValue{
      * @param   value   The value to return from the stubbed method call.
      * @return  The fflib_MethodReturnValue instance to allow you to chain the methods.
      */
+    @NamespaceAccessible
     public fflib_MethodReturnValue thenReturn( Object value ){
         thenAnswer( this.basicAnswer.setValue( value ) );
         return this;
@@ -34,6 +37,7 @@ public with sharing class fflib_MethodReturnValue{
      * @param   e   The exception to throw from the stubbed method call.
      * @return  The fflib_MethodReturnValue instance to allow you to chain the methods.
      */
+    @NamespaceAccessible
     public fflib_MethodReturnValue thenThrow( Exception e ){
         thenAnswer( this.basicAnswer.setValue( e ) );
         return this;
@@ -44,8 +48,9 @@ public with sharing class fflib_MethodReturnValue{
      *
      * @param   answer  The answer to run from the stubbed method call.
      */
+    @NamespaceAccessible
     public void thenAnswer( fflib_Answer answer ){
-        this.Answer = answer;
+        this.answer = answer;
     }
 
     /**
@@ -54,6 +59,7 @@ public with sharing class fflib_MethodReturnValue{
      * @param   values  The values to return from the stubbed method call in consecutive calls.
      * @return  The fflib_MethodReturnValue instance to allow you to chain the methods.
      */
+    @NamespaceAccessible
     public fflib_MethodReturnValue thenReturnMulti( List<Object> values ){
         thenAnswer( this.basicAnswer.setValues( values ) );
         return this;
@@ -65,6 +71,7 @@ public with sharing class fflib_MethodReturnValue{
      * @param   es  The exceptions to throw from the stubbed method call in consecutive calls.
      * @return  The fflib_MethodReturnValue instance to allow you to chain the methods.
      */
+    @NamespaceAccessible
     public fflib_MethodReturnValue thenThrowMulti( List<Exception> es ){
         thenAnswer( this.basicAnswer.setValues( es ) );
         return this;
@@ -74,6 +81,7 @@ public with sharing class fflib_MethodReturnValue{
      * Inner class to handle all the stubs that do not use the thenAnswer method directly.
      * For internal use only.
      */
+    @NamespaceAccessible
     public class StandardAnswer implements fflib_Answer{
         private Integer whichStubReturnIndex = 0;
 

@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -536,7 +536,7 @@ private with sharing class fflib_SObjectSelectorTest{
         try{
             selectorNone.setContext( fflib_Database.Context.FULL );
             System.Assert.fail( 'Expected InvalidContextAssignmentException to be thrown as Context can only be defined once' );
-        } catch( fflib_SObjectSelector.InvalidContextAssignmentException ex ){
+        } catch( dfflib_Utils.InvalidImplementationException ex ){
             System.Assert.areEqual(
                 'Database security context can only be defined when constructing a new selector instance! Please provide a valid fflib_Database.Context when creating a new instance of a selector class.',
                 ex.getMessage()
@@ -547,7 +547,7 @@ private with sharing class fflib_SObjectSelectorTest{
         try{
             selectorNone.setDataAccess( fflib_SObjectSelector.DataAccess.USER_MODE );
             System.Assert.fail( 'Expected InvalidContextAssignmentException to be thrown as Context and DataAccess can only be defined once' );
-        } catch( fflib_SObjectSelector.InvalidContextAssignmentException ex ){
+        } catch( dfflib_Utils.InvalidImplementationException ex ){
             System.Assert.areEqual(
                 'Database security context can only be defined when constructing a new selector instance! Please provide a valid fflib_Database.Context when creating a new instance of a selector class.',
                 ex.getMessage()
@@ -908,7 +908,7 @@ private with sharing class fflib_SObjectSelectorTest{
         try{
             selector.getCursor( qfWithForUpdate );
             System.Assert.fail( 'Expected InvalidCursorQueryException to be thrown for FOR UPDATE query' );
-        } catch( fflib_SObjectSelector.InvalidCursorQueryException ex ){
+        } catch( dfflib_Utils.InvalidImplementationException ex ){
             System.Assert.isTrue( ex.getMessage().contains( 'FOR UPDATE' ), 'Expected exception message to reference FOR UPDATE' );
         }
 
@@ -916,7 +916,7 @@ private with sharing class fflib_SObjectSelectorTest{
         try{
             selector.getCursor( qfWithForUpdate.toSOQL() );
             System.Assert.fail( 'Expected InvalidCursorQueryException to be thrown for FOR UPDATE query string' );
-        } catch( fflib_SObjectSelector.InvalidCursorQueryException ex ){
+        } catch( dfflib_Utils.InvalidImplementationException ex ){
             System.Assert.isTrue( ex.getMessage().contains( 'FOR UPDATE' ), 'Expected exception message to reference FOR UPDATE' );
         }
     }
@@ -931,7 +931,7 @@ private with sharing class fflib_SObjectSelectorTest{
         try{
             selector.getCursor( qfWithGroupBy );
             System.Assert.fail( 'Expected InvalidCursorQueryException to be thrown for GROUP BY query' );
-        } catch( fflib_SObjectSelector.InvalidCursorQueryException ex ){
+        } catch( dfflib_Utils.InvalidImplementationException ex ){
             System.Assert.isTrue( ex.getMessage().contains( 'GROUP BY' ), 'Expected exception message to reference GROUP BY' );
         }
 
@@ -939,7 +939,7 @@ private with sharing class fflib_SObjectSelectorTest{
         try{
             selector.getCursor( qfWithGroupBy.toSOQL() );
             System.Assert.fail( 'Expected InvalidCursorQueryException to be thrown for GROUP BY query string' );
-        } catch( fflib_SObjectSelector.InvalidCursorQueryException ex ){
+        } catch( dfflib_Utils.InvalidImplementationException ex ){
             System.Assert.isTrue( ex.getMessage().contains( 'GROUP BY' ), 'Expected exception message to reference GROUP BY' );
         }
     }
@@ -954,7 +954,7 @@ private with sharing class fflib_SObjectSelectorTest{
         try{
             selector.getPaginationCursor( qfWithGroupBy );
             System.Assert.fail( 'Expected InvalidCursorQueryException to be thrown for GROUP BY query' );
-        } catch( fflib_SObjectSelector.InvalidCursorQueryException ex ){
+        } catch( dfflib_Utils.InvalidImplementationException ex ){
             System.Assert.isTrue( ex.getMessage().contains( 'GROUP BY' ), 'Expected exception message to reference GROUP BY' );
         }
     }

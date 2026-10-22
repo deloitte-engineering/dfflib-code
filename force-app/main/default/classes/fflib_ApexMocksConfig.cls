@@ -1,12 +1,13 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
 @IsTest
+@NamespaceAccessible
+@SuppressWarnings('PMD.AvoidBooleanMethodParameters, PMD.ClassNamingConventions, PMD.PropertyNamingConventions')
 public class fflib_ApexMocksConfig{
-
     /**
      * When false, stubbed behaviour and invocation counts are shared among all test spies.
      * - See fflib_ApexMocksTest.thatMultipleInstancesCanBeMockedDependently
@@ -14,9 +15,10 @@ public class fflib_ApexMocksConfig{
      * When true, each test spy instance has its own stubbed behaviour and invocations.
      * - See fflib_ApexMocksTest.thatMultipleInstancesCanBeMockedIndependently
      */
-    public static Boolean HasIndependentMocks{ get; set; }
+    @NamespaceAccessible
+    public static Boolean hasIndependentMocks {get; set;}
 
     static{
-        HasIndependentMocks = false;
+        hasIndependentMocks = false;
     }
 }

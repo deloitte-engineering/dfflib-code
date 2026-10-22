@@ -1,11 +1,11 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
-@SuppressWarnings( 'PMD.ApexUnitTestClassShouldHaveAsserts' ) // to avoid warnings due to inner assert methods
 @IsTest( isParallel = true )
+@SuppressWarnings('PMD.ApexUnitTestClassShouldHaveAsserts, PMD.ClassNamingConventions, PMD.ApexUnitTestClassShouldHaveRunAs, PMD.ApexDoc')  // to avoid warnings due to inner assert methods
 private with sharing class fflib_ApexMocksTest{
     private static final fflib_ApexMocks MY_MOCKS = new fflib_ApexMocks();
     private static final fflib_MyList MY_MOCK_LIST = ( fflib_MyList ) MY_MOCKS.mock( fflib_MyList.class );
@@ -826,7 +826,25 @@ private with sharing class fflib_ApexMocksTest{
     }
 
     @IsTest
-    private static void thatMultipleInstancesCanBeMockedIndependently(){
+    private static void whenMockVoidMethodRecordsCallCanVerify(){
+        // Given
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        fflib_MyList mockList = ( fflib_MyList ) mocks.mock( fflib_MyList.class );
+
+        // When
+        mocks.mockVoidMethod(
+            mockList,
+            'clear',
+            new List<Type>(),
+            new List<Object>()
+        );
+
+        // Then
+        ( ( fflib_MyList.IList ) mocks.verify( mockList, 1 ) ).clear();
+    }
+
+    @isTest
+    static void thatMultipleInstancesCanBeMockedIndependently(){
         fflib_ApexMocksConfig.HasIndependentMocks = true;
 
         // Create mocks

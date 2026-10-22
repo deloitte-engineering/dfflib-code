@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -10,6 +10,8 @@
  * however Apex cannot perform the auto casting that Java can.
  * To be consistent with Mockito, the captor does not perform any checks on the type of the argument.
  */
+@NamespaceAccessible
+@SuppressWarnings('PMD.ClassNamingConventions, PMD.ApexDoc')
 public with sharing class fflib_ArgumentCaptor{
     protected List<Object> argumentsCaptured = new List<Object>();
 
@@ -22,6 +24,7 @@ public with sharing class fflib_ArgumentCaptor{
      * @param	ignoredCaptureType	Type (class) of the captured argument
      * @return	A new fflib_ArgumentCaptor.
      */
+    @NamespaceAccessible
     public static fflib_ArgumentCaptor forClass( Type ignoredCaptureType ){
         return new fflib_ArgumentCaptor();
     }
@@ -33,6 +36,7 @@ public with sharing class fflib_ArgumentCaptor{
      *
      * @return	A special matcher that matches any argument and remembers the value.
      */
+    @NamespaceAccessible
     public Object capture(){
         AnyObject myMatcher = new AnyObject( this );
 
@@ -45,6 +49,7 @@ public with sharing class fflib_ArgumentCaptor{
      *
      * @return	Captured argument value.
      */
+    @NamespaceAccessible
     public Object getValue(){
         if( argumentsCaptured == null ||
             argumentsCaptured.size() == 0 ){
@@ -61,10 +66,12 @@ public with sharing class fflib_ArgumentCaptor{
      *
      * @return	Returns all captured values. Use it when capturing multiple arguments on the same call or when the verified method was called multiple times.
      */
+    @NamespaceAccessible
     public List<Object> getAllValues(){
         return argumentsCaptured;
     }
 
+    @NamespaceAccessible
     public class AnyObject implements fflib_IMatcher{
         private fflib_ArgumentCaptor captor;
         private Object value;

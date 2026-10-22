@@ -1,5 +1,5 @@
 /**
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -365,7 +365,7 @@ public with sharing class UT_SObjectFactory{
          * @param    sObj        sObject
          */
         public SObjectMock( SObject sObj ){
-            fflib_Objects.verifyNotNull( sObj, 'sObj' );
+            dfflib_Utils.verifyNotNull( sObj, 'sObj' );
             this.sObj = sObj;
             createWithSObjectTemplate( sObj );
         }
@@ -481,8 +481,8 @@ public with sharing class UT_SObjectFactory{
          * @param    children            List of SObjectMock instances which will be linked to this instance.
          */
         public SObjectMock addChildren( String relationshipName, List<SObjectMock> children ){
-            fflib_Objects.verifyNotBlank( relationshipName, 'relationshipName' );
-            fflib_Objects.verifyNotNull( children, 'children' );
+            dfflib_Utils.verifyNotBlank( relationshipName, 'relationshipName' );
+            dfflib_Utils.verifyNotNull( children, 'children' );
 
             // if withId(), add set the correct parentId;
             if( getId() != null && children != null ){
@@ -599,7 +599,7 @@ public with sharing class UT_SObjectFactory{
          * @param   defaults
          */
         public SObjectMock setDefaults( ISObjectDefaults defaults ){
-            fflib_Objects.verifyNotNull( defaults, 'defaults' );
+            dfflib_Utils.verifyNotNull( defaults, 'defaults' );
             this.defaults = defaults;
             return this;
         }
@@ -981,10 +981,10 @@ public with sharing class UT_SObjectFactory{
          * @return SObject
          */
         private SObject saveToUOW( fflib_ISObjectUnitOfWork uow ){
-            fflib_Objects.verifyNotNull( uow, 'uow' );
+            dfflib_Utils.verifyNotNull( uow, 'uow' );
 
             if( getId() != null ){
-                throw new SObjectFactoryException( 'createWithId cannot be used with saving records' );
+                throw new dfflib_Utils.InvalidImplementationException( 'createWithId cannot be used with saving records' );
             }
 
             SObject parent = getSObjectForSave();
@@ -1282,12 +1282,6 @@ public with sharing class UT_SObjectFactory{
     }
 
     /**
-     * Exception classes
-     */
-    public class SObjectFactoryException extends Exception{
-    }
-
-    /**
      * A domain object interacts with the SObjectFactory to populate the field values and allows adding, removing
      * of parent and child relationships to the sObject record the domain is responsible for. Once the domain has
      * all of the necessary data set on the domain, it exposes an API to either mock or save the records to the
@@ -1532,7 +1526,7 @@ public with sharing class UT_SObjectFactory{
          * used to locate an existing record which matches the same value.
          */
         public virtual SObject query(){
-            SObjectField field = fflib_SObjectDescribe.getDescribe( record.getSObjectType() ).getNameField();
+            SObjectField field = fflib_SObjectDescribe.getNameField( record.getSObjectType() );
             String nameField = UT_SObjectFactoryUtils.getFieldName( field );
             return query( new FindByFieldValueLocator( nameField ) );
         }

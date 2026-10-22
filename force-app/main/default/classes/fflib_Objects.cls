@@ -1,14 +1,15 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
 /**
  * Base class for generic Apex objects (including SObjects), providing core utilities to treat records as typed object instances for other framework layers
- *
  */
+@NamespaceAccessible
 public virtual class fflib_Objects implements fflib_IObjects{
+    @NamespaceAccessible
     protected List<Object> objects{ get; protected set; } {
         objects = new List<Object>();
     }
@@ -16,23 +17,28 @@ public virtual class fflib_Objects implements fflib_IObjects{
     /**
      * Class constructor
      */
+    @NamespaceAccessible
     public fflib_Objects( List<Object> objects ){
         // Ensure the domain class has its own copy of the data
         this.objects = objects.clone();
     }
 
+    @NamespaceAccessible
     public virtual Object getType(){
         return Object.class;
     }
 
+    @NamespaceAccessible
     public List<Object> getObjects(){
         return this.objects;
     }
 
+    @NamespaceAccessible
     public Boolean contains( Object value ){
         return getObjects()?.contains( value );
     }
 
+    @NamespaceAccessible
     public Boolean containsAll( List<Object> values ){
         if( values == null ){
             return false;
@@ -41,6 +47,7 @@ public virtual class fflib_Objects implements fflib_IObjects{
         return containsAll( new Set<Object>( values ) );
     }
 
+    @NamespaceAccessible
     public Boolean containsAll( Set<Object> values ){
         if( values == null ){
             return false;
@@ -52,16 +59,19 @@ public virtual class fflib_Objects implements fflib_IObjects{
         return true;
     }
 
+    @NamespaceAccessible
     public Boolean containsNot( Object value ){
         return !contains( value );
     }
 
+    @NamespaceAccessible
     public Boolean containsNot( List<Object> values ){
         if( values == null ) return true;
 
         return containsNot( new Set<Object>( values ) );
     }
 
+    @NamespaceAccessible
     public Boolean containsNot( Set<Object> values ){
         if( values == null ) return true;
 
@@ -71,67 +81,30 @@ public virtual class fflib_Objects implements fflib_IObjects{
         return true;
     }
 
+    @NamespaceAccessible
     public Boolean isEmpty(){
-        return getObjects()?.isEmpty();
+        return getObjects()?.isEmpty() ?? true;
     }
 
+    @NamespaceAccessible
     public Boolean isNotEmpty(){
         return !isEmpty();
     }
 
+    @NamespaceAccessible
     public Integer size(){
         return getObjects().size();
     }
 
+    @NamespaceAccessible
     @TestVisible
     protected void setObjects( List<Object> objects ){
         this.objects = objects;
     }
 
     /**
-     * Method to verify whether the input parameter is not null
-     *
-     * @param   param           The parameter to validate
-     * @param   paramName       The parameter name to display in case the parameter is invalid
+     * Centralised Exception to allow reuse on any invalid input/field value
      */
-    public static void verifyNotNull( Object param, String paramName ){
-        if( param == null ){
-            throw new fflib.InvalidInputValueException( message( '{0} cannot be null', paramName ) );
-        }
-    }
-
-    /**
-     * Method to verify whether the input parameter is not blank
-     *
-     * @param   param           The parameter to validate
-     * @param   paramName       The parameter name to display in case the parameter is invalid
-     */
-    public static void verifyNotBlank( String param, String paramName ){
-        if( String.isBlank( param ) ){
-            throw new fflib.InvalidInputValueException( message( '{0} cannot be blank', paramName ) );
-        }
-    }
-
-    /**
-     * Method to verify whether the input list is not null nor empty
-     *
-     * @param   objList         The list to validate
-     * @param   paramName       The parameter name to display in case the parameter is invalid
-     */
-    public static void verifyNotEmpty( List<Object> objList, String paramName ){
-        if( objList == null || objList.isEmpty() ){
-            throw new fflib.InvalidInputValueException( message( '{0} cannot be empty', paramName ) );
-        }
-    }
-
-    /**
-     * Method to shortcut the String.format call when having only one parameter to be substituted
-     *
-     * @param   message             The message to be formatted
-     * @param   substitutionString  The substitution string to replace in the original message
-     * @return  String where {0} in message variable is substituted with substitutionString
-     */
-    public static String message( String message, String substitutionString ){
-        return String.format( message, new List<String>{ substitutionString } );
-    }
+	@NamespaceAccessible
+    public virtual class InvalidValueException extends Exception{}
 }

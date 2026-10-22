@@ -1,6 +1,6 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -18,6 +18,7 @@
  * Use fflib_Database.Context.FULL for full user-mode enforcement (FLS + sharing).
  * Use fflib_Database.Context.NONE to guarantee all-records visibility regardless of sharing declarations.
  */
+@NamespaceAccessible
 public abstract inherited sharing class fflib_SObjectSelector implements fflib_ISObjectSelector{
     public enum DataAccess{ LEGACY, USER_MODE, SYSTEM_MODE }
     private static final Map<DataAccess, fflib_Database.Context> ACCESS_TO_CONTEXT_MAP = new Map<DataAccess, fflib_Database.Context>{
@@ -33,7 +34,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
     private Boolean CURRENCY_ISO_CODE_ENABLED{
         get{
             if( CURRENCY_ISO_CODE_ENABLED == null ){
-                CURRENCY_ISO_CODE_ENABLED = describeWrapper.getFieldsMap().keySet().contains( 'currencyisocode' );
+                CURRENCY_ISO_CODE_ENABLED = sObjectFieldsMap.containsKey( 'currencyisocode' );
             }
             return CURRENCY_ISO_CODE_ENABLED;
         }
@@ -74,14 +75,27 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
     private Boolean m_sortSelectFields = false;
 
     /**
-     * Describe helper
+     * Native describe of the SObject this selector represents, lazy loaded once per selector instance
      */
-    private fflib_SObjectDescribe describeWrapper{
+    private Schema.DescribeSObjectResult sObjectDescribe{
         get{
-            if( describeWrapper == null ){
-                describeWrapper = fflib_SObjectDescribe.getDescribe( getSObjectType() );
+            if( sObjectDescribe == null ){
+                sObjectDescribe = getSObjectType().getDescribe();
             }
-            return describeWrapper;
+            return sObjectDescribe;
+        }
+        set;
+    }
+
+    /**
+     * Native fields map of the SObject this selector represents, lazy loaded once per selector instance
+     */
+    private Map<String, Schema.SObjectField> sObjectFieldsMap{
+        get{
+            if( sObjectFieldsMap == null ){
+                sObjectFieldsMap = sObjectDescribe.fields.getMap();
+            }
+            return sObjectFieldsMap;
         }
         set;
     }
@@ -153,6 +167,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      *   SEL_Accounts.newInstance( fflib_Database.Context.NONE ).selectSObjectsById( ... )
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector(){}
 
     /**
@@ -161,6 +176,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param   securityContext         Database security context
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector( fflib_Database.Context securityContext ){
         this.setContext( securityContext );
     }
@@ -170,6 +186,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param   includeFieldSetFields   Set to true if the Selector queries are to include Fieldset fields as well
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector( Boolean includeFieldSetFields ){
         this( includeFieldSetFields, null, null, false, false );
     }
@@ -179,6 +196,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param access Legacy enum to specify the data access mode for this query
      * @deprecated Legacy backward-compatibility constructor, suggestion to migrate to fflib_Database.Context securityContext
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector( Boolean includeFieldSetFields, DataAccess access ){
         this( includeFieldSetFields, null, null, false, false, ACCESS_TO_CONTEXT_MAP.get( access ) );
     }
@@ -192,6 +210,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   includeFieldSetFields   Set to true if the Selector queries are to include Fieldset fields as well
      * @param   securityContext         Database security context
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector( Boolean includeFieldSetFields, fflib_Database.Context securityContext ){
         this( includeFieldSetFields, null, null, false, false, securityContext );
     }
@@ -204,6 +223,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   enforceFLS              Enforce Field Level Security
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector( Boolean includeFieldSetFields, Boolean enforceCRUD, Boolean enforceFLS ){
         this( includeFieldSetFields, enforceCRUD, enforceFLS, false, false );
     }
@@ -216,14 +236,17 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param enforceFLS                Enforce Field Level Security
      * @param sortSelectFields          Set to false if selecting many columns to skip sorting select fields and improve performance
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
-     **/
+     */
+    @NamespaceAccessible
     public fflib_SObjectSelector( Boolean includeFieldSetFields, Boolean enforceCRUD, Boolean enforceFLS, Boolean sortSelectFields ){
         this( includeFieldSetFields, enforceCRUD, enforceFLS, sortSelectFields, false );
     }
+    @NamespaceAccessible
     public fflib_SObjectSelector( Boolean includeFieldSetFields, Boolean sortSelectFields, fflib_Database.Context securityContext ){
         this( includeFieldSetFields, null, null, sortSelectFields, false, securityContext );
     }
 
+    @NamespaceAccessible
     public fflib_SObjectSelector( Boolean includeFieldSetFields, Boolean sortSelectFields, Boolean includeRelatedFieldSetFields, fflib_Database.Context securityContext ){
         this( includeFieldSetFields, null, null, sortSelectFields, includeRelatedFieldSetFields, securityContext );
     }
@@ -238,6 +261,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   includeRelatedFieldSetFields    Set to true if the Selector queries are to include related Fieldset fields as well
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector( Boolean includeFieldSetFields, Boolean enforceCRUD, Boolean enforceFLS, Boolean sortSelectFields, Boolean includeRelatedFieldSetFields ){
         this.m_includeFieldSetFields = includeFieldSetFields;
         this.m_enforceCRUD = enforceCRUD;
@@ -248,9 +272,11 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
     /**
      * @deprecated Legacy backward-compatibility constructor, suggestion to migrate to fflib_Database.Context
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector( Boolean includeFieldSetFields, Boolean enforceCRUD, Boolean enforceFLS, Boolean sortSelectFields, Boolean includeRelatedFieldSetFields, DataAccess access ){
         this( includeFieldSetFields, enforceCRUD, enforceFLS, sortSelectFields, includeRelatedFieldSetFields, ACCESS_TO_CONTEXT_MAP.get( access ) );
     }
+    @NamespaceAccessible
     public fflib_SObjectSelector( Boolean includeFieldSetFields, Boolean enforceCRUD, Boolean enforceFLS, Boolean sortSelectFields, Boolean includeRelatedFieldSetFields, fflib_Database.Context securityContext ){
         this( includeFieldSetFields, enforceCRUD, enforceFLS, sortSelectFields, includeRelatedFieldSetFields );
         this.setContext( securityContext );
@@ -261,6 +287,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  List<Schema.FieldSet> to be provided optionally to base queries
      */
+    @NamespaceAccessible
     public virtual List<Schema.FieldSet> getSObjectFieldSetList(){
         return null;
     }
@@ -271,20 +298,15 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  String representing the ordering of records to include in base queries.
      */
+    @NamespaceAccessible
     public virtual String getOrderBy(){
         if( m_orderBy == null ){
-            Schema.SObjectField nameField = describeWrapper.getNameField();
-            if( nameField != null && !nameField.getDescribe().isEncrypted() ){
-                m_orderBy = nameField.getDescribe().getName();
+            Schema.SObjectField nameField = fflib_SObjectDescribe.getNameField( getSObjectType() );
+            Schema.DescribeFieldResult nameFieldDescribe = nameField != null ? nameField.getDescribe() : null;
+            if( nameFieldDescribe != null && !nameFieldDescribe.isEncrypted() ){
+                m_orderBy = nameFieldDescribe.getName();
             } else{
-                m_orderBy = DEFAULT_SORT_FIELD;
-                try{
-                    if( describeWrapper.getField( m_orderBy ) == null ){
-                        m_orderBy = SF_ID_FIELD;
-                    }
-                } catch( fflib_QueryFactory.InvalidFieldException ex ){
-                    m_orderBy = SF_ID_FIELD;
-                }
+                m_orderBy = sObjectFieldsMap.containsKey( DEFAULT_SORT_FIELD ) ? DEFAULT_SORT_FIELD : SF_ID_FIELD;
             }
         }
         return m_orderBy;
@@ -297,6 +319,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @return  This fflib_SObjectSelector instance
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector enforceFLS(){
         m_enforceFLS = true;
         return this;
@@ -307,6 +330,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  This fflib_SObjectSelector instance
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector includeFieldSetFields(){
         this.m_includeFieldSetFields = true;
         return this;
@@ -317,6 +341,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  This fflib_SObjectSelector instance
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector includeRelatedFieldSetFields(){
         this.m_includeRelatedFieldSetFields = true;
         return this;
@@ -328,11 +353,13 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @return  This fflib_SObjectSelector instance
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector ignoreCRUD(){
         this.m_enforceCRUD = false;
         return this;
     }
 
+    @NamespaceAccessible
     public fflib_SObjectSelector unsortedSelectFields(){
         this.m_sortSelectFields = false;
         return this;
@@ -343,6 +370,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @return This fflib_SObjectSelector instance
      * @deprecated Legacy backward-compatibility method, suggestion to migrate to fflib_Database.Context
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector setDataAccess( DataAccess access ){
         this.setContext( ACCESS_TO_CONTEXT_MAP.get( access ) );
 
@@ -352,6 +380,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
             m_enforceFLS = false;
         }
 
+        this.m_dataAccess = access; // set for backward compatibility
         return this;
     }
 
@@ -360,6 +389,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  Boolean determining if Field Set fields are to be included
      */
+    @NamespaceAccessible
     public Boolean isIncludeFieldSetFields(){
         return m_includeFieldSetFields;
     }
@@ -369,6 +399,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  Boolean determining if related Field Set fields are to be included
      */
+    @NamespaceAccessible
     public Boolean isIncludeRelatedFieldSetFields(){
         return m_includeRelatedFieldSetFields;
     }
@@ -379,6 +410,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @return  Boolean determining if selector is enforcing FLS
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
      */
+    @NamespaceAccessible
     public Boolean isEnforcingFLS(){
         return m_enforceFLS;
     }
@@ -389,6 +421,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @return  Boolean determining if selector is enforcing CRUD
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
      */
+    @NamespaceAccessible
     public Boolean isEnforcingCRUD(){
         return m_enforceCRUD;
     }
@@ -398,6 +431,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  This instance's database context fflib_Database.Context
      */
+    @NamespaceAccessible
     public fflib_Database.Context getContext(){
         return m_securityContext ?? defaultSecurityContext;
     }
@@ -407,6 +441,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  Boolean determining if selected fields are to be sorted
      */
+    @NamespaceAccessible
     public Boolean isSortingSelectedFields(){
         return m_sortSelectFields;
     }
@@ -416,8 +451,9 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  String representation of the SObject this selector represents
      */
+    @NamespaceAccessible
     public String getSObjectName(){
-        return describeWrapper.getDescribe().getName();
+        return sObjectDescribe.getName();
     }
 
     /**
@@ -427,6 +463,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   securityContext     Database security model for this selector instance
      * @return  Returns this instance
      */
+    @NamespaceAccessible
     public fflib_SObjectSelector setContext( fflib_Database.Context securityContext ){
         if( this.m_securityContext == null ){
             this.m_securityContext = securityContext;
@@ -434,7 +471,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
 
             return this;
         } else{
-            throw new InvalidContextAssignmentException(
+            throw new dfflib_Utils.InvalidImplementationException(
                 'Database security context can only be defined when constructing a new selector instance! Please provide a valid fflib_Database.Context when creating a new instance of a selector class.'
             );
         }
@@ -446,6 +483,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  This instance's SObjectType
      */
+    @NamespaceAccessible
     public SObjectType getSObjectType2(){
         return getSObjectType();
     }
@@ -456,6 +494,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  This instance's SObjectType
      */
+    @NamespaceAccessible
     public SObjectType sObjectType(){
         return getSObjectType();
     }
@@ -470,6 +509,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   idSet   Set<Id> to be matched
      * @return  A list of SObject's.
      */
+    @NamespaceAccessible
     public virtual List<SObject> selectSObjectsById( Set<Id> idSet ){
         return this.executeQuery( buildQuerySObjectById(), new Map<String, Object>{ 'idSet' => idSet } );
     }
@@ -484,6 +524,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   idSet   Set<Id> to be matched
      * @return  A QueryLocator (typically for use in a Batch Apex job).
      */
+    @NamespaceAccessible
     public virtual Database.QueryLocator queryLocatorById( Set<Id> idSet ){
         return this.getQueryLocator( buildQuerySObjectById(), new Map<String, Object>{ 'idSet' => idSet } );
     }
@@ -495,8 +536,9 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param 	queryConditionString	The query criteria (F.e. Origin = 'Phone')
      * @return  List of records for deletion.
      */
+    @NamespaceAccessible
     public Database.QueryLocator selectDeleteBatchRecords( String queryConditionString ){
-        fflib_Objects.verifyNotBlank( queryConditionString, 'queryConditionString' );
+        dfflib_Utils.verifyNotBlank( queryConditionString, 'queryConditionString' );
 
         fflib_QueryFactory query = newQueryFactory();
         query.setCondition( String.escapeSingleQuotes( queryConditionString ).replace( '\\', '' ) );
@@ -512,6 +554,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return List of SObject records
      */
+    @NamespaceAccessible
     public List<SObject> selectAllSObjectRecords(){
         return this.executeQuery( newQueryFactory().toSOQL() );
     }
@@ -521,6 +564,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @return  fflib_QueryFactory instance configured with default settings
      */
+    @NamespaceAccessible
     public fflib_QueryFactory newQueryFactory(){
         return newQueryFactory( this.m_enforceCRUD, this.m_enforceFLS, true, this.m_includeRelatedFieldSetFields );
     }
@@ -531,9 +575,11 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   includeSelectorFields   Boolean whether selected fields should be included
      * @return  fflib_QueryFactory instance configured with provided settings
      */
+    @NamespaceAccessible
     public fflib_QueryFactory newQueryFactory( Boolean includeSelectorFields ){
         return newQueryFactory( this.m_enforceCRUD, this.m_enforceFLS, includeSelectorFields, this.m_includeRelatedFieldSetFields );
     }
+    @NamespaceAccessible
     public fflib_QueryFactory newQueryFactory( Boolean includeSelectorFields, Boolean includeRelatedFieldSetFields ){
         return newQueryFactory( this.m_enforceCRUD, this.m_enforceFLS, includeSelectorFields, includeRelatedFieldSetFields );
     }
@@ -548,6 +594,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @return  fflib_QueryFactory instance configured with provided settings
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
      */
+    @NamespaceAccessible
     public fflib_QueryFactory newQueryFactory( Boolean assertCRUD, Boolean enforceFLS, Boolean includeSelectorFields ){
         return this.newQueryFactory( assertCRUD, enforceFLS, includeSelectorFields, this.m_includeRelatedFieldSetFields );
     }
@@ -574,6 +621,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @return  fflib_QueryFactory instance configured with provided settings
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
      */
+    @NamespaceAccessible
     public fflib_QueryFactory newQueryFactory( Boolean assertCRUD, Boolean enforceFLS, Boolean includeSelectorFields, Boolean includeRelatedFieldSetFields ){
         // Construct QueryFactory around the given SObject
         return configureQueryFactory(
@@ -584,6 +632,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
     /**
      * Adds the selectors fields to the given QueryFactory using the given relationship path as a prefix
      */
+    @NamespaceAccessible
     public void configureQueryFactoryFields( fflib_QueryFactory queryFactory, String relationshipFieldPath ){
         // Add fields from selector prefixing the relationship path
         for( SObjectField field : getSObjectFieldList() ){
@@ -606,6 +655,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @deprecated Ambiguous when the same child SObject is reachable via multiple relationships.
      *             Use {@link #addQueryFactorySubselect(fflib_QueryFactory, String)} instead, passing the explicit relationship name.
      */
+    @NamespaceAccessible
     public fflib_QueryFactory addQueryFactorySubselect( fflib_QueryFactory parentQueryFactory ){
         System.debug( LoggingLevel.WARN, 'fflib_SObjectSelector.addQueryFactorySubselect(fflib_QueryFactory) is deprecated. '
             + 'Use addQueryFactorySubselect(fflib_QueryFactory, String) with an explicit relationship name instead.' );
@@ -621,6 +671,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @deprecated Ambiguous when the same child SObject is reachable via multiple relationships.
      *               Use {@link #addQueryFactorySubselect(fflib_QueryFactory, String, Boolean)} instead, passing the explicit relationship name.
      */
+    @NamespaceAccessible
     public fflib_QueryFactory addQueryFactorySubselect( fflib_QueryFactory parentQueryFactory, Boolean includeSelectorFields ){
         System.debug( LoggingLevel.WARN, 'fflib_SObjectSelector.addQueryFactorySubselect(fflib_QueryFactory, Boolean) is deprecated. '
             + 'Use addQueryFactorySubselect(fflib_QueryFactory, String, Boolean) with an explicit relationship name instead.' );
@@ -635,6 +686,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @return  Configured QueryFactory based on provided instance
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
      */
+    @NamespaceAccessible
     public fflib_QueryFactory addQueryFactorySubselectNoAccess( fflib_QueryFactory parentQueryFactory ){
         fflib_QueryFactory subSelectQueryFactory = parentQueryFactory.subselectQuery( getSObjectType2() );
         return configureQueryFactory( subSelectQueryFactory, false, false, true, false );
@@ -647,6 +699,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   relationshipName        Relationship to be set on subselect
      * @return  The parent QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory addQueryFactorySubselect( fflib_QueryFactory parentQueryFactory, String relationshipName ){
         return addQueryFactorySubselect( parentQueryFactory, relationshipName, true );
     }
@@ -660,6 +713,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @return  The parent QueryFactory instance
      * @deprecated - Consider using fflib_Database.Context for native platform enforcement of CRUD and FLS
 	 */
+    @NamespaceAccessible
     public fflib_QueryFactory addQueryFactorySubselectNoAccessChecks( fflib_QueryFactory parentQueryFactory, String relationshipName, Boolean includeSelectorFields ){
         fflib_QueryFactory subSelectQueryFactory = parentQueryFactory.subselectQuery( relationshipName );
         return configureQueryFactory( subSelectQueryFactory, false, false, includeSelectorFields, false );
@@ -673,6 +727,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   includeSelectorFields   Boolean whether to include selected fields
      * @return  The parent QueryFactory instance
      */
+    @NamespaceAccessible
     public fflib_QueryFactory addQueryFactorySubselect( fflib_QueryFactory parentQueryFactory, String relationshipName, Boolean includeSelectorFields ){
         fflib_QueryFactory subSelectQueryFactory = parentQueryFactory.subselectQuery( relationshipName );
         return configureQueryFactory( subSelectQueryFactory, m_enforceCRUD, m_enforceFLS, includeSelectorFields, m_includeRelatedFieldSetFields );
@@ -699,7 +754,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
                 queryFactory.assertIsAccessible();
             } catch( fflib_SecurityUtils.CrudException e ){
                 // Marshal exception into DomainException for backwards compatibility
-                throw new fflib_SObjectDomain.DomainException( 'Permission to access an ' + getSObjectType().getDescribe().getName() + ' denied.' );
+                throw new fflib_SObjectDomain.DomainException( 'Permission to access an ' + getSObjectName() + ' denied.' );
             }
         }
 
@@ -792,7 +847,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
             ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).query( ( String ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
         } catch( Exception ex ){
             // Capture the Exception, to provide a more explanatory Assert failure message
-            throw new fflib.InvalidImplementationException( 'No executeQuery() was called without bindVariablesMap. If you provided a Map, please use verifyQueryAndBindVariableKeys()' );
+            throw new dfflib_Utils.InvalidImplementationException( 'No executeQuery() was called without bindVariablesMap. If you provided a Map, please use verifyQueryAndBindVariableKeys()' );
         }
         return this.processVerifyQueryResults( argumentCaptor, 1 );
     }
@@ -805,6 +860,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param mocks     fflib_ApexMocks to which the mock was registered
      * @return          Instance of SelectorVerificationResults providing query string, bind map and QueryFactory
+     * @throws dfflib_Utils.InvalidImplementationException if the query was not executed as expected
      */
     @TestVisible
     private SelectorVerificationResults verifyQueryAndBindVariableKeys( fflib_ApexMocks mocks ){
@@ -814,7 +870,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
             ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).query( ( String ) argumentCaptor.capture(), ( Map<String, Object> ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
         } catch( Exception ex ){
             // Capture the Exception, to provide a more explanatory Assert failure message
-            throw new fflib.InvalidImplementationException( 'No executeQuery() was called providing bind-variables, if you didn\'t provide a bindVariablesMap, please use verifyQuery()' );
+            throw new dfflib_Utils.InvalidImplementationException( 'No executeQuery() was called providing bind-variables, if you didn\'t provide a bindVariablesMap, please use verifyQuery()' );
         }
         return this.processVerifyQueryResults( argumentCaptor, 2 );
     }
@@ -824,6 +880,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param mocks     fflib_ApexMocks to which the mock was registered
      * @return          Instance of SelectorVerificationResults providing query string and QueryFactory
+     * @throws dfflib_Utils.InvalidImplementationException if the query locator was not executed as expected
      */
     @TestVisible
     private SelectorVerificationResults verifyQueryLocator( fflib_ApexMocks mocks ){
@@ -833,7 +890,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
             ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).getQueryLocator( ( String ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
         } catch( Exception ex ){
             // Capture the Exception, to provide a more explanatory Assert failure message
-            throw new fflib.InvalidImplementationException( 'No getQueryLocator() was called without bindVariablesMap. If you provided a Map, please use verifyQueryLocatorAndBindVariables()' );
+            throw new dfflib_Utils.InvalidImplementationException( 'No getQueryLocator() was called without bindVariablesMap. If you provided a Map, please use verifyQueryLocatorAndBindVariables()' );
         }
         return this.processVerifyQueryResults( argumentCaptor, 1 );
     }
@@ -846,6 +903,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param mocks     fflib_ApexMocks to which the mock was registered
      * @return          Instance of SelectorVerificationResults providing query string, bind map and QueryFactory
+     * @throws dfflib_Utils.InvalidImplementationException if the query locator with bind variables was not executed as expected
      */
     @TestVisible
     private SelectorVerificationResults verifyQueryLocatorAndBindVariableKeys( fflib_ApexMocks mocks ){
@@ -855,7 +913,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
             ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).getQueryLocator( ( String ) argumentCaptor.capture(), ( Map<String, Object> ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
         } catch( Exception ex ){
             // Capture the Exception, to provide a more explanatory Assert failure message
-            throw new fflib.InvalidImplementationException( 'No getQueryLocator() was called providing bind-variables, if you didn\'t provide a bindVariablesMap, please use verifyQueryLocator()' );
+            throw new dfflib_Utils.InvalidImplementationException( 'No getQueryLocator() was called providing bind-variables, if you didn\'t provide a bindVariablesMap, please use verifyQueryLocator()' );
         }
         return this.processVerifyQueryResults( argumentCaptor, 2 );
     }
@@ -865,6 +923,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param mocks     fflib_ApexMocks to which the mock was registered
      * @return          Instance of SelectorVerificationResults providing query string and QueryFactory
+     * @throws dfflib_Utils.InvalidImplementationException if the cursor was not executed as expected
      */
     @TestVisible
     private SelectorVerificationResults verifyCursor( fflib_ApexMocks mocks ){
@@ -872,7 +931,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
         try{
             ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).getCursor( ( String ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
         } catch( Exception ex ){
-            throw new fflib.InvalidImplementationException( 'No getCursor() was called without bindVariablesMap. If you provided a Map, please use verifyCursorAndBindVariableKeys()' );
+            throw new dfflib_Utils.InvalidImplementationException( 'No getCursor() was called without bindVariablesMap. If you provided a Map, please use verifyCursorAndBindVariableKeys()' );
         }
         return this.processVerifyQueryResults( argumentCaptor, 1 );
     }
@@ -885,6 +944,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param mocks     fflib_ApexMocks to which the mock was registered
      * @return          Instance of SelectorVerificationResults providing query string, bind map and QueryFactory
+     * @throws dfflib_Utils.InvalidImplementationException if the cursor with bind variables was not executed as expected
      */
     @TestVisible
     private SelectorVerificationResults verifyCursorAndBindVariableKeys( fflib_ApexMocks mocks ){
@@ -892,7 +952,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
         try{
             ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).getCursor( ( String ) argumentCaptor.capture(), ( Map<String, Object> ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
         } catch( Exception ex ){
-            throw new fflib.InvalidImplementationException( 'No getCursor() was called with bindVariablesMap. If you didn\'t provide a Map, please use verifyCursor()' );
+            throw new dfflib_Utils.InvalidImplementationException( 'No getCursor() was called with bindVariablesMap. If you didn\'t provide a Map, please use verifyCursor()' );
         }
         return this.processVerifyQueryResults( argumentCaptor, 2 );
     }
@@ -902,6 +962,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param mocks     fflib_ApexMocks to which the mock was registered
      * @return          Instance of SelectorVerificationResults providing query string and QueryFactory
+     * @throws dfflib_Utils.InvalidImplementationException if the pagination cursor was not executed as expected
      */
     @TestVisible
     private SelectorVerificationResults verifyPaginationCursor( fflib_ApexMocks mocks ){
@@ -909,7 +970,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
         try{
             ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).getPaginationCursor( ( String ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
         } catch( Exception ex ){
-            throw new fflib.InvalidImplementationException( 'No getPaginationCursor() was called without bindVariablesMap. If you provided a Map, please use verifyPaginationCursorAndBindVariableKeys()' );
+            throw new dfflib_Utils.InvalidImplementationException( 'No getPaginationCursor() was called without bindVariablesMap. If you provided a Map, please use verifyPaginationCursorAndBindVariableKeys()' );
         }
         return this.processVerifyQueryResults( argumentCaptor, 1 );
     }
@@ -922,6 +983,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param mocks     fflib_ApexMocks to which the mock was registered
      * @return          Instance of SelectorVerificationResults providing query string, bind map and QueryFactory
+     * @throws dfflib_Utils.InvalidImplementationException if the pagination cursor with bind variables was not executed as expected
      */
     @TestVisible
     private SelectorVerificationResults verifyPaginationCursorAndBindVariableKeys( fflib_ApexMocks mocks ){
@@ -929,7 +991,7 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
         try{
             ( ( fflib_Database_IQuery ) mocks.verify( this.m_queryProxy, 1 ) ).getPaginationCursor( ( String ) argumentCaptor.capture(), ( Map<String, Object> ) argumentCaptor.capture(), ( AccessLevel ) fflib_Match.anyObject() );
         } catch( Exception ex ){
-            throw new fflib.InvalidImplementationException( 'No getPaginationCursor() was called with bindVariablesMap. If you didn\'t provide a Map, please use verifyPaginationCursor()' );
+            throw new dfflib_Utils.InvalidImplementationException( 'No getPaginationCursor() was called with bindVariablesMap. If you didn\'t provide a Map, please use verifyPaginationCursor()' );
         }
         return this.processVerifyQueryResults( argumentCaptor, 2 );
     }
@@ -1069,52 +1131,64 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      */
 
     // Database.query() specifications
+    @NamespaceAccessible
     public List<SObject> executeQuery( String query ){
         return ( List<SObject> ) m_queryProxy.query( query, fflib_Database.getAccessLevel( getContext() ) );
     }
 
+    @NamespaceAccessible
     public List<SObject> executeQuery( fflib_QueryFactory qf ){
         return this.executeQuery( qf.toSOQL() );
     }
 
+    @NamespaceAccessible
     public List<SObject> executeQuery( String query, Map<String, Object> bindVariablesMap ){
         return ( List<SObject> ) m_queryProxy.query( query, bindVariablesMap, fflib_Database.getAccessLevel( getContext() ) );
     }
 
+    @NamespaceAccessible
     public List<SObject> executeQuery( fflib_QueryFactory qf, Map<String, Object> bindVariablesMap ){
         return this.executeQuery( qf.toSOQL(), bindVariablesMap );
     }
 
     // Database.query() for Grouped By Results returning AggregateResults
+    @NamespaceAccessible
     public List<fflib_AggregateResult> executeAggregateQuery( String query ){
         return fflib_AggregateResult.construct( ( List<AggregateResult> ) m_queryProxy.query( query, fflib_Database.getAccessLevel( getContext() ) ) );
     }
 
+    @NamespaceAccessible
     public List<fflib_AggregateResult> executeAggregateQuery( fflib_QueryFactory qf ){
         return this.executeAggregateQuery( qf.toSOQL() );
     }
 
+    @NamespaceAccessible
     public List<fflib_AggregateResult> executeAggregateQuery( String query, Map<String, Object> bindVariablesMap ){
         return fflib_AggregateResult.construct( ( List<AggregateResult> ) m_queryProxy.query( query, bindVariablesMap, fflib_Database.getAccessLevel( getContext() ) ) );
     }
 
+    @NamespaceAccessible
     public List<fflib_AggregateResult> executeAggregateQuery( fflib_QueryFactory qf, Map<String, Object> bindVariablesMap ){
         return this.executeAggregateQuery( qf.toSOQL(), bindVariablesMap );
     }
 
     // Database.getQueryLocator() specifications
+    @NamespaceAccessible
     public Database.QueryLocator getQueryLocator( String query ){
         return m_queryProxy.getQueryLocator( query, fflib_Database.getAccessLevel( getContext() ) );
     }
 
+    @NamespaceAccessible
     public Database.QueryLocator getQueryLocator( fflib_QueryFactory qf ){
         return this.getQueryLocator( qf.toSOQL() );
     }
 
+    @NamespaceAccessible
     public Database.QueryLocator getQueryLocator( String query, Map<String, Object> bindVariablesMap ){
         return m_queryProxy.getQueryLocator( query, bindVariablesMap, fflib_Database.getAccessLevel( getContext() ) );
     }
 
+    @NamespaceAccessible
     public Database.QueryLocator getQueryLocator( fflib_QueryFactory qf, Map<String, Object> bindVariablesMap ){
         return this.getQueryLocator( qf.toSOQL(), bindVariablesMap );
     }
@@ -1129,8 +1203,9 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param   query   A raw SOQL string
      * @return  Database.Cursor for incremental processing of large result sets
-     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     * @throws  dfflib_Utils.InvalidImplementationException if the query contains FOR UPDATE or GROUP BY
      */
+    @NamespaceAccessible
     public Database.Cursor getCursor( String query ){
         this.checkCursorQueryCompatibility( query );
         return m_queryProxy.getCursor( query, fflib_Database.getAccessLevel( getContext() ) );
@@ -1142,8 +1217,9 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param   qf  The QueryFactory instance to execute as a cursor
      * @return  Database.Cursor for incremental processing of large result sets
-     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     * @throws  dfflib_Utils.InvalidImplementationException if the query contains FOR UPDATE or GROUP BY
      */
+    @NamespaceAccessible
     public Database.Cursor getCursor( fflib_QueryFactory qf ){
         return this.getCursor( qf.toSOQL() );
     }
@@ -1158,8 +1234,9 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   query               A raw SOQL string
      * @param   bindVariablesMap    Map of bind variable names to their values
      * @return  Database.Cursor for incremental processing of large result sets
-     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     * @throws  dfflib_Utils.InvalidImplementationException if the query contains FOR UPDATE or GROUP BY
      */
+    @NamespaceAccessible
     public Database.Cursor getCursor( String query, Map<String, Object> bindVariablesMap ){
         this.checkCursorQueryCompatibility( query );
         return m_queryProxy.getCursor( query, bindVariablesMap, fflib_Database.getAccessLevel( getContext() ) );
@@ -1172,8 +1249,9 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   qf                  The QueryFactory instance to execute as a cursor
      * @param   bindVariablesMap    Map of bind variable names to their values
      * @return  Database.Cursor for incremental processing of large result sets
-     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     * @throws  dfflib_Utils.InvalidImplementationException if the query contains FOR UPDATE or GROUP BY
      */
+    @NamespaceAccessible
     public Database.Cursor getCursor( fflib_QueryFactory qf, Map<String, Object> bindVariablesMap ){
         return this.getCursor( qf.toSOQL(), bindVariablesMap );
     }
@@ -1189,8 +1267,9 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param   query   A raw SOQL string
      * @return  Database.PaginationCursor for UI-based pagination
-     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     * @throws  dfflib_Utils.InvalidImplementationException if the query contains FOR UPDATE or GROUP BY
      */
+    @NamespaceAccessible
     public Database.PaginationCursor getPaginationCursor( String query ){
         this.checkCursorQueryCompatibility( query );
         return m_queryProxy.getPaginationCursor( query, fflib_Database.getAccessLevel( getContext() ) );
@@ -1203,8 +1282,9 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      *
      * @param   qf  The QueryFactory instance to execute as a pagination cursor
      * @return  Database.PaginationCursor for UI-based pagination
-     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     * @throws  dfflib_Utils.InvalidImplementationException if the query contains FOR UPDATE or GROUP BY
      */
+    @NamespaceAccessible
     public Database.PaginationCursor getPaginationCursor( fflib_QueryFactory qf ){
         return this.getPaginationCursor( qf.toSOQL() );
     }
@@ -1220,8 +1300,9 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   query               A raw SOQL string
      * @param   bindVariablesMap    Map of bind variable names to their values
      * @return  Database.PaginationCursor for UI-based pagination
-     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     * @throws  dfflib_Utils.InvalidImplementationException if the query contains FOR UPDATE or GROUP BY
      */
+    @NamespaceAccessible
     public Database.PaginationCursor getPaginationCursor( String query, Map<String, Object> bindVariablesMap ){
         this.checkCursorQueryCompatibility( query );
         return m_queryProxy.getPaginationCursor( query, bindVariablesMap, fflib_Database.getAccessLevel( getContext() ) );
@@ -1235,8 +1316,9 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * @param   qf                  The QueryFactory instance to execute as a pagination cursor
      * @param   bindVariablesMap    Map of bind variable names to their values
      * @return  Database.PaginationCursor for UI-based pagination
-     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     * @throws  dfflib_Utils.InvalidImplementationException if the query contains FOR UPDATE or GROUP BY
      */
+    @NamespaceAccessible
     public Database.PaginationCursor getPaginationCursor( fflib_QueryFactory qf, Map<String, Object> bindVariablesMap ){
         return this.getPaginationCursor( qf.toSOQL(), bindVariablesMap );
     }
@@ -1246,12 +1328,12 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
      * before dispatching to the proxy layer.
      *
      * FOR UPDATE and GROUP BY are rejected by the platform (throw {@code System.QueryException}) - empirically verified.
-     * This guard provides an early, descriptive failure via {@link InvalidCursorQueryException} before the query reaches the proxy.
+     * This guard provides an early, descriptive failure via {@link dfflib_Utils.InvalidImplementationException} before the query reaches the proxy.
      *
      * Called internally by all {@code getCursor()} and {@code getPaginationCursor()} overloads via their String delegation path.
      *
      * @param   query   The SOQL query string to validate
-     * @throws  InvalidCursorQueryException if the query contains FOR UPDATE or GROUP BY
+     * @throws  dfflib_Utils.InvalidImplementationException if the query contains FOR UPDATE or GROUP BY
      */
     @TestVisible
     private void checkCursorQueryCompatibility( String query ){
@@ -1260,13 +1342,23 @@ public abstract inherited sharing class fflib_SObjectSelector implements fflib_I
         }
         String upperQuery = query.toUpperCase();
         if( upperQuery.contains( ' FOR UPDATE' ) ){
-            throw new InvalidCursorQueryException( 'FOR UPDATE is not supported by Database.getCursor() or Database.getPaginationCursor(). Row locking is incompatible with stateless cursor fetching.' );
+            throw new dfflib_Utils.InvalidImplementationException( 'FOR UPDATE is not supported by Database.getCursor() or Database.getPaginationCursor(). Row locking is incompatible with stateless cursor fetching.' );
         }
         if( upperQuery.contains( ' GROUP BY' ) ){
-            throw new InvalidCursorQueryException( 'Aggregate queries (GROUP BY) are not supported by Database.getCursor() or Database.getPaginationCursor(). Use executeAggregateQuery() instead.' );
+            throw new dfflib_Utils.InvalidImplementationException( 'Aggregate queries (GROUP BY) are not supported by Database.getCursor() or Database.getPaginationCursor(). Use executeAggregateQuery() instead.' );
         }
     }
 
-    public class InvalidContextAssignmentException extends Exception{}
-    public class InvalidCursorQueryException extends Exception{}
+    /**
+     * @deprecated Kept DataAccess variable for backward compatibility. Use the new Context setup instead.
+     */
+    private DataAccess m_dataAccess;
+    /**
+     * @return  The current DataAccess mode for this selector instance
+     * @deprecated Kept DataAccess getter for backward compatibility/compilation. Use the new Context setup instead.
+     */
+    @NamespaceAccessible
+    public DataAccess getDataAccess(){
+        return this.m_dataAccess;
+    }
 }

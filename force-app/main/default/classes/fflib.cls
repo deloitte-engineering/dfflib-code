@@ -1,19 +1,13 @@
 /**
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
 /**
- * Main application utility class for common functionalities, fflib structure setup.
- *
- * Common functionalities:
- * - Input parameter checking
- * - Exception Handling
- *
- * FFLIB Structure setup:
- * - Returning correct business implementation for UnitOfWork, Service, Selector and Domain Layers within the application
- *
+ * Application class to centralise access to core fflib factories.
+ * Ensuring the metadata-driven layer initiation is correctly linked. 
  */
+@NamespaceAccessible
 public with sharing class fflib{
 
     /**
@@ -39,11 +33,4 @@ public with sharing class fflib{
      * Services - sequence: alphabetic, mapping the classes to allow mocking
      */
     public static final fflib_Application.ServiceFactory service = new fflib_Application.ServiceFactory();
-
-    /**
-     * COMMON EXCEPTIONS - to prevent custom exceptions per class
-     */
-    public class InvalidImplementationException extends Exception{}
-    public class InvalidInputValueException extends Exception{}
-    public class MissingDataException extends Exception{}
 }

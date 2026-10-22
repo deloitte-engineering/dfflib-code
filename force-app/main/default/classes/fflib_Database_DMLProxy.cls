@@ -1,5 +1,5 @@
 /**
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -99,6 +99,17 @@ public abstract class fflib_Database_DMLProxy{
             return null;
         }
 
+        public List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel ){
+            switch on action{
+                when dUPSERT, dUPSERT_PRIO{
+                    return Database.upsert( objList, externalIdField, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with ExternalIdField ' + action );
+                }
+            }
+        }
+
         public List<Object> performOperation( fflib_SObjectUnitOfWork.Operations operation, List<Object> objList ){
             if( objList != null && !objList.isEmpty() ){
                 // Per operation convert List<Any> to right format by looping per record to prevent "Invalid conversion" exception
@@ -193,6 +204,17 @@ public abstract class fflib_Database_DMLProxy{
             return null;
         }
 
+        public List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel ){
+            switch on action{
+                when dUPSERT, dUPSERT_PRIO{
+                    return Database.upsert( objList, externalIdField, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with ExternalIdField ' + action );
+                }
+            }
+        }
+
         public List<Object> performOperation( fflib_SObjectUnitOfWork.Operations operation, List<Object> objList ){
             if( objList != null && !objList.isEmpty() ){
                 // Per operation convert List<Any> to right format by looping per record to prevent "Invalid conversion" exception
@@ -285,6 +307,17 @@ public abstract class fflib_Database_DMLProxy{
                 }
             }
             return null;
+        }
+
+        public List<Object> performDMLAction( fflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel ){
+            switch on action{
+                when dUPSERT, dUPSERT_PRIO{
+                    return Database.upsert( objList, externalIdField, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with ExternalIdField ' + action );
+                }
+            }
         }
 
         public List<Object> performOperation( fflib_SObjectUnitOfWork.Operations operation, List<Object> objList ){

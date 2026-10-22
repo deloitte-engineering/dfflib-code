@@ -1,5 +1,5 @@
 /**
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
@@ -302,6 +302,48 @@ private with sharing class fflib_DatabaseTest{
             } catch( fflib_Database_DMLProxy.InvalidDMLActionException dmlActionException ){
                 System.Assert.areEqual( 'Invalid Action for DMLAction without additional parameters ' + fflib_SObjectUnitOfWork.DMLActions.dNEW, dmlActionException.getMessage() );
             }
+        }
+    }
+
+    @IsTest
+    private static void performDMLAction_externalIdField_realUpsert(){
+        // Given - create data: reuse the already-seeded, DML-safe sampleSolutionList - no new object needed, no new required-field risk
+        Solution existingSolution = sampleSolutionList[ 0 ];
+        Solution newSolution = sampleSolutionList[ 0 ].clone( false, true );
+        newSolution.SolutionName = 'Upsert New via ExternalId(Id)';
+
+        // FULL -> WithSimpleDML
+        fflib_Database_IDML dmlProxyFull = fflib_Database.getDMLProxy( fflib_Database.Context.FULL );
+        List<Database.UpsertResult> resultsFull = ( List<Database.UpsertResult> ) dmlProxyFull.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPSERT, new List<Solution>{ newSolution }, Solution.Id, true, withSharingAccessLevel );
+        System.Assert.areEqual( 1, resultsFull?.size(), 'Expected 1 UpsertResult for FULL context' );
+        System.Assert.isTrue( resultsFull[ 0 ].isSuccess(), 'Expected genuine Database.upsert() to succeed for FULL context' );
+        System.Assert.isTrue( resultsFull[ 0 ].isCreated(), 'Expected the new Solution (blank Id) to be created' );
+
+        // NONE -> WithoutSimpleDML
+        fflib_Database_IDML dmlProxyNone = fflib_Database.getDMLProxy( fflib_Database.Context.NONE );
+        AccessLevel systemAccessLevel = fflib_Database.getAccessLevel( fflib_Database.Context.NONE );
+        List<Database.UpsertResult> resultsNone = ( List<Database.UpsertResult> ) dmlProxyNone.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPSERT, new List<Solution>{ existingSolution }, Solution.Id, true, systemAccessLevel );
+        System.Assert.areEqual( 1, resultsNone?.size(), 'Expected 1 UpsertResult for NONE context' );
+        System.Assert.isTrue( resultsNone[ 0 ].isSuccess(), 'Expected genuine Database.upsert() to succeed for NONE context' );
+        System.Assert.isFalse( resultsNone[ 0 ].isCreated(), 'Expected the existing Solution (populated Id) to be updated, not created' );
+
+        // INHERIT -> InheritSimpleDML
+        fflib_Database_IDML dmlProxyInherit = fflib_Database.getDMLProxy( fflib_Database.Context.INHERIT );
+        AccessLevel inheritAccessLevel_local = fflib_Database.getAccessLevel( fflib_Database.Context.INHERIT );
+        List<Database.UpsertResult> resultsInherit = ( List<Database.UpsertResult> ) dmlProxyInherit.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dUPSERT_PRIO, new List<Solution>{ existingSolution }, Solution.Id, true, inheritAccessLevel_local );
+        System.Assert.areEqual( 1, resultsInherit?.size(), 'Expected 1 UpsertResult for INHERIT context' );
+        System.Assert.isTrue( resultsInherit[ 0 ].isSuccess(), 'Expected genuine Database.upsert() to succeed for INHERIT context' );
+    }
+
+    @IsTest
+    private static void performDMLAction_invalidAction_ExternalIdField_exception(){
+        fflib_Database_IDML dmlProxy = fflib_Database.getDMLProxy( fflib_Database.Context.FULL );
+
+        try{
+            dmlProxy.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dDELETE, new List<Solution>(), Solution.Id, true, withSharingAccessLevel );
+            System.Assert.fail( 'An exception was expected due to an invalid DML action for the ExternalIdField overload.' );
+        } catch( fflib_Database_DMLProxy.InvalidDMLActionException dmlActionException ){
+            System.Assert.areEqual( 'Invalid Action for DMLAction with ExternalIdField ' + fflib_SObjectUnitOfWork.DMLActions.dDELETE, dmlActionException.getMessage() );
         }
     }
 
@@ -1125,6 +1167,20 @@ private with sharing class fflib_DatabaseTest{
     }
 
     @IsTest
+    private static void withoutSharing_shouldThrowExceptionWithInvalidDMLActionForExternalIdField(){
+        // Given - create data
+        fflib_Database_IDML dmlProxy = fflib_Database.getDMLProxy( fflib_Database.Context.NONE );
+
+        // When, Then
+        try{
+            dmlProxy.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dDELETE, new List<Solution>(), Solution.Id, true, withoutSharingAccessLevel );
+            System.Assert.fail( 'An exception was expected due to an invalid DML action for the ExternalIdField overload.' );
+        } catch( fflib_Database_DMLProxy.InvalidDMLActionException dmlActionException ){
+            System.Assert.areEqual( 'Invalid Action for DMLAction with ExternalIdField ' + fflib_SObjectUnitOfWork.DMLActions.dDELETE, dmlActionException.getMessage() );
+        }
+    }
+
+    @IsTest
     private static void withoutSharing_shouldCorrectlyInsertAllOrNoneDMLOptionsAndQueryWithBinds(){
         // Given - create data
         fflib_Database_IDML dmlProxy = fflib_Database.getDMLProxy( fflib_Database.Context.NONE );
@@ -1345,7 +1401,7 @@ private with sharing class fflib_DatabaseTest{
             System.Assert.areEqual( 0, solutionsResult.size() );
 
             // When, Then - setting ALL ROWS to true, Solution should be accessible still
-            queryFactory.setAllRowsRequired( true );
+            queryFactory.setAllRows( true );
             solutionsResult = ( List<Solution> ) queryProxy.query( queryFactory.toSOQL(), bindVariablesMap, withoutSharingAccessLevel );
             System.Assert.areEqual( 1, solutionsResult.size() );
 
@@ -1620,6 +1676,20 @@ private with sharing class fflib_DatabaseTest{
             System.Assert.fail( 'An exception was expected due to an invalid DML action.' );
         } catch( fflib_Database_DMLProxy.InvalidDMLActionException dmlActionException ){
             System.Assert.areEqual( 'Invalid Action for DMLAction without additional parameters ' + fflib_SObjectUnitOfWork.DMLActions.dNEW, dmlActionException.getMessage() );
+        }
+    }
+
+    @IsTest
+    private static void inheritedSharing_shouldThrowExceptionWithInvalidDMLActionForExternalIdField(){
+        // Given - create data
+        fflib_Database_IDML dmlProxy = fflib_Database.getDMLProxy( fflib_Database.Context.INHERIT );
+
+        // When, Then
+        try{
+            dmlProxy.performDMLAction( fflib_SObjectUnitOfWork.DMLActions.dDELETE, new List<Solution>(), Solution.Id, true, inheritedAccessLevel );
+            System.Assert.fail( 'An exception was expected due to an invalid DML action for the ExternalIdField overload.' );
+        } catch( fflib_Database_DMLProxy.InvalidDMLActionException dmlActionException ){
+            System.Assert.areEqual( 'Invalid Action for DMLAction with ExternalIdField ' + fflib_SObjectUnitOfWork.DMLActions.dDELETE, dmlActionException.getMessage() );
         }
     }
 

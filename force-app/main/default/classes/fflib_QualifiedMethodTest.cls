@@ -1,10 +1,11 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
 @IsTest( isParallel = true )
+@SuppressWarnings('PMD.ClassNamingConventions, PMD.ApexUnitTestClassShouldHaveRunAs')
 private with sharing class fflib_QualifiedMethodTest{
     @IsTest
     private static void equalsReturnsExpectedResults(){
@@ -100,13 +101,13 @@ private with sharing class fflib_QualifiedMethodTest{
         fflib_QualifiedMethod qm4 = new fflib_QualifiedMethod( 'Type1', 'Method1', new List<Type>{ Integer.class }, instance2 );
 
         // When, Then
-        fflib_ApexMocksConfig.HasIndependentMocks = false;
+        fflib_ApexMocksConfig.hasIndependentMocks = false;
 
         System.Assert.areEqual( qm1, qm2 );
         System.Assert.areEqual( qm1, qm3 );
         System.Assert.areEqual( qm1, qm4 );
 
-        fflib_ApexMocksConfig.HasIndependentMocks = true;
+        fflib_ApexMocksConfig.hasIndependentMocks = true;
 
         System.Assert.areNotEqual( qm1, qm2 );
         System.Assert.areNotEqual( qm1, qm3 );
@@ -129,13 +130,13 @@ private with sharing class fflib_QualifiedMethodTest{
         fflib_QualifiedMethod qm4 = new fflib_QualifiedMethod( 'Type1', 'Method1', new List<Type>{ Integer.class }, instance2 );
 
         // When, Then
-        fflib_ApexMocksConfig.HasIndependentMocks = false;
+        fflib_ApexMocksConfig.hasIndependentMocks = false;
 
         System.Assert.areEqual( qm1.hashCode(), qm2.hashCode() );
         System.Assert.areEqual( qm1.hashCode(), qm3.hashCode() );
         System.Assert.areEqual( qm1.hashCode(), qm4.hashCode() );
 
-        fflib_ApexMocksConfig.HasIndependentMocks = true;
+        fflib_ApexMocksConfig.hasIndependentMocks = true;
 
         System.Assert.areNotEqual( qm1.hashCode(), qm2.hashCode() );
         System.Assert.areNotEqual( qm1.hashCode(), qm3.hashCode() );

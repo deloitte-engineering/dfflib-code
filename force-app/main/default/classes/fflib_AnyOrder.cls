@@ -1,16 +1,34 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
+
 /**
  * 'Classic' invocation verifier - checks that a method was called with the given arguments the expected number of times.
  * The order of method calls is not important.
  */
-public class fflib_AnyOrder extends fflib_MethodVerifier{
+@NamespaceAccessible
+@SuppressWarnings('PMD.ClassNamingConventions')
+public with sharing class fflib_AnyOrder extends fflib_MethodVerifier{
+
+    private final fflib_MethodCountRecorder methodCountRecorder;
 
     /**
+     * Retained for backward compatibility with the published API. Verifies against
+     * the globally shared (static) recorder state.
+     * @deprecated Use {@link #fflib_AnyOrder(fflib_MethodCountRecorder)} instead.
+     */
+    public fflib_AnyOrder(){
+        this.methodCountRecorder = null;
+    }
+
+    public fflib_AnyOrder( fflib_MethodCountRecorder methodCountRecorder ){
+        this.methodCountRecorder = methodCountRecorder;
+    }
+
+    /*
      * Verifies a method was invoked the expected number of times, with the expected arguments.
      *
      * @param   qualifiedMethod     The method to be verified.
@@ -19,7 +37,11 @@ public class fflib_AnyOrder extends fflib_MethodVerifier{
      */
     protected override void verify( fflib_QualifiedMethod qualifiedMethod, fflib_MethodArgValues expectedArguments, fflib_VerificationMode verificationMode ){
         List<fflib_IMatcher> expectedMatchers = fflib_Match.Matching ? fflib_Match.getAndClearMatchers( expectedArguments.argValues.size() ) : null;
-        List<fflib_MethodArgValues> actualArguments = fflib_MethodCountRecorder.getMethodArgumentsByTypeName().get( qualifiedMethod );
+        Map<fflib_QualifiedMethod, List<fflib_MethodArgValues>> argumentsByTypeName =
+            ( methodCountRecorder != null )
+                ? methodCountRecorder.getInstanceMethodArgumentsByTypeName()
+                : fflib_MethodCountRecorder.getMethodArgumentsByTypeName();
+        List<fflib_MethodArgValues> actualArguments = argumentsByTypeName.get( qualifiedMethod );
 
         Integer methodCount = getMethodCount( expectedArguments, expectedMatchers, actualArguments );
         String qualifier = '';

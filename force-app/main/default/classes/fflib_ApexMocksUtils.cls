@@ -1,11 +1,12 @@
 /**
  * Copyright (c), FinancialForce.com, inc
- * Copyright (c), Deloitte Consultative Services B.V.
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
  * SPDX-License-Identifier: BSD-3-Clause
  * See LICENSE in the repository root for the full license text.
  */
-public class fflib_ApexMocksUtils{
-
+@NamespaceAccessible
+@SuppressWarnings('PMD.ExcessiveParameterList, PMD.ClassNamingConventions, PMD.ApexDoc')
+public without sharing class fflib_ApexMocksUtils{
     /**
      * This is taken from https://gist.github.com/afawcett/8dbfc0e1d8c43c982881.
      *
@@ -60,7 +61,8 @@ public class fflib_ApexMocksUtils{
     }
 
     /**
-     * Generic overload to makeRelationship. Enables creation of relationships in a loosely-coupled manner.
+     * Generic overload to makeRelationship. Enables creation of
+     * relationships in a loosely-coupled manner.
      *
      * @param   parentTypeName              Type definition used to describe the parent objects.
      * @param   childTypeName               Type definition used to describe the child objects.
@@ -69,8 +71,8 @@ public class fflib_ApexMocksUtils{
      * @param   children                    List of lists of SObjects representing the child objects.
      * @return	Deserialized SObject result of deconstructing JSON structure.
      */
+    @NamespaceAccessible
     public static Object makeRelationship( String parentTypeName, String childTypeName, List<SObject> parents, String relationshipFieldName, List<List<SObject>> children ){
-
         // Find out more about this relationship...
         SObjectType parentType = getType( parentTypeName );
         SObjectField relationshipField = getField( childTypeName, relationshipFieldName );
@@ -83,6 +85,7 @@ public class fflib_ApexMocksUtils{
      * Gives the ability to set test values on formula
      * and other read-only fields of mock SObjects
      */
+    @NamespaceAccessible
     public static Object setReadOnlyFields( SObject objInstance, Type deserializeType, Map<SObjectField, Object> properties ){
         Map<String, Object> fieldNameMap = new Map<String, Object>();
         for( SObjectField field : properties.keySet() ){
@@ -96,19 +99,26 @@ public class fflib_ApexMocksUtils{
      * Generic overload to setReadOnlyFields. Enables setting test
      * values on read-only fields by their name
      */
+    @NamespaceAccessible
     public static Object setReadOnlyFields( SObject objInstance, Type deserializeType, Map<String, Object> properties ){
-        Map<String, Object> mergedMap = new Map<String, Object>( objInstance.getPopulatedFieldsAsMap() );
-        // Merge the values from the properties map into the fields already set on the object
-        mergedMap.putAll( properties );
-        // Serialize the merged map, and then deserialize it as the desired object type.
-        String jsonString = JSON.serializePretty( mergedMap );
-        return ( SObject ) JSON.deserialize( jsonString, deserializeType );
+        JSONParser parser = JSON.createParser( ( JSON.serialize( objInstance ) ) );
+        JSONGenerator combinedOutput = JSON.createGenerator( false );
+
+        // parse the source object and inject new fields into the resulting JSON
+        streamTokens( parser, combinedOutput, new InjectFieldsEventHandler( properties ) );
+        return JSON.deserialize( combinedOutput.getAsString(), deserializeType );
     }
 
     /**
      * Helper Methods
      */
-    private static Object deserializeParentsAndChildren( Type parentsType, DescribeSObjectResult parentDescribe, SObjectField relationshipField, List<SObject> parents, List<List<SObject>> children ){
+    private static Object deserializeParentsAndChildren(
+        Type parentsType,
+        DescribeSObjectResult parentDescribe,
+        SObjectField relationshipField,
+        List<SObject> parents,
+        List<List<SObject>> children
+    ){
         List<Schema.ChildRelationship> childRelationships = parentDescribe.getChildRelationships();
 
         String relationshipName = null;
@@ -163,6 +173,36 @@ public class fflib_ApexMocksUtils{
     }
 
     /**
+     * Monitors stream events for end of object for the current SObject
+     *   then injects new fields into the stream
+     */
+    private class InjectFieldsEventHandler implements JSONParserEvents{
+        Map<String, Object> properties = new Map<String, Object>();
+
+        public InjectFieldsEventHandler( Map<String, Object> properties ){
+            if( properties != null && !properties.isEmpty() ){
+                this.properties.putAll( properties );
+            }
+        }
+
+        public void nextToken( JSONParser fromStream, Integer depth, JSONGenerator toStream ){
+            // Inject the additional fields when the current SObject closes
+            JSONToken currentToken = fromStream.getCurrentToken();
+            if( depth == 1 && currentToken == JSONToken.END_OBJECT ){
+                for( String field : properties.keySet() ){
+                    Object value = properties.get( field );
+                    // writeObjectField throws on null, so write an explicit null field instead
+                    if( value == null ){
+                        toStream.writeNullField( field );
+                    } else{
+                        toStream.writeObjectField( field, value );
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Utility function to stream tokens from a reader to a write, while providing a basic eventing model
      */
     private static void streamTokens( JSONParser fromStream, JSONGenerator toStream, JSONParserEvents events ){
@@ -172,6 +212,7 @@ public class fflib_ApexMocksUtils{
             if( events != null ){
                 events.nextToken( fromStream, depth, toStream );
             }
+
             // Forward to output stream
             switch on fromStream.getCurrentToken(){
                 when START_ARRAY{
@@ -201,8 +242,9 @@ public class fflib_ApexMocksUtils{
                 }
             }
             // Don't continue to stream beyond the initial starting point
-            if( depth == 0 )
+            if( depth == 0 ){
                 break;
+            }
         }
     }
 
