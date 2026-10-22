@@ -8,6 +8,7 @@
 # ║   - Conditional: Only executes if the PR was merged (not just closed)        ║
 # ║                                                                              ║
 # ║ PROTECTED BRANCHES: main, master, develop (never deleted)                    ║
+# ║ RUNNER: ubuntu-24.04 (pinned)                                                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: Auto Delete Merged Branch
@@ -47,7 +48,7 @@ jobs:
   # └──────────────────────────────────────────────────────────────────────────────┘
   delete-branch:
     if: github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:

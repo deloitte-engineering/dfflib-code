@@ -2,7 +2,8 @@
 # unlocked-package.yml - Salesforce Unlocked Package Release Workflow
 # =============================================================================
 # Purpose:  Creates and releases a Salesforce Unlocked Package from the main
-#           branch. Supports validate (dry-run) and release modes.
+#           branch. Supports validate (dry-run), release, and resume (finish a
+#           partial release without building a new package version) modes.
 #
 # Triggers: - workflow_dispatch ONLY (manual trigger via GitHub Actions UI)
 #           No automatic trigger — releases are intentional manual actions.
@@ -20,22 +21,36 @@
 #   version_description   Optional  Defaults to "New release"
 #   release_notes         Optional  Path to release notes file
 #   run_preflight        Optional  Run deployment validation before creating package (default: false)
-#   mode                  Optional  "validate" (dry-run) or "release" (default)
+#   mode                  Optional  "validate" (dry-run), "release" (default), or
+#                                   "resume" (finish a partial release of an existing,
+#                                   promoted package version; needs exact X.Y.Z.BUILD)
+#
+# Secrets Required:
+#   SF_CLIENT_ID       Consumer Key from Connected App
+#   SF_USERNAME        Salesforce username to authenticate as
+#   SF_PRIVATE_KEY    Private key (RSA) for JWT signing
+#   SF_INSTANCE_URL   Instance URL (e.g. https://deloitte-nl.my.salesforce.com)
+#   INSTALLATION_KEY  Package installation key (if protected)
 #
 # Job Pipeline (runs in order):
 #   1. preflight-checks    Validates version format, branch, and generates changelog
 #   2. validation-mode     If mode=validate: outputs summary and stops
-#   3. package-build       If mode=release: verify, create, promote package (SF CLI once)
-#   4. publish-release     Creates git tag, commits alias, generates notes, GitHub Release
+#   3. package-build       release: verify, create, promote package (SF CLI once)
+#                          resume:  look up the existing promoted version (04t) instead
+#   4. publish-release     Release tag -> release notes -> GitHub Release -> package alias.
+#                          Each part is skipped when it already exists. Only the package
+#                          alias is non-fatal: a rejected push (e.g. main ruleset) leaves
+#                          a pending alias (warning + paste-ready JSON line).
 #   5. summary             Outputs final release summary (always runs)
 #
-# Setup:    See .github/SETUP_SALESFORCE_CICD.md for full setup instructions
+# Package name: never hardcoded — read from sfdx-project.json (default
+#           packageDirectory) via build/scripts/release-lib.sh.
+#
+# Runner:   ubuntu-24.04 (pinned). Actions
+#           run on the runner's native Node 24 runtime; no force flag needed.
 # =============================================================================
 
 name: Create Unlocked Package
-
-permissions:
-  contents: write
 
 # Prevent concurrent runs — cancels in-progress workflow when a new one starts on the same branch
 concurrency:
@@ -60,24 +75,31 @@ on:
         required: false
         default: ''
       mode:
-        description: 'Run mode'
+        description: 'Run mode (resume = finish a partial release of an existing promoted version)'
         required: false
         type: choice
         default: 'release'
         options:
           - validate
           - release
+          - resume
       run_preflight:
         description: 'Run pre-flight deployment validation before creating the package'
         required: false
         type: boolean
         default: false
+      debug:
+        description: 'Enable debug output (raw API responses, internal IDs). Default: false'
+        required: false
+        type: boolean
+        default: false
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   VERSION_NUMBER: ${{ github.event.inputs.version_number }}
   VERSION_NAME: ${{ github.event.inputs.version_name }}
   VERSION_DESC: ${{ github.event.inputs.version_description || 'New release' }}
+  MODE: ${{ github.event.inputs.mode || 'release' }}
+  DEBUG: ${{ github.event.inputs.debug || 'false' }}
 
 jobs:
   # ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -109,10 +131,11 @@ jobs:
   # │ FAILURE BEHAVIOR:                                                            │
   # │   Blocks entire pipeline — invalid version, non-main branch, or duplicate   │
   # │   tag stops the release. User must fix input and re-run.                    │
+  # │   mode=resume accepts an existing tag (the release is being finished).      │
   # └──────────────────────────────────────────────────────────────────────────────┘
   preflight-checks:
     name: Preflight Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       valid: ${{ steps.validate.outputs.valid }}
       version: ${{ steps.validate.outputs.version }}
@@ -124,7 +147,7 @@ jobs:
       has_changes: ${{ steps.changelog.outputs.has_changes }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -137,7 +160,7 @@ jobs:
       - name: Validate version format
         id: validate
         run: |
-          VERSION="${{ github.event.inputs.version_number }}"
+          VERSION="$VERSION_NUMBER"
 
           # Match X.Y.Z or X.Y.Z-suffix (e.g., 4.1.0, 4.1.0-rc.1)
           if echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
@@ -160,14 +183,19 @@ jobs:
 
       # ─────────────────────────────────────────────────────────────────────────────
       # Step 2: Check if version tag already exists
-      # Prevents duplicate releases if the git tag already exists
+      # Prevents duplicate releases if the git tag already exists.
+      # mode=resume finishes a partial release, so an existing tag is expected there.
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Check if version tag already exists
         run: |
-          VERSION="${{ github.event.inputs.version_number }}"
+          VERSION="$VERSION_NUMBER"
           if git tag | grep -q "^v${VERSION}$"; then
-            echo "::error::Tag v${VERSION} already exists. Use a new version number."
-            exit 1
+            if [[ "$MODE" == "resume" ]]; then
+              echo "ℹ️ Tag v${VERSION} already exists — resume will skip it"
+            else
+              echo "::error::Tag v${VERSION} already exists. Use a new version number, or mode=resume to finish a partial release."
+              exit 1
+            fi
           fi
 
       # ─────────────────────────────────────────────────────────────────────────────
@@ -178,8 +206,8 @@ jobs:
       - name: Check branch
         id: check-branch
         run: |
-          BRANCH="${{ github.ref_name }}"
-          TAG="${{ github.ref_type }}"
+          BRANCH="$GITHUB_REF_NAME"
+          TAG="$GITHUB_REF_TYPE"
 
           # Allow if on main/master branch, or if this is a tag pushed to main
           if [[ "$BRANCH" == "main" ]] || [[ "$BRANCH" == "master" ]]; then
@@ -204,7 +232,7 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          CURRENT_TAG="v${{ env.VERSION_NUMBER }}"
+          CURRENT_TAG="v$VERSION_NUMBER"
 
           # Get the most recent tag reachable from HEAD (excluding the tag we're about to create)
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 "$CURRENT_TAG"^ 2>/dev/null || \
@@ -251,9 +279,9 @@ jobs:
               echo "EOF" >> $GITHUB_OUTPUT
             else
               echo "has_changes=false" >> $GITHUB_OUTPUT
-              echo "full_changelog<<EOF" >> $GITHUB_OUTPUT
+              echo "full_changelog<<" >> $GITHUB_OUTPUT
               echo "EOF" >> $GITHUB_OUTPUT
-              echo "filtered_changelog<<EOF" >> $GITHUB_OUTPUT
+              echo "filtered_changelog<<" >> $GITHUB_OUTPUT
               echo "EOF" >> $GITHUB_OUTPUT
             fi
 
@@ -263,10 +291,10 @@ jobs:
             echo "previous_tag=" >> $GITHUB_OUTPUT
             echo "commit_count=0" >> $GITHUB_OUTPUT
             echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "full_changelog<<EOF" >> $GITHUB_OUTPUT
+            echo "full_changelog<<" >> $GITHUB_OUTPUT
             echo "Initial release" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
-            echo "filtered_changelog<<EOF" >> $GITHUB_OUTPUT
+            echo "filtered_changelog<<" >> $GITHUB_OUTPUT
             echo "Initial release" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
             echo "No previous tag found - this is the first release"
@@ -301,18 +329,20 @@ jobs:
     name: Validation Complete
     needs: [ preflight-checks ]
     if: ${{ github.event.inputs.mode == 'validate' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Summary
+        env:
+          CHANGELOG: ${{ needs.preflight-checks.outputs.changelog }}
         run: |
           echo "=============================================="
-          echo "✅ VALIDATION PASSED FOR VERSION ${{ env.VERSION_NUMBER }}"
+          echo "✅ VALIDATION PASSED FOR VERSION $VERSION_NUMBER"
           echo "=============================================="
           echo ""
-          echo "Version: ${{ env.VERSION_NUMBER }}"
-          echo "Release Name: ${{ env.VERSION_NAME }}"
+          echo "Version: $VERSION_NUMBER"
+          echo "Release Name: $VERSION_NAME"
           echo "Changelog:"
-          echo "${{ needs.preflight-checks.outputs.changelog }}"
+          echo "$CHANGELOG"
           echo ""
           echo "📋 To create the package, run this workflow with mode='release'"
 
@@ -327,13 +357,16 @@ jobs:
   # │   Consolidated Salesforce operations: verifies version availability,         │
   # │   optionally validates deployment, creates package version, and promotes     │
   # │   it to Released status. SF CLI is installed ONCE in this job.               │
+  # │   mode=resume builds nothing: it looks up the existing promoted version and  │
+  # │   emits the same outputs, so publish-release can finish a partial release.   │
   # │                                                                              │
   # │ DEPENDENCIES:                                                                │
   # │   - preflight-checks: Provides validated version string and branch approval  │
   # │                                                                              │
-  # │ CONDITIONAL: Only runs if mode input is 'release'                            │
+  # │ CONDITIONAL: Only runs if mode input is 'release' or 'resume'                │
   # │                                                                              │
   # │ OUTPUTS:                                                                     │
+  # │   - package_name: Package from sfdx-project.json (default packageDirectory)  │
   # │   - package_version_id: Subscriber Package Version ID (04t prefix)           │
   # │   - sandbox_install_url: URL to install in sandbox orgs                      │
   # │   - production_install_url: URL to install in production orgs                │
@@ -341,61 +374,85 @@ jobs:
   # │                                                                              │
   # │ FAILURE BEHAVIOR:                                                            │
   # │   Blocks downstream jobs — no tag, release, or summary if this fails.        │
+  # │   resume fails if the version is missing from the Dev Hub or not promoted.   │
   # │                                                                              │
   # │ STEPS:                                                                       │
   # │   1. Checkout code                                                           │
   # │   2. Verify pre-installed utilities (tar, jq)                                │
-  # │   3. Install Salesforce CLI (pinned to 2.137.6)                              │
-  # │   4. Authenticate to Dev Hub                                                 │
-  # │   5. Verify version not already released                                     │
-  # │   6. Validate deployment (preflight) — conditional                           │
-  # │   7. Create package version                                                  │
-  # │   8. Promote package to Released                                             │
+  # │   3. Resolve package name (sfdx-project.json)                                │
+  # │   4. Install Salesforce CLI (pinned to 2.137.6)                              │
+  # │   5. Authenticate to Dev Hub                                                 │
+  # │   6. Verify version not already released          (release)                  │
+  # │   7. Validate deployment (preflight) — conditional (release)                 │
+  # │   8. Create package version                       (release)                  │
+  # │   9. Promote package to Released                  (release)                  │
+  # │  10. Look up promoted package version             (resume)                   │
   # └──────────────────────────────────────────────────────────────────────────────┘
   package-build:
     name: Package Build
     needs: [ preflight-checks ]
-    if: ${{ github.event.inputs.mode == 'release' }}
-    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.mode == 'release' || github.event.inputs.mode == 'resume' }}
+    runs-on: ubuntu-24.04
     environment: release
     outputs:
-      package_version_id: ${{ steps.create-package.outputs.package_version_id }}
-      sandbox_install_url: ${{ steps.create-package.outputs.sandbox_install_url }}
-      production_install_url: ${{ steps.create-package.outputs.production_install_url }}
-      created_version: ${{ steps.create-package.outputs.created_version }}
+      package_name: ${{ steps.pkg.outputs.name }}
+      package_version_id: ${{ steps.create-package.outputs.package_version_id || steps.resume-version.outputs.package_version_id }}
+      sandbox_install_url: ${{ steps.create-package.outputs.sandbox_install_url || steps.resume-version.outputs.sandbox_install_url }}
+      production_install_url: ${{ steps.create-package.outputs.production_install_url || steps.resume-version.outputs.production_install_url }}
+      created_version: ${{ steps.create-package.outputs.created_version || steps.resume-version.outputs.created_version }}
     steps:
       # ─────────────────────────────────────────────────────────────────────────────
       # Step 1: Checkout code
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # ─────────────────────────────────────────────────────────────────────────────
       # Step 2: Verify pre-installed utilities
-      # tar and jq are pre-installed on ubuntu-latest — no apt-get needed
+      # tar and jq are pre-installed on ubuntu-24.04 — no apt-get needed
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Verify required utilities
         run: |
-          echo "Verifying pre-installed utilities..."
-          command -v tar && tar --version | head -1
-          command -v jq && jq --version
+          command -v tar > /dev/null && command -v jq > /dev/null
+          if [[ "$DEBUG" == "true" ]]; then
+            echo "🔍 tar: $(tar --version | head -1)"
+            echo "🔍 jq: $(jq --version)"
+          fi
+          echo "✅ Required utilities verified (tar, jq)"
+
+      # ───────────────────────────────────────────────────────────────────────────
+      # Step 3: Resolve package name
+      # Read from sfdx-project.json so no step hardcodes it (multi-package ready).
+      # ───────────────────────────────────────────────────────────────────────────
+      - name: Resolve package name
+        id: pkg
+        run: |
+          set -euo pipefail
+          source build/scripts/release-lib.sh
+          if ! PKG_NAME=$(package_name); then
+            echo "::error::No package found in sfdx-project.json packageDirectories."
+            exit 1
+          fi
+          echo "name=$PKG_NAME" >> "$GITHUB_OUTPUT"
+          echo "✅ Package: $PKG_NAME"
 
       # ─────────────────────────────────────────────────────────────────────────────
-      # Step 3: Install Salesforce CLI (ONCE for entire job)
-      # Always installs latest to avoid update-warning noise in JSON output
+      # Step 4: Install Salesforce CLI (ONCE for entire job)
+      # Pinned to 2.137.6 to match validate-project for reproducible builds
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Install Salesforce CLI
         run: |
-          export PATH="$PATH:$(npm root -g)"
-          npm install -g @salesforce/cli
-          export PATH="$PATH:$(npm root -g)"
-          echo "CLI installed: $(sf --version 2>&1)"
+          set -euo pipefail
+          npm config set prefix "$HOME/.npm-global"
+          echo "$HOME/.npm-global/bin" >> "$GITHUB_PATH"
+          npm install -g @salesforce/cli@2.137.6
+          "$HOME/.npm-global/bin/sf" --version
 
       # ─────────────────────────────────────────────────────────────────────────────
-      # Step 4: Authenticate to Dev Hub (ONCE for entire job)
+      # Step 5: Authenticate to Dev Hub (ONCE for entire job)
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Authenticate to Dev Hub
         env:
@@ -404,7 +461,7 @@ jobs:
           SF_PRIVATE_KEY: ${{ secrets.SF_PRIVATE_KEY }}
           SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}
         run: |
-          export PATH="$PATH:$(npm root -g)"
+          set -euo pipefail
           echo "Authenticating to dfflib-packaging-prod org..."
           sf org login jwt \
             --instance-url "$SF_INSTANCE_URL" \
@@ -417,41 +474,62 @@ jobs:
             || { echo "::error::Authentication failed."; exit 1; }
 
       # ─────────────────────────────────────────────────────────────────────────────
-      # Step 5: Verify version not already released
+      # Step 6: Verify version not already released
       # Checks if a package version with this version number already exists
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Verify version not already released
         id: check-version
+        if: ${{ github.event.inputs.mode == 'release' }}
+        env:
+          PKG_NAME: ${{ steps.pkg.outputs.name }}
         run: |
-          export PATH="$PATH:$(npm root -g)"
+          set -euo pipefail
           echo "🔍 Checking version $VERSION_NUMBER availability..."
-
-          # Query existing package versions
+          
+          # Query existing package versions — capture stdout/stderr separately so a CLI
+          # warning on stderr cannot corrupt the --json response
+          ERR_FILE=$(mktemp)
           RESULT=$(sf package version list \
-            --packages "D'fflib" \
+            --packages "$PKG_NAME" \
             --target-dev-hub dfflib-packaging-prod \
-            --json 2>&1)
+            --json 2>"$ERR_FILE") && CLI_EXIT=0 || CLI_EXIT=$?
+          ERR_TXT=$(cat "$ERR_FILE"); rm -f "$ERR_FILE"
+
+          if [[ $CLI_EXIT -ne 0 ]]; then
+            echo "::error::Failed to query package versions. Check authentication."
+            [[ -n "$ERR_TXT" ]] && echo "$ERR_TXT"
+            exit 1
+          fi
+
+          if ! echo "$RESULT" | jq empty 2>/dev/null; then
+            echo "::error::Package version list returned non-JSON output."
+            echo "--- stdout ---"; echo "$RESULT"
+            echo "--- stderr ---"; echo "$ERR_TXT"
+            exit 1
+          fi
 
           # Check if the version already exists
           EXISTING=$(echo "$RESULT" | jq -r --arg ver "$VERSION_NUMBER" \
-            '.result[] | select(.Version == $ver) | .SubscriberPackageVersionId' 2>/dev/null || echo "")
+            '(.result // [])[] | select(.Version == $ver) | .SubscriberPackageVersionId')
 
           if [[ -n "$EXISTING" ]]; then
-            echo "::error::Version $VERSION_NUMBER already exists"
-            echo "Use a different version number or delete the existing version first."
+            echo "::error::Version $VERSION_NUMBER already exists. Use a different version number."
+            if [[ "$DEBUG" == "true" ]]; then
+              echo "🔍 Existing version ID: $EXISTING"
+            fi
             exit 1
           fi
 
           echo "✅ Version $VERSION_NUMBER is available"
 
       # ─────────────────────────────────────────────────────────────────────────────
-      # Step 6: Validate deployment (preflight) — conditional
-      # Only runs if run_preflight input is 'true'
+      # Step 7: Validate deployment (preflight) — conditional
+      # Only runs if run_preflight input is 'true' (release mode only)
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Validate deployment (preflight)
-        if: ${{ github.event.inputs.run_preflight == 'true' }}
+        if: ${{ github.event.inputs.mode == 'release' && github.event.inputs.run_preflight == 'true' }}
         run: |
-          export PATH="$PATH:$(npm root -g)"
+          set -euo pipefail
           echo "=== Pre-flight Deployment Validation ==="
           echo "Source: force-app/main/default, force-app/test-factory"
           echo "Target org: dfflib-packaging-prod"
@@ -465,8 +543,7 @@ jobs:
             --source-dir force-app/test-factory \
             --test-level RunLocalTests \
             --target-org dfflib-packaging-prod \
-            --wait 60
-          EXIT_CODE=$?
+            --wait 60 && EXIT_CODE=0 || EXIT_CODE=$?
 
           if [[ $EXIT_CODE -ne 0 ]]; then
             echo "::error::Pre-flight validation failed with exit code $EXIT_CODE"
@@ -476,45 +553,64 @@ jobs:
           echo "✅ Pre-flight validation passed"
 
       # ─────────────────────────────────────────────────────────────────────────────
-      # Step 7: Create package version
+      # Step 8: Create package version
       # Creates a new package version in the Dev Hub
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Create package version
         id: create-package
+        if: ${{ github.event.inputs.mode == 'release' }}
         env:
           INSTALLATION_KEY: ${{ secrets.INSTALLATION_KEY }}
+          PKG_NAME: ${{ steps.pkg.outputs.name }}
         run: |
-          export PATH="$PATH:$(npm root -g)"
+          set -euo pipefail
+          source build/scripts/release-lib.sh
           echo "=== Create Package Version ==="
           echo "Version: $VERSION_NUMBER ($VERSION_NAME)"
           echo "Description: $VERSION_DESC"
-          echo "Package: D'fflib"
+          echo "Package: $PKG_NAME"
           echo "Target: dfflib-packaging-prod org"
           echo ""
 
           # Verify the package exists in the Dev Hub.
-          # Read the 0Ho ID from sfdx-project.json, then confirm it exists in the Dev Hub by matching on Id.
-          PKG_ID=$(jq -r '.packageAliases["D'\''fflib"] // empty' sfdx-project.json)
+          # Read the 0Ho ID from sfdx-project.json, then confirm it exists in the Dev Hub
+          # by matching on Id (not Name — immune to name changes and multi-package repos).
+          PKG_ID=$(jq -r --arg name "$PKG_NAME" '.packageAliases[$name] // empty' sfdx-project.json)
 
           if [[ -z "$PKG_ID" ]]; then
-            echo "::error::Package alias not found in sfdx-project.json."
+            echo "::error::Package alias '$PKG_NAME' not found in sfdx-project.json."
             echo "Run 'sf package create' locally and commit the updated sfdx-project.json."
             exit 1
           fi
 
-          PKG_LIST=$(sf package list --target-dev-hub dfflib-packaging-prod --json 2>&1)
-          PKG_LIST_EXIT=$?
+          # Capture stdout/stderr separately — merging them corrupts the --json response
+          ERR_FILE=$(mktemp)
+          PKG_LIST=$(sf package list --target-dev-hub dfflib-packaging-prod --json 2>"$ERR_FILE") && PKG_LIST_EXIT=0 || PKG_LIST_EXIT=$?
+          PKG_LIST_ERR=$(cat "$ERR_FILE"); rm -f "$ERR_FILE"
 
           if [[ $PKG_LIST_EXIT -ne 0 ]]; then
             echo "::error::Failed to query Dev Hub package list. Check authentication."
+            [[ -n "$PKG_LIST_ERR" ]] && echo "$PKG_LIST_ERR"
             exit 1
           fi
 
-          EXISTING_PKG=$(echo "$PKG_LIST" | jq -r --arg id "$PKG_ID" '.result[] | select(.Id == $id) | .Id' 2>/dev/null || echo "")
+          # Reject non-JSON output so a polluted response is not misread as a missing package
+          if ! echo "$PKG_LIST" | jq empty 2>/dev/null; then
+            echo "::error::Dev Hub package list returned non-JSON output."
+            echo "--- stdout ---"; echo "$PKG_LIST"
+            echo "--- stderr ---"; echo "$PKG_LIST_ERR"
+            exit 1
+          fi
+
+          # Match on the 15-char ID prefix so 15/18-char ID forms compare equal
+          PKG_ID15="${PKG_ID:0:15}"
+          EXISTING_PKG=$(echo "$PKG_LIST" | jq -r --arg id "$PKG_ID15" '(.result // [])[] | select((.Id | .[0:15]) == $id) | .Id')
 
           if [[ -z "$EXISTING_PKG" ]]; then
-            echo "::error::Package not found in Dev Hub org dfflib-packaging-prod."
-            echo "The package may have been deleted, or sfdx-project.json may be pointing at a different org."
+            echo "::error::Package $PKG_ID not found in Dev Hub org dfflib-packaging-prod."
+            echo "The Dev Hub returned these package IDs:"
+            echo "$PKG_LIST" | jq -r '(.result // [])[] | "  - \(.Id) (\(.Name))"'
+            echo "Confirm sfdx-project.json points at the same Dev Hub org the release authenticates to."
             exit 1
           fi
 
@@ -522,10 +618,10 @@ jobs:
           echo ""
 
           # Build CLI command conditionally based on whether INSTALLATION_KEY is set
-          echo "🔐 Using provided installation key..."
           if [[ -n "$INSTALLATION_KEY" ]]; then
+            if [[ "$DEBUG" == "true" ]]; then echo "🔍 Using provided installation key"; fi
             CMD=(sf package version create \
-              --package "D'fflib" \
+              --package "$PKG_NAME" \
               --code-coverage \
               --installation-key "$INSTALLATION_KEY" \
               --wait 60 \
@@ -535,8 +631,9 @@ jobs:
               --version-name "$VERSION_NAME" \
               --json)
           else
+            if [[ "$DEBUG" == "true" ]]; then echo "🔍 No installation key — bypassing"; fi
             CMD=(sf package version create \
-              --package "D'fflib" \
+              --package "$PKG_NAME" \
               --code-coverage \
               --installation-key-bypass \
               --wait 60 \
@@ -549,19 +646,47 @@ jobs:
 
           echo "⏳ Creating package version $VERSION_NUMBER — this may take several minutes..."
 
-          # Run package version create and capture full output
-          RESULT=$("${CMD[@]}" 2>&1)
-          EXIT_CODE=$?
+          # Capture stdout (JSON) and stderr (progress/warnings) separately
+          # `&& … || …` keeps errexit from killing the shell before the error is reported
+          ERR_FILE=$(mktemp)
+          RESULT=$("${CMD[@]}" 2>"$ERR_FILE") && EXIT_CODE=0 || EXIT_CODE=$?
+          RESULT_ERR=$(cat "$ERR_FILE"); rm -f "$ERR_FILE"
+
+          if [[ "$DEBUG" == "true" ]]; then
+            echo ""
+            echo "🔍 Raw package version create stdout:"
+            echo "$RESULT"
+            echo "🔍 Raw package version create stderr:"
+            echo "$RESULT_ERR"
+            echo ""
+          fi
 
           # Check for CLI-level errors (exit code non-zero)
           if [[ $EXIT_CODE -ne 0 ]]; then
-            echo "::error::Package version creation failed with exit code $EXIT_CODE"
+            echo "::error::Package version creation failed."
+            echo "$RESULT" | jq -r '.message // empty' 2>/dev/null || echo "$RESULT"
+            [[ -n "$RESULT_ERR" ]] && echo "$RESULT_ERR"
             exit $EXIT_CODE
           fi
 
           # Parse the response status
           RESPONSE_STATUS=$(echo "$RESULT" | jq -r '.result.Status // .status // "unknown"' 2>/dev/null)
-          echo "🔍 Response status: $RESPONSE_STATUS"
+          if [[ "$DEBUG" == "true" ]]; then
+            echo "🔍 Response status: $RESPONSE_STATUS"
+            STATUS_MSG=$(echo "$RESULT" | jq -r '.result.StatusDetail // .result.Error[0] // ""' 2>/dev/null)
+            if [[ -n "$STATUS_MSG" ]] && [[ "$STATUS_MSG" != "null" ]]; then
+              echo "🔍 Status detail: $STATUS_MSG"
+            fi
+          fi
+
+          # Check for JSON-level errors
+          if echo "$RESULT" | jq -e '.result.Status' 2>/dev/null | grep -qi "Error"; then
+            echo "::error::Package version creation returned an error status."
+            if [[ "$DEBUG" == "true" ]]; then
+              echo "$RESULT" | jq '.' 2>/dev/null || echo "$RESULT"
+            fi
+            exit 1
+          fi
 
           # Extract IDs from the response (Salesforce API uses PascalCase)
           # SubscriberPackageVersionId (04t) — used for installation URLs, aliases, and promotion
@@ -569,57 +694,131 @@ jobs:
           CREATED_VERSION=$(echo "$RESULT" | jq -r '.result.VersionNumber // empty')
 
           if [[ -z "$SUBSCRIBER_PKG_VERSION_ID" ]]; then
-            echo "::error::Failed to extract subscriber package version ID from response"
+            echo "::error::Failed to extract package version ID from response."
+            if [[ "$DEBUG" == "true" ]]; then
+              echo "🔍 Full response:"
+              echo "$RESULT" | jq '.' 2>/dev/null || echo "$RESULT"
+            fi
             exit 1
           fi
 
           echo "✅ Package version $CREATED_VERSION created successfully"
+          if [[ "$DEBUG" == "true" ]]; then
+            echo "🔍 Subscriber Package Version ID: $SUBSCRIBER_PKG_VERSION_ID"
+          fi
           echo ""
 
           # Output the subscriber package version ID (04t prefix) — used for installation, aliases, and promotion
           echo "package_version_id=$SUBSCRIBER_PKG_VERSION_ID" >> $GITHUB_OUTPUT
           echo "created_version=$CREATED_VERSION" >> $GITHUB_OUTPUT
-
-          # Generate installation URLs in the correct Salesforce format (use 04t subscriber ID)
-          SANDBOX_URL="https://test.salesforce.com/packaging/installPackage.apexp?p0=$SUBSCRIBER_PKG_VERSION_ID"
-          PROD_URL="https://login.salesforce.com/packaging/installPackage.apexp?p0=$SUBSCRIBER_PKG_VERSION_ID"
-          echo "sandbox_install_url=$SANDBOX_URL" >> $GITHUB_OUTPUT
-          echo "production_install_url=$PROD_URL" >> $GITHUB_OUTPUT
+          install_url_outputs "$SUBSCRIBER_PKG_VERSION_ID" >> "$GITHUB_OUTPUT"
 
       # ─────────────────────────────────────────────────────────────────────────────
-      # Step 8: Promote package to Released
+      # Step 9: Promote package to Released
       # Promotes the package version from Beta to Released status
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Promote package to Released
+        if: ${{ github.event.inputs.mode == 'release' }}
+        env:
+          PKG_VER_ID: ${{ steps.create-package.outputs.package_version_id }}
         run: |
-          export PATH="$PATH:$(npm root -g)"
-          PKG_VER_ID="${{ steps.create-package.outputs.package_version_id }}"
+          set -euo pipefail
 
           echo "=== Promote Package Version ==="
           echo "Version: $VERSION_NUMBER"
+          if [[ "$DEBUG" == "true" ]]; then
+            echo "🔍 Subscriber Package Version ID: $PKG_VER_ID"
+          fi
           echo ""
 
+          # Capture stdout (JSON) and stderr (progress/warnings) separately
+          ERR_FILE=$(mktemp)
           RESULT=$(sf package version promote \
             --package "$PKG_VER_ID" \
             --target-dev-hub dfflib-packaging-prod \
             --no-prompt \
-            --json 2>&1)
-          EXIT_CODE=$?
+            --json 2>"$ERR_FILE") && EXIT_CODE=0 || EXIT_CODE=$?
+          RESULT_ERR=$(cat "$ERR_FILE"); rm -f "$ERR_FILE"
+
+          if [[ "$DEBUG" == "true" ]]; then
+            echo "🔍 Promotion stdout:"
+            echo "$RESULT"
+            echo "🔍 Promotion stderr:"
+            echo "$RESULT_ERR"
+            echo ""
+          fi
 
           if [[ $EXIT_CODE -ne 0 ]]; then
-            echo "::error::Package promotion failed with exit code $EXIT_CODE"
+            echo "::error::Package promotion failed."
+            echo "$RESULT" | jq -r '.message // empty' 2>/dev/null || echo "$RESULT"
+            [[ -n "$RESULT_ERR" ]] && echo "$RESULT_ERR"
             exit $EXIT_CODE
           fi
 
-          PROMO_STATUS=$(echo "$RESULT" | jq -r '.status // .result?.Status // "unknown"' 2>/dev/null)
-          echo "🔍 Promotion status: $PROMO_STATUS"
+          if [[ "$DEBUG" == "true" ]]; then
+            PROMO_STATUS=$(echo "$RESULT" | jq -r '.status // .result?.Status // "unknown"' 2>/dev/null)
+            echo "🔍 Promotion status: $PROMO_STATUS"
+          fi
 
           if echo "$RESULT" | jq -e '.result?.Status' 2>/dev/null | grep -qi "Error"; then
-            echo "::error::Package promotion returned an error"
+            echo "::error::Package promotion returned an error."
+            if [[ "$DEBUG" == "true" ]]; then
+              echo "$RESULT" | jq '.' 2>/dev/null || echo "$RESULT"
+            fi
             exit 1
           fi
 
           echo "✅ Package version $VERSION_NUMBER promoted to Released"
+
+      # ───────────────────────────────────────────────────────────────────────────
+      # Step 10: Look up promoted package version (resume only)
+      # Nothing is built: a resumed run has no create-package outputs, so the 04t ID
+      # comes from the Dev Hub. Fails if the version is missing or not promoted.
+      # ───────────────────────────────────────────────────────────────────────────
+      - name: Look up promoted package version
+        id: resume-version
+        if: ${{ github.event.inputs.mode == 'resume' }}
+        env:
+          PKG_NAME: ${{ steps.pkg.outputs.name }}
+        run: |
+          set -euo pipefail
+          source build/scripts/release-lib.sh
+          echo "🔍 Looking up $PKG_NAME version $VERSION_NUMBER in the Dev Hub..."
+
+          # Capture stdout/stderr separately so a CLI warning cannot corrupt the --json response
+          ERR_FILE=$(mktemp)
+          RESULT=$(sf package version list \
+            --packages "$PKG_NAME" \
+            --target-dev-hub dfflib-packaging-prod \
+            --json 2>"$ERR_FILE") && CLI_EXIT=0 || CLI_EXIT=$?
+          ERR_TXT=$(cat "$ERR_FILE"); rm -f "$ERR_FILE"
+          if [[ $CLI_EXIT -ne 0 ]]; then
+            echo "::error::Failed to query package versions. Check authentication."
+            [[ -n "$ERR_TXT" ]] && echo "$ERR_TXT"
+            exit 1
+          fi
+
+          RC=0
+          PKG_VER_ID=$(resolve_released_version "$RESULT" "$VERSION_NUMBER") && RC=0 || RC=$?
+          case $RC in
+            0) ;;
+            2) echo "::error::Package version list returned non-JSON output."
+               echo "--- stdout ---"; echo "$RESULT"
+               echo "--- stderr ---"; echo "$ERR_TXT"
+               exit 1 ;;
+            3) echo "::error::Version $VERSION_NUMBER of $PKG_NAME does not exist in the Dev Hub. Resume needs the exact X.Y.Z.BUILD of an existing package version; use mode=release to build a new one."
+               exit 1 ;;
+            4) echo "::error::Version $VERSION_NUMBER of $PKG_NAME exists but is not promoted. Promote it (sf package version promote) before resuming."
+               exit 1 ;;
+          esac
+
+          echo "✅ Found promoted version $VERSION_NUMBER"
+          if [[ "$DEBUG" == "true" ]]; then
+            echo "🔍 Subscriber Package Version ID: $PKG_VER_ID"
+          fi
+          echo "package_version_id=$PKG_VER_ID" >> "$GITHUB_OUTPUT"
+          echo "created_version=$VERSION_NUMBER" >> "$GITHUB_OUTPUT"
+          install_url_outputs "$PKG_VER_ID" >> "$GITHUB_OUTPUT"
 
   # ╔══════════════════════════════════════════════════════════════════════════════╗
   # ║ STAGE 4: PUBLISH RELEASE                                                     ║
@@ -629,42 +828,56 @@ jobs:
   # │ JOB: publish-release                                                         │
   # ├──────────────────────────────────────────────────────────────────────────────┤
   # │ PURPOSE:                                                                     │
-  # │   Consolidated GitHub operations: creates git tag, commits package alias,    │
-  # │   generates custom release notes, and publishes GitHub Release.              │
+  # │   Publishes the release first, records the package alias last:              │
+  # │   release tag -> release notes -> GitHub Release -> package alias.          │
+  # │   Each part is skipped when it already exists (mode=resume).                │
   # │                                                                              │
   # │ DEPENDENCIES:                                                                │
-  # │   - package-build: Provides package_version_id for install URLs              │
+  # │   - package-build: Provides package_name, package_version_id, install URLs   │
   # │   - preflight-checks: Provides previous_tag for PR range                     │
   # │                                                                              │
-  # │ CONDITIONAL: Only runs if mode input is 'release'                            │
+  # │ CONDITIONAL: Only runs if mode input is 'release' or 'resume'                │
   # │                                                                              │
   # │ OUTPUTS:                                                                     │
-  # │   - release_url: URL to the created GitHub release                           │
+  # │   - release_url: URL to the created (or existing) GitHub release             │
+  # │   - alias_status: pushed | exists | mismatch | pending (empty = pending)     │
+  # │   - alias_line: paste-ready "<package>@<version>": "<04t>" JSON line         │
+  # │   - nothing_to_do: true when a resume found every part already present       │
   # │                                                                              │
   # │ FAILURE BEHAVIOR:                                                            │
-  # │   Non-critical — package is still valid even if GitHub release fails.        │
+  # │   Tag, notes and GitHub Release are fatal. The package alias step is         │
+  # │   non-fatal: a rejected push leaves a pending alias (warning + JSON line).   │
   # │                                                                              │
   # │ STEPS:                                                                       │
   # │   1. Checkout code                                                           │
   # │   2. Configure Git identity                                                  │
   # │   3. Create version tag                                                      │
-  # │   4. Commit package alias                                                    │
+  # │   4. Check GitHub Release (exists? make_latest?)                             │
   # │   5. Generate release notes                                                  │
   # │   6. Publish GitHub Release                                                  │
+  # │   7. Deliver package alias (push ladder, pending-alias fallback)             │
   # └──────────────────────────────────────────────────────────────────────────────┘
   publish-release:
     name: Publish Release
     needs: [ package-build, preflight-checks ]
-    if: ${{ github.event.inputs.mode == 'release' }}
-    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.mode == 'release' || github.event.inputs.mode == 'resume' }}
+    runs-on: ubuntu-24.04
+    # Needs write access to push the tag, commit the alias, and create the GitHub Release;
+    # pull-requests:read lets the notes step fetch merged PRs (else 'Resource not accessible').
+    permissions:
+      contents: write
+      pull-requests: read
     outputs:
-      release_url: ${{ steps.create-release.outputs.url }}
+      release_url: ${{ steps.create-release.outputs.url || steps.release-exists.outputs.url }}
+      alias_status: ${{ steps.alias.outputs.status }}
+      alias_line: ${{ steps.alias.outputs.line }}
+      nothing_to_do: ${{ steps.result.outputs.nothing_to_do }}
     steps:
       # ─────────────────────────────────────────────────────────────────────────────
       # Step 1: Checkout code
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -678,51 +891,59 @@ jobs:
           git config user.email "actions@github.com"
 
       # ─────────────────────────────────────────────────────────────────────────────
-      # Step 3: Create version tag
+      # Step 3: Create version tag (skipped when it already exists — resume)
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Create and push tag
+        id: tag
         run: |
-          VERSION="${{ env.VERSION_NUMBER }}"
-          git tag "v$VERSION" HEAD
-          git push origin "v$VERSION"
-          echo "✅ Created and pushed tag v$VERSION"
-
-      # ─────────────────────────────────────────────────────────────────────────────
-      # Step 4: Commit package alias to sfdx-project.json
-      # ─────────────────────────────────────────────────────────────────────────────
-      - name: Commit package alias
-        run: |
-          VERSION="${{ env.VERSION_NUMBER }}"
-          PKG_VER_ID="${{ needs.package-build.outputs.package_version_id }}"
-          ALIAS_KEY="D'fflib@${VERSION}"
-
-          # Check if alias already exists (might have been added by a previous run)
-          EXISTING_ID=$(jq -r ".packageAliases[\"$ALIAS_KEY\"] // empty" sfdx-project.json)
-          if [[ -n "$EXISTING_ID" ]]; then
-            echo "Alias $ALIAS_KEY already exists: $EXISTING_ID — no update needed"
-          else
-            echo "Adding $ALIAS_KEY to packageAliases..."
-            jq --arg pkgId "$PKG_VER_ID" \
-               --arg version "$VERSION" \
-               '.packageAliases["D'\''fflib@\($version)"] = $pkgId' \
-               sfdx-project.json > sfdx-project.tmp.json \
-            && mv sfdx-project.tmp.json sfdx-project.json
-
-            git add sfdx-project.json
-            git commit -m "chore: update sfdx-project.json for v${VERSION}"
-            git push origin HEAD:main
-            echo "✅ sfdx-project.json updated and pushed"
+          set -euo pipefail
+          TAG="v$VERSION_NUMBER"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "existed=true" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ Tag $TAG already exists — skipping"
+            exit 0
           fi
+          if [[ "$MODE" == "resume" ]]; then
+            echo "::warning::Tag $TAG was missing; tagging the dispatch commit $(git rev-parse --short HEAD)."
+          fi
+          git tag "$TAG" HEAD
+          git push origin "$TAG"
+          echo "existed=false" >> "$GITHUB_OUTPUT"
+          echo "✅ Created and pushed tag $TAG"
+
+      # ─────────────────────────────────────────────────────────────────────────────
+      # Step 4: Check GitHub Release
+      # A resumed run skips notes + release when the release already exists.
+      # make_latest keeps "Latest" on the highest version when an older one is resumed.
+      # ─────────────────────────────────────────────────────────────────────────────
+      - name: Check GitHub Release
+        id: release-exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          source build/scripts/release-lib.sh
+          TAG="v$VERSION_NUMBER"
+          if URL=$(gh release view "$TAG" --json url --jq .url 2>/dev/null); then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "url=$URL" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ GitHub Release $TAG already exists — skipping notes and release"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "make_latest=$(make_latest_for "$TAG")" >> "$GITHUB_OUTPUT"
 
       # ─────────────────────────────────────────────────────────────────────────────
       # Step 5: Generate release notes
       # This step fetches all merged PRs between the previous tag and current tag,
-      # then groups them by the files they changed. Each PR appears under every
-      # component it modified, making it easy to see what changed in each area.
+      # assigns each PR one primary component (or a flat bullet when it touches no
+      # Salesforce component), and groups them under the .github/release.yml
+      # categories so every PR appears at most once per category.
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Generate Custom Release Notes
         id: generate-notes
-        uses: actions/github-script@v7
+        if: ${{ steps.release-exists.outputs.exists != 'true' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           PREVIOUS_TAG: ${{ needs.preflight-checks.outputs.previous_tag }}
           CURRENT_TAG: v${{ env.VERSION_NUMBER }}
@@ -826,160 +1047,124 @@ jobs:
             console.log(`Fetched details for ${prs.length} PRs`);
             
             // ─────────────────────────────────────────────────────────────────────
-            // Step 4: Extract component names from file paths
+            // Step 4: Pure helpers
             // ─────────────────────────────────────────────────────────────────────
-            function getComponentName(filePath) {
-              // Skip CI/docs files — these are pipeline noise, not Salesforce components
-              if (filePath.startsWith('.github/') || filePath.startsWith('documentation/')) {
-                return null;
-              }
-            
-              // Extract class/component name from various Salesforce paths
-              const patterns = [
-                // Apex classes: force-app/main/default/classes/MyClass.cls
-                /classes\/([^\/]+)\.cls$/,
-                // Apex triggers: force-app/main/default/triggers/MyTrigger.trigger
-                /triggers\/([^\/]+)\.trigger$/,
-                // LWC: force-app/main/default/lwc/myComponent/myComponent.js
-                /lwc\/([^\/]+)\//,
-                // Aura: force-app/main/default/aura/myComponent/myComponent.cmp
-                /aura\/([^\/]+)\//,
-                // Objects: force-app/main/default/objects/Account/Account.object-meta.xml
-                /objects\/([^\/]+)\//,
-                // Flows: force-app/main/default/flows/My_Flow.flow-meta.xml
-                /flows\/([^\/]+)\.flow/
-              ];
-            
-              for (const pattern of patterns) {
-                const match = filePath.match(pattern);
-                if (match) {
-                  return match[1];
+            // Categories mirror .github/release.yml exactly (no "Others"); unmatched -> misc.
+            function categorize(rawLabels) {
+              const labels = rawLabels.map((l) => l.toLowerCase());
+              if (labels.some((l) => l.includes('breaking'))) return 'breaking';
+              if (labels.some((l) => ['enhancement', 'feat', 'features'].includes(l))) return 'features';
+              if (labels.some((l) => ['bug', 'fix', 'bugfix'].includes(l))) return 'bugs';
+              return 'misc';
+            }
+
+            // Files that are pipeline/docs noise, never a Salesforce component.
+            function isNoise(filePath) {
+              if (filePath.endsWith('.md')) return true;
+              if (filePath === 'sfdx-project.json') return true;
+              return /^(\.github|documentation|docs|manifest)\//.test(filePath);
+            }
+
+            // One primary component per PR, by priority; null when no real component.
+            const COMPONENT_PATTERNS = [
+              /classes\/([^/]+)\.cls(?:-meta\.xml)?$/,
+              /triggers\/([^/]+)\.trigger(?:-meta\.xml)?$/,
+              /lwc\/([^/]+)\//,
+              /aura\/([^/]+)\//,
+              /objects\/([^/]+)\//,
+              /flows\/([^/]+)\.flow/,
+            ];
+            function getPrimaryComponent(files) {
+              for (const pattern of COMPONENT_PATTERNS) {
+                for (const file of files) {
+                  if (isNoise(file)) continue;
+                  const match = file.match(pattern);
+                  if (match) return match[1];
                 }
               }
-            
-              // Fallback: use filename and strip ALL extensions
-              // Handles: .cls, -meta.xml, .profile-meta.xml, .yml, etc.
-              const filename = filePath.split('/').pop();
-              return filename.replace(/(\.[^.]+)+$/, '');
+              return null;
             }
-            
-            // ─────────────────────────────────────────────────────────────────────
-            // Step 5: Categorize PRs by labels AND files
-            // Category mapping:
-            //   - breaking → breaking
-            //   - enhancement, feat, features → features
-            //   - bug, fix, bugfix → bugs
-            //   - style, refactor, perf, chore, ci (or any other) → misc
-            // ─────────────────────────────────────────────────────────────────────
-            const categories = {
-              breaking: { title: '### 🛠 Breaking news / changes', prs: [] },
-              features: { title: '### 🎉 New features', prs: [] },
-              bugs: { title: '### 🐛 Bug fixes', prs: [] },
-              misc: { title: '### 📚 Miscellaneous updates', prs: [] },
-              others: { title: '### ⚙️ Others', prs: [] }
-            };
-            
-            function categorize(pr) {
-              const labels = pr.labels.map(l => l.toLowerCase());
-            
-              // Check labels first (ALL labels attached to the PR)
-              if (labels.some(l => l.includes('breaking'))) return 'breaking';
-              if (labels.some(l => ['enhancement', 'feat', 'features'].includes(l))) return 'features';
-              if (labels.some(l => ['bug', 'fix', 'bugfix'].includes(l))) return 'bugs';
-              if (labels.some(l => ['style', 'refactor', 'perf', 'chore', 'ci'].includes(l))) return 'misc';
-            
-              // If no matching labels, categorize as others
-              return 'others';
+
+            // Strip a conventional-commit prefix from a PR title.
+            function cleanTitle(title) {
+              return title.replace(/^(feat|fix|chore|ci|style|refactor|perf)(\([^)]+\))?:\s*/i, '');
             }
-            
-            // ─────────────────────────────────────────────────────────────────────
-            // Step 6: Group PRs by component within each category
-            // Takes into account ALL labels AND files touched
-            // ─────────────────────────────────────────────────────────────────────
-            const componentsByCategory = {};
-            for (const [catKey, catData] of Object.entries(categories)) {
-              componentsByCategory[catKey] = {};
-            }
-            
-            for (const pr of prs) {
-              const category = categorize(pr);
-              const components = new Set();
-            
-              // Extract component names from ALL files touched
-              for (const file of pr.files) {
-                const component = getComponentName(file);
-                if (component) {
-                  components.add(component);
-                }
-              }
-            
-              // If no components found, use "Other"
-              if (components.size === 0) {
-                components.add('Other');
-              }
-            
-              // Add PR to each component it touched
-              for (const component of components) {
-                if (!componentsByCategory[category][component]) {
-                  componentsByCategory[category][component] = [];
-                }
-                componentsByCategory[category][component].push(pr);
-              }
-            }
-            
-            // ─────────────────────────────────────────────────────────────────────
-            // Step 7: Build release notes markdown with custom format
-            // Format:
-            //   ## **D'fflib vX.X.X.X**
-            //   Unlocked package: [Sandbox Install](url) / [Production Install](url)
-            //
-            //   ## What's Changed
-            //   ### 🎉 New features
-            //   - [`component`]
-            //       - PR title by @author in https://github.com/.../pull/123
-            //
-            // Empty categories are hidden (not shown at all).
-            // GitHub auto-links @mentions and full PR URLs.
-            // ─────────────────────────────────────────────────────────────────────
-            let releaseNotes = `## **D'fflib v${versionNumber}**\n`;
-            releaseNotes += `Unlocked package: [Sandbox Install](${sandboxUrl}) / [Production Install](${prodUrl})\n\n\n`;
-            releaseNotes += `## What's Changed\n`;
-            
-            // Add each category with components (skip empty categories)
-            for (const [catKey, catData] of Object.entries(categories)) {
-              const components = componentsByCategory[catKey];
-              const componentNames = Object.keys(components).sort();
-            
-              // Skip empty categories entirely
-              if (componentNames.length === 0) {
-                continue;
-              }
-            
-              releaseNotes += `${catData.title}\n`;
-            
-              for (const component of componentNames) {
-                const componentPrs = components[component];
-                releaseNotes += `- [\`${component}\`]\n`;
-            
-                for (const pr of componentPrs) {
-                  // Format: - PR title by @author in https://github.com/.../pull/123
-                  // Strip conventional commit prefix (e.g., "feat: ", "fix(scope): ") from title
-                  // GitHub auto-links @mentions and full PR URLs
-                  const cleanTitle = pr.title.replace(/^(feat|fix|chore|ci|style|refactor|perf)(\([^)]+\))?:\s*/i, '');
-                  const prUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/pull/${pr.number}`;
-                  releaseNotes += `    - ${cleanTitle} by @${pr.author} in ${prUrl}\n`;
-                }
-              }
-              releaseNotes += `\n`;
-            }
-            
-            // ─────────────────────────────────────────────────────────────────────
-            // Step 8: Add new contributors section
-            // ─────────────────────────────────────────────────────────────────────
-            let newContributors = [];
-            try {
-              // Check if any PR authors are first-time contributors
+
+            // Build the release-notes markdown. Pure: no API calls, no I/O.
+            function buildReleaseNotes(meta) {
+              const { versionNumber, sandboxUrl, prodUrl, prs, newContributors, previousTag, currentTag, owner, repo } = meta;
+
+              const categories = {
+                breaking: { title: '### 🛠 Breaking Changes', prs: [] },
+                features: { title: '### 🎉 New features', prs: [] },
+                bugs: { title: '### 🐛 Bug fixes', prs: [] },
+                misc: { title: '### 📚 Miscellaneous updates', prs: [] },
+              };
               for (const pr of prs) {
+                categories[categorize(pr.labels)].prs.push(pr);
+              }
+
+              let notes = `## **D'fflib v${versionNumber}**\n`;
+              notes += `Unlocked package: [Sandbox Install](${sandboxUrl}) / [Production Install](${prodUrl})\n\n\n`;
+              notes += `## What's Changed\n`;
+
+              for (const key of ['breaking', 'features', 'bugs', 'misc']) {
+                const catPrs = categories[key].prs;
+                if (catPrs.length === 0) continue;
+                notes += `${categories[key].title}\n`;
+
+                const groups = {};
+                const flat = [];
+                for (const pr of catPrs) {
+                  const component = getPrimaryComponent(pr.files);
+                  if (component) {
+                    (groups[component] = groups[component] || []).push(pr);
+                  } else {
+                    flat.push(pr);
+                  }
+                }
+
+                for (const component of Object.keys(groups).sort()) {
+                  notes += `- [\`${component}\`]\n`;
+                  for (const pr of groups[component]) {
+                    notes += `    - ${cleanTitle(pr.title)} by @${pr.author} in #${pr.number}\n`;
+                  }
+                }
+                for (const pr of flat) {
+                  notes += `- ${cleanTitle(pr.title)} by @${pr.author} in #${pr.number}\n`;
+                }
+                notes += `\n`;
+              }
+
+              if (newContributors.length > 0) {
+                notes += `\n### New Contributors\n`;
+                for (const contributor of newContributors) {
+                  notes += `- @${contributor.login} made their first contribution in #${contributor.prNumber}\n`;
+                }
+                notes += `\n`;
+              }
+
+              const changelogUrl = previousTag
+                ? `https://github.com/${owner}/${repo}/compare/${previousTag}...${currentTag}`
+                : `https://github.com/${owner}/${repo}/commits/${currentTag}`;
+              notes += `\n**Full Changelog**: ${changelogUrl}\n`;
+
+              return notes;
+            }
+            
+            // ─────────────────────────────────────────────────────────────────────
+            // Step 5: Skip bot-authored PRs (Renovate/Dependabot) so they don't
+            // clutter the notes or the New Contributors list.
+            // ─────────────────────────────────────────────────────────────────────
+            const releasablePrs = prs.filter((pr) => !pr.author.endsWith('[bot]'));
+            console.log(`${releasablePrs.length} of ${prs.length} PRs after excluding bots`);
+
+            // ─────────────────────────────────────────────────────────────────────
+            // Step 6: Detect first-time contributors (exactly one merged PR).
+            // ─────────────────────────────────────────────────────────────────────
+            const newContributors = [];
+            try {
+              for (const pr of releasablePrs) {
                 const authorPrs = await github.rest.search.issuesAndPullRequests({
                   q: `repo:${context.repo.owner}/${context.repo.repo} is:pr is:merged author:${pr.author}`,
                   per_page: 2
@@ -991,61 +1176,122 @@ jobs:
             } catch (error) {
               console.log(`Error checking contributors: ${error.message}`);
             }
-            
-            // Only show New Contributors section if there are new contributors
-            if (newContributors.length > 0) {
-              releaseNotes += `### New Contributors\n`;
-              for (const contributor of newContributors) {
-                const prUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/pull/${contributor.prNumber}`;
-                releaseNotes += `@${contributor.login} made their first contribution in ${prUrl}\n`;
-              }
-              releaseNotes += `\n`;
-            }
-            
+
             // ─────────────────────────────────────────────────────────────────────
-            // Step 9: Add full changelog link
-            // Format: **Full Changelog**: URL (plain URL, not linked text)
+            // Step 7: Render and write the release notes.
             // ─────────────────────────────────────────────────────────────────────
-            if (previousTag) {
-              const compareUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/compare/${previousTag}...${currentTag}`;
-              releaseNotes += `**Full Changelog**: ${compareUrl}\n`;
-            } else {
-              const commitsUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commits/${currentTag}`;
-              releaseNotes += `**Full Changelog**: ${commitsUrl}\n`;
-            }
-            
-            // Write to file for the release action
+            const releaseNotes = buildReleaseNotes({
+              versionNumber,
+              sandboxUrl,
+              prodUrl,
+              prs: releasablePrs,
+              newContributors,
+              previousTag,
+              currentTag,
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+
             fs.writeFileSync('release_notes.md', releaseNotes);
             console.log('Release notes written to release_notes.md');
             console.log('---');
             console.log(releaseNotes);
 
       # ─────────────────────────────────────────────────────────────────────────────
-      # Step 6: Create GitHub Release
-      # target_commitish is intentionally omitted — the tag was pushed to HEAD in
-      # the "Create and push tag" step above, so softprops resolves it correctly.
-      # Using github.sha here would cause SHA drift if the alias commit step pushed
-      # a new commit to main before this step runs.
+      # Step 6: Create GitHub Release (skipped when it already exists — resume)
+      # target_commitish is intentionally omitted — the tag already exists (created
+      # in "Create and push tag" or by the original run), so softprops resolves it.
+      # The package alias commit comes later and never moves the tag.
       # ─────────────────────────────────────────────────────────────────────────────
       - name: Create GitHub Release
         id: create-release
-        uses: softprops/action-gh-release@v2
+        if: ${{ steps.release-exists.outputs.exists != 'true' }}
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: "v${{ env.VERSION_NUMBER }}"
           name: "${{ env.VERSION_NAME }}"
           body_path: release_notes.md
           draft: false
           prerelease: ${{ contains(env.VERSION_NUMBER, '-rc.') || contains(env.VERSION_NUMBER, '-beta.') }}
+          make_latest: ${{ steps.release-exists.outputs.make_latest }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # ───────────────────────────────────────────────────────────────────────────
+      # Step 7: Deliver package alias (last, NON-FATAL)
+      # Ladder (push_alias in build/scripts/release-lib.sh): push the alias commit
+      # to the release branch; on non-fast-forward rebase once and retry; any other
+      # rejection (e.g. the main ruleset) leaves a pending alias — warning plus a
+      # paste-ready JSON line in the job summary. The release is already published.
+      # ───────────────────────────────────────────────────────────────────────────
+      - name: Deliver package alias
+        id: alias
+        continue-on-error: true
+        env:
+          PKG_NAME: ${{ needs.package-build.outputs.package_name }}
+          PKG_VER_ID: ${{ needs.package-build.outputs.package_version_id }}
+          # X.Y.Z.BUILD as created (an X.Y.Z input gets its BUILD from Salesforce)
+          CREATED_VERSION: ${{ needs.package-build.outputs.created_version }}
+        run: |
+          set -euo pipefail
+          source build/scripts/release-lib.sh
+          ALIAS_KEY="${PKG_NAME}@${CREATED_VERSION:-$VERSION_NUMBER}"
+          ALIAS_LINE="\"${ALIAS_KEY}\": \"${PKG_VER_ID}\""
+          echo "line=$ALIAS_LINE" >> "$GITHUB_OUTPUT"
+
+          EXISTING_ID=$(jq -r --arg key "$ALIAS_KEY" '.packageAliases[$key] // empty' sfdx-project.json)
+          if [[ -n "$EXISTING_ID" ]]; then
+            if [[ "$EXISTING_ID" != "$PKG_VER_ID" ]]; then
+              echo "status=mismatch" >> "$GITHUB_OUTPUT"
+              echo "::warning::Package alias $ALIAS_KEY records $EXISTING_ID, but the Dev Hub has $PKG_VER_ID. Fix sfdx-project.json via a PR: $ALIAS_LINE"
+              exit 0
+            fi
+            echo "status=exists" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ Package alias $ALIAS_KEY already recorded — skipping"
+            exit 0
+          fi
+
+          jq --arg key "$ALIAS_KEY" --arg id "$PKG_VER_ID" '.packageAliases[$key] = $id' \
+            sfdx-project.json > sfdx-project.tmp.json && mv sfdx-project.tmp.json sfdx-project.json
+          git add sfdx-project.json
+          git commit -q -m "chore: update sfdx-project.json for v${VERSION_NUMBER}"
+
+          STATUS=$(push_alias "$GITHUB_REF_NAME") || true
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          if [[ "$STATUS" == "pushed" ]]; then
+            echo "✅ Package alias $ALIAS_KEY pushed to $GITHUB_REF_NAME"
+            exit 0
+          fi
+
+          echo "::warning title=Package alias pending::Could not push the package alias to $GITHUB_REF_NAME (push error above). Add it to sfdx-project.json packageAliases via a PR: $ALIAS_LINE"
+          {
+            echo "### ⚠️ Package alias pending"
+            echo ""
+            echo "The release is published, but the package alias could not be pushed to \`$GITHUB_REF_NAME\`."
+            echo "Add this line to \`packageAliases\` in \`sfdx-project.json\` through a normal PR:"
+            echo ""
+            echo '```json'
+            echo "$ALIAS_LINE"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Display Release Info
+        id: result
+        env:
+          TAG_EXISTED: ${{ steps.tag.outputs.existed }}
+          RELEASE_EXISTED: ${{ steps.release-exists.outputs.exists }}
+          ALIAS_STATUS: ${{ steps.alias.outputs.status }}
         run: |
           echo ""
           echo "=============================================="
-          echo "✅ GITHUB RELEASE CREATED"
+          if [[ "$TAG_EXISTED" == "true" && "$RELEASE_EXISTED" == "true" && "$ALIAS_STATUS" == "exists" ]]; then
+            echo "nothing_to_do=true" >> "$GITHUB_OUTPUT"
+            echo "✅ NOTHING TO DO — release v$VERSION_NUMBER is already complete"
+          else
+            echo "✅ GITHUB RELEASE PUBLISHED"
+          fi
           echo "=============================================="
-          echo "Release: https://github.com/${{ github.repository }}/releases/tag/v${{ env.VERSION_NUMBER }}"
+          echo "Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/v$VERSION_NUMBER"
 
   # ╔══════════════════════════════════════════════════════════════════════════════╗
   # ║ STAGE 5: SUMMARY                                                             ║
@@ -1069,33 +1315,60 @@ jobs:
   # │ FAILURE BEHAVIOR: N/A — this job always succeeds if reached.                 │
   # │                                                                              │
   # │ TECHNICAL NOTES:                                                             │
-  # │   - Displays: Package ID, install URLs, git tag, GitHub release link         │
-  # │   - Shows success/failure status based on needs.package-build.result         │
+  # │   - Displays: Package ID, install URLs, git tag, GitHub release link,        │
+  # │     and a "Package alias" row (pushed / already recorded / pending + line)   │
+  # │   - Status from package-build + publish-release results; resume with every   │
+  # │     part present reports "Nothing to do"                                     │
   # └──────────────────────────────────────────────────────────────────────────────┘
   summary:
     name: Release Summary
     needs: [ package-build, publish-release ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: always()
     steps:
       - name: Generate Summary
+        env:
+          PKG_VER_ID: ${{ needs.package-build.outputs.package_version_id }}
+          SANDBOX_URL: ${{ needs.package-build.outputs.sandbox_install_url }}
+          PROD_URL: ${{ needs.package-build.outputs.production_install_url }}
+          BUILD_RESULT: ${{ needs.package-build.result }}
+          PUBLISH_RESULT: ${{ needs.publish-release.result }}
+          ALIAS_STATUS: ${{ needs.publish-release.outputs.alias_status }}
+          ALIAS_LINE: ${{ needs.publish-release.outputs.alias_line }}
+          NOTHING_TO_DO: ${{ needs.publish-release.outputs.nothing_to_do }}
         run: |
+          TITLE="RELEASE COMPLETE"
+          [[ "$MODE" == "resume" ]] && TITLE="RESUME COMPLETE"
           echo ""
           echo "=============================================="
-          echo "🚀 RELEASE COMPLETE: ${{ env.VERSION_NUMBER }}"
+          echo "🚀 $TITLE: $VERSION_NUMBER"
           echo "=============================================="
           echo ""
           echo "**Package Details:**"
-          echo "- Package ID: \`${{ needs.package-build.outputs.package_version_id }}\`"
-          echo "- Sandbox Install: ${{ needs.package-build.outputs.sandbox_install_url }}"
-          echo "- Production Install: ${{ needs.package-build.outputs.production_install_url }}"
+          echo "- Package ID: \`$PKG_VER_ID\`"
+          echo "- Sandbox Install: $SANDBOX_URL"
+          echo "- Production Install: $PROD_URL"
           echo ""
           echo "**Git:**"
-          echo "- Tag: v${{ env.VERSION_NUMBER }}"
-          echo "- Release: https://github.com/${{ github.repository }}/releases/tag/v${{ env.VERSION_NUMBER }}"
+          echo "- Tag: v$VERSION_NUMBER"
+          echo "- Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/v$VERSION_NUMBER"
+          # The alias step is non-fatal: a green publish-release without pushed/exists means pending.
+          if [[ "$PUBLISH_RESULT" != "success" ]]; then
+            echo "- Package alias: not attempted (publish-release did not finish)"
+          elif [[ "$ALIAS_STATUS" == "pushed" ]]; then
+            echo "- Package alias: pushed to $GITHUB_REF_NAME"
+          elif [[ "$ALIAS_STATUS" == "exists" ]]; then
+            echo "- Package alias: already recorded"
+          elif [[ "$ALIAS_STATUS" == "mismatch" ]]; then
+            echo "- Package alias: recorded with a different 04t — fix via a PR: $ALIAS_LINE"
+          else
+            echo "- Package alias: pending — add to sfdx-project.json packageAliases via a PR: $ALIAS_LINE"
+          fi
           echo ""
           echo "**Status:**"
-          if [[ "${{ needs.package-build.result }}" == "success" ]]; then
+          if [[ "$NOTHING_TO_DO" == "true" ]]; then
+            echo "✅ Nothing to do — tag, GitHub Release and package alias already exist"
+          elif [[ "$BUILD_RESULT" == "success" && "$PUBLISH_RESULT" == "success" ]]; then
             echo "✅ All steps completed successfully"
           else
             echo "❌ Some steps failed. Check workflow logs for details."

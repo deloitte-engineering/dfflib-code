@@ -3,10 +3,10 @@
 # ║ PURPOSE: Defines file path patterns for automatic PR labeling based on       ║
 # ║          which files are changed in a pull request.                          ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║ USED BY: .github/workflows/pr-labeler.yml (file-based labels)                ║
+# ║ USED BY: .github/workflows/pr-labels.yml (file-labels job)                   ║
 # ║                                                                              ║
 # ║ HOW IT WORKS:                                                                ║
-# ║   When a PR is opened/updated, the pr-labeler workflow reads this file       ║
+# ║   When a PR is opened/updated, the pr-labels file-labels job reads this file ║
 # ║   and applies labels based on which files were changed. Multiple labels      ║
 # ║   can be applied if changes span multiple categories.                        ║
 # ║                                                                              ║
