@@ -1,0 +1,405 @@
+# =============================================================================
+# beta-build.yml - Beta build of the release PR
+# =============================================================================
+# Purpose:  Builds the beta package version of the release PR (the open
+#           `autorelease: pending` PR) BEFORE it is merged, and records its
+#           package alias on the release branch, so the human merging the PR
+#           can install exactly what the pipeline promotes later.
+#           Three jobs, split by what each may hold:
+#             1. build       environment `release` (main only, see Triggers).
+#                            Checks who started
+#                            the run, selects the release PR, stops when its branch
+#                            records a current beta build (a stale one is
+#                            rebuilt), otherwise makes one buildBeta call over the
+#                            Dev Hub adapter: it reuses an unpromoted version with
+#                            the same version and content tag, or creates one (code
+#                            coverage on). One promotable rule governs both: a
+#                            version whose code coverage check did not pass, or whose
+#                            validation was skipped, is not reused, and a created
+#                            one that fails it is not recorded (the job fails and
+#                            names the check). Every decision is in release-beta.cjs
+#                            (select, plan, buildBeta); the steps move data in and out.
+#             2. push-alias  environment `release` and the release token. Adds the
+#                            alias with the git data API and a NON-force ref
+#                            update pinned to the SHA the build started from;
+#                            a branch that moved meanwhile fails the job and the
+#                            next run builds again or reuses the version.
+#             3. sync        GITHUB_TOKEN only. Refreshes the override box, label
+#                            and preview (install links) of the release PR.
+#
+# Triggers: workflow_dispatch only, with an optional pr_number.
+#           beta-build-request.yml dispatches it when a maintainer adds the label
+#           `release: build-beta` to the release PR; it can also be dispatched
+#           by hand (debugging).
+#           A dispatch is the only trigger the release token action accepts
+#           besides push, so no change to the guard is needed.
+#
+# Inputs:   pr_number (optional): the release PR to build. Empty selects the one
+#           open `autorelease: pending` PR.
+#
+# Who and where:
+#           The workflow runs from `main` only (the `release` environment on the
+#           build and push-alias jobs allows `main`). The first step after the
+#           checkout checks the actor (a person needs maintain or admin; a
+#           [bot] login passes: the label path runs as github-actions[bot]).
+#
+# Concurrency:
+#   One group for every run, whoever started it, so a manual and a label-started
+#   run never overlap. A running run is never cancelled (cancel-in-progress:
+#   false); one run can wait, and a newer waiting run replaces it. Cancelling a
+#   version create or a push halfway would waste a version create.
+#   The sync job joins the release-notes-override group instead: a waiting sync can
+#   be replaced by a newer run of that workflow (one started by a comment on a release
+#   PR; a skipped run takes no slot), which does the same work, but this
+#   run then ends cancelled, so nothing may read its conclusion.
+#
+# Secrets:  SF_CLIENT_ID, SF_USERNAME, SF_PRIVATE_KEY, SF_INSTANCE_URL (build job
+#           only, passed to the sf-login action, which owns the CLI pin and the
+#           login); RELEASE_TOKEN (push-alias job only, environment `release`);
+#           GITHUB_TOKEN (the other jobs).
+#
+# Recovery: A failed run names what to fix; fix it and dispatch again (or add the
+#           label again). A rerun reuses a version that already passes the
+#           promotable rule, so it never creates a second one for the same
+#           content. A failed push-alias job leaves the version created and
+#           unrecorded; the next run finds it and records it.
+#
+# Setup:    The package exists in the Dev Hub and the label `release: build-beta`
+#           exists in the repository.
+#
+# Logic:    build/scripts/release-beta.cjs (selectBetaPr, checkBetaPr, planBeta,
+#           buildBeta, pushAliasCommit), release-devhub.cjs (the Dev Hub adapter:
+#           the sf list and create command lines), release-rules.cjs
+#           (buildCheckFailures, the promotable rule), the assemble-monolith action
+#           (the Assembled tree of the release branch, built before the login), release-pr.cjs
+#           (listOpenReleasePrs: which PR is the release PR), release-record.cjs
+#           (readBetaBuildState: whether the recorded beta build is current;
+#           applyBetaAlias: what a branch records) and
+#           release-override.cjs (syncRelease).
+# =============================================================================
+
+name: Beta Build
+
+concurrency:
+  group: beta-build
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Release PR number (empty = the single open release PR)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+# The alias the Dev Hub login gets in this run; every sf call below targets it.
+env:
+  DEVHUB_ALIAS: devhub
+
+jobs:
+  build:
+    name: Build beta version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: release
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      proceed: ${{ steps.select.outputs.proceed }}
+      pr_number: ${{ steps.select.outputs.pr_number }}
+      head_ref: ${{ steps.select.outputs.head_ref }}
+      build_sha: ${{ steps.select.outputs.build_sha }}
+      needed: ${{ steps.plan.outputs.needed }}
+      builds: ${{ steps.build.outputs.builds }}
+    steps:
+      # The modules come from the default branch.
+      - name: Checkout default branch (scripts)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            build/scripts
+            .github/actions/sf-login
+            .github/actions/assemble-monolith
+
+      # Policy check: a person needs maintain or admin (the role rule is in
+      # release-beta.cjs). Logins ending in [bot] pass: the label path starts this
+      # workflow with GITHUB_TOKEN.
+      - name: Check who started the build
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          ACTOR: ${{ github.triggering_actor }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { canStartBeta } = require(`${process.env.GITHUB_WORKSPACE}/build/scripts/release-beta.cjs`);
+            const { owner, repo } = context.repo;
+            const actor = process.env.ACTOR;
+            core.info(`Actor ${context.actor}, triggering actor ${actor}, event ${context.eventName}`);
+            const { allowed, notice } = await canStartBeta({ github, owner, repo, actor });
+            if (!allowed) {
+              core.setFailed(notice);
+              return;
+            }
+            core.info(`${actor} may start a beta build`);
+
+      # Exactly one open autorelease: pending PR, or the one named by pr_number.
+      # None or several ends the run with a notice (nothing to build).
+      - name: Select the release PR
+        id: select
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DISPATCH_PR_NUMBER: ${{ inputs.pr_number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const root = process.env.GITHUB_WORKSPACE;
+            const { selectBetaPr, checkBetaPr } = require(`${root}/build/scripts/release-beta.cjs`);
+            const { listOpenReleasePrs } = require(`${root}/build/scripts/release-pr.cjs`);
+            const { owner, repo } = context.repo;
+            const labelled = await listOpenReleasePrs({ github, owner, repo });
+            const selected = selectBetaPr({ prs: labelled, input: process.env.DISPATCH_PR_NUMBER });
+            if (selected.refusal) {
+              core.setFailed(selected.refusal);
+              return;
+            }
+            if (selected.notice) {
+              core.notice(selected.notice);
+              core.setOutput('proceed', 'false');
+              return;
+            }
+            // The issue objects have no head: fetch the PR for its head repository and SHA.
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: selected.number });
+            const checked = checkBetaPr(pr, { owner, repo });
+            if (checked.refusal) {
+              core.setFailed(checked.refusal);
+              return;
+            }
+            core.info(`Release PR #${checked.number}, branch head ${checked.buildSha}`);
+            core.setOutput('proceed', 'true');
+            core.setOutput('pr_number', String(checked.number));
+            core.setOutput('head_ref', checked.headRef);
+            core.setOutput('build_sha', checked.buildSha);
+
+      # The release branch is checked out into release/ at the exact SHA
+      # selected above, and only built.
+      - name: Checkout the release branch
+        if: steps.select.outputs.proceed == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.select.outputs.build_sha }}
+          path: release
+          persist-credentials: false
+
+      # release-please drops the alias whenever it rebuilds the branch, so an alias
+      # on the branch means a beta build of this version is recorded. It is skipped
+      # only when it is current (none, current or stale: readBetaBuildState reads it
+      # from git through the API, at the build SHA); a stale one is built again.
+      # The tag is one hash of the content inputs (contentTag in release-content-tag.cjs): same content, same tag.
+      - name: Plan the build
+        id: plan
+        if: steps.select.outputs.proceed == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          BUILD_SHA: ${{ steps.select.outputs.build_sha }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const root = process.env.GITHUB_WORKSPACE;
+            const { planBeta } = require(`${root}/build/scripts/release-beta.cjs`);
+            const { readBetaBuildState, readProjectText, githubReads } = require(`${root}/build/scripts/release-record.cjs`);
+            const { contentTag } = require(`${root}/build/scripts/release-content-tag.cjs`);
+            const { owner, repo } = context.repo;
+            const ref = process.env.BUILD_SHA;
+            const projectText = await readProjectText({ github, owner, repo, ref });
+            const betaState = await readBetaBuildState({ github, owner, repo, ref });
+            core.info(`Recorded beta build: ${betaState.state}${betaState.reason ? ` (${betaState.reason.code}, ${betaState.reason.package})` : ''}${betaState.aliasCommit ? `, alias commit ${betaState.aliasCommit}` : ''}`);
+            // One content tag for every package, from the same function as the state check and the publish guard.
+            // No tag (no force-app at the build SHA) makes planBeta refuse.
+            const tag = await contentTag(githubReads({ github, owner, repo }), ref);
+            const plan = planBeta({ projectText, betaState, contentTag: tag });
+            if (plan.refusal) {
+              core.setFailed(plan.refusal);
+              return;
+            }
+            if (plan.skip) {
+              core.notice(plan.notice);
+              core.setOutput('needed', 'false');
+              return;
+            }
+            for (const item of plan.packages) core.info(`Package ${item.package} ${item.version}, content tag ${item.tag}`);
+            core.setOutput('needed', 'true');
+            core.setOutput('plan', JSON.stringify(plan));
+
+      # The monolith package is built from the Assembled tree (monolith/, gitignored), so it is assembled in release/
+      # before the build, by the composite action. The action and its script are the default branch's.
+      # The action checks the .gitmodules allowlist before it fetches any submodule and runs before the login.
+      - name: Assemble the monolith
+        if: steps.plan.outputs.needed == 'true'
+        uses: ./.github/actions/assemble-monolith
+        with:
+          working-directory: release
+          script-root: ${{ github.workspace }}
+          checkout: 'false'
+
+      # The action comes from the default branch checked out first.
+      - name: Log in to Dev Hub
+        if: steps.plan.outputs.needed == 'true'
+        uses: ./.github/actions/sf-login
+        with:
+          instance-url: ${{ secrets.SF_INSTANCE_URL }}
+          client-id: ${{ secrets.SF_CLIENT_ID }}
+          username: ${{ secrets.SF_USERNAME }}
+          private-key: ${{ secrets.SF_PRIVATE_KEY }}
+          alias: ${{ env.DEVHUB_ALIAS }}
+          set-default-dev-hub: 'true'
+
+      # One call over the Dev Hub adapter: list, decide (reuse only a version that passes the
+      # promotable rule), create, read the created row and check it with the same rule.
+      # A refusal (a failed check, an adapter error) fails the job; builds whose numbers differ
+      # only warn. sf runs in release/, where sfdx-project.json is; its stdout is the JSON the
+      # adapter reads.
+      - name: Build the beta package version
+        id: build
+        if: steps.plan.outputs.needed == 'true'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PLAN: ${{ steps.plan.outputs.plan }}
+        with:
+          script: |
+            const execFile = require('util').promisify(require('child_process').execFile);
+            const root = process.env.GITHUB_WORKSPACE;
+            const { buildBeta } = require(`${root}/build/scripts/release-beta.cjs`);
+            const { sfDevHub } = require(`${root}/build/scripts/release-devhub.cjs`);
+            const run = async (args) => (await execFile('sf', args, { cwd: `${root}/release`, maxBuffer: 64 * 1024 * 1024 })).stdout;
+            const devHub = sfDevHub({ run, targetDevHub: process.env.DEVHUB_ALIAS });
+            const plan = JSON.parse(process.env.PLAN);
+            const result = await buildBeta({ devHub, packages: plan.packages });
+            if (result.refusal) {
+              core.setFailed(result.refusal);
+              return;
+            }
+            for (const built of result.builds) core.info(`${built.package}: ${built.action} build ${built.build} (${built.installId})`);
+            // The packages share X.Y.Z; each keeps its own BUILD, so the numbers can differ: shown, never a failure.
+            if (result.warning) core.warning(result.warning);
+            core.setOutput('builds', JSON.stringify(result.builds));
+
+  push-alias:
+    name: Record the alias on the release branch
+    needs: build
+    if: needs.build.outputs.needed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      # The release-token action is loaded from the default branch.
+      - name: Checkout default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            build/scripts
+            .github/actions/release-token
+
+      - name: Resolve release token
+        id: release-token
+        uses: ./.github/actions/release-token
+        with:
+          pat: ${{ secrets.RELEASE_TOKEN }}
+
+      # A user token, not GITHUB_TOKEN: events caused by GITHUB_TOKEN start no
+      # workflow runs, so only a user-token push runs the checks on the commit.
+      # The ref update is not forced; a branch that moved since the build started
+      # (release-please rebuilt it, or a person pushed) fails the job.
+      - name: Push the alias commit
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          HEAD_REF: ${{ needs.build.outputs.head_ref }}
+          BUILD_SHA: ${{ needs.build.outputs.build_sha }}
+          BUILDS: ${{ needs.build.outputs.builds }}
+          GIT_USER: ${{ steps.release-token.outputs.git-user }}
+          GIT_EMAIL: ${{ steps.release-token.outputs.git-email }}
+        with:
+          github-token: ${{ steps.release-token.outputs.token }}
+          script: |
+            const { pushAliasCommit, aliasCommitMessage } = require(`${process.env.GITHUB_WORKSPACE}/build/scripts/release-beta.cjs`);
+            const { applyBetaAliases, readProjectText } = require(`${process.env.GITHUB_WORKSPACE}/build/scripts/release-record.cjs`);
+            const { owner, repo } = context.repo;
+            const env = process.env;
+            const builds = JSON.parse(env.BUILDS || '[]');
+            const valid = (built) => /^04t[A-Za-z0-9]{12,15}$/.test(built.installId) && Number.isInteger(built.build);
+            if (builds.length === 0 || !builds.every(valid)) {
+              core.setFailed('The build job did not return package version ids and build numbers');
+              return;
+            }
+            const text = await readProjectText({ github, owner, repo, ref: env.BUILD_SHA });
+            let updated;
+            try {
+              updated = applyBetaAliases(text, builds);
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
+            if (updated === text) {
+              core.notice('The alias is already recorded at the build SHA - nothing to push');
+              return;
+            }
+            // Every package has its own alias and BUILD; the message lists them all.
+            const message = aliasCommitMessage(builds);
+            const result = await pushAliasCommit({ github, owner, repo, branch: env.HEAD_REF, baseSha: env.BUILD_SHA, projectText: updated, message, identity: { name: env.GIT_USER, email: env.GIT_EMAIL } });
+            if (result.status === 'branch-moved') {
+              core.setFailed(`${env.HEAD_REF} moved since the build started - the next run builds again or reuses the version`);
+              return;
+            }
+            core.info(`Aliases ${builds.map((built) => `${built.package}@${built.version}.${built.build}`).join(', ')} pushed as ${result.sha}`);
+
+  sync:
+    name: Refresh the release PR preview
+    needs: [build, push-alias]
+    # After push-alias so the preview shows the install links; also when the alias
+    # was already on the branch. Not after a failed alias push.
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.push-alias.result != 'failure' && needs.build.outputs.pr_number != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Shares the group of release-notes-override.yml: one writer of the box,
+    # label and preview at a time.
+    concurrency:
+      group: release-notes-override
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: build/scripts
+
+      - name: Sync the override box, label and preview
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_NUMBER: ${{ needs.build.outputs.pr_number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { syncRelease } = require(`${process.env.GITHUB_WORKSPACE}/build/scripts/release-override.cjs`);
+            const { owner, repo } = context.repo;
+            const prNumber = Number(process.env.PR_NUMBER);
+            const result = await syncRelease({ github, owner, repo, prNumber, log: core.info });
+            core.info(`PR #${prNumber}: ${result.action}`);
+            for (const warning of result.warnings) core.warning(`PR #${prNumber}: ${warning}`);
+            if (result.summary) core.summary.addRaw(result.summary, true);
+            await core.summary.write();
+            if (result.failed.length > 0) core.setFailed(`Sync failed for #${prNumber} (${result.failed.join(', ')})`);

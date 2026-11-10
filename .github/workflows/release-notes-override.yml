@@ -1,0 +1,160 @@
+# =============================================================================
+# release-notes-override.yml - Release notes preview and override box
+# =============================================================================
+# Purpose:  Keeps the release PR (`autorelease: pending`) in step with its
+#           release notes override. One idempotent recompute that:
+#             1. ensures the override box exists: one bot-created comment whose
+#                whole body is `<!-- release-notes-override -->`, never edited
+#                by this workflow. A maintainer edits it to override.
+#             2. mirrors "the box holds a valid, non-empty override" in the
+#                automation-managed label `release-notes: override`.
+#             3. refreshes the one bot-only sticky preview comment: status,
+#                install links, effective notes, generated notes.
+#           The box is the source of truth; the label only mirrors it and humans
+#           never set it by hand. The steps are isolated: a failing label or
+#           preview step never skips or undoes the other, and the job ends red if
+#           any failed. Label and preview need the box state, so when the box
+#           step itself fails they are skipped and the old label and preview stay.
+#           What the release notes could not read (a collection warning)
+#           does not fail the job: it is listed in the run summary and annotated.
+#
+# Triggers: - issue_comment (created, edited, deleted) on a PR labelled
+#             `autorelease: pending`; a comment on any other PR or issue starts
+#             no runner (job `if:`). A run recomputes every open release PR from
+#             scratch; it never reads the event action or the commented PR.
+#             Events from the preview comment itself are skipped.
+#           - workflow_run of "Release PR" (completed, success): release-please
+#             can create the release PR under a new number or change its content.
+#           - workflow_dispatch (optional pr_number; empty = every open release
+#             PR).
+#
+# Inputs:   pr_number (optional, workflow_dispatch only): recompute that PR
+#           instead of every open release PR.
+#
+# Concurrency:
+#   One group, cancel-in-progress false, set on the JOB, not the workflow. A
+#   workflow-level group is taken before the job `if:` is evaluated, so a run
+#   whose job is then skipped would still take the one pending slot and replace
+#   a real pending sync. On the job, a skipped run takes no slot. Every run that
+#   does start recomputes every open release PR (or the one in pr_number) from
+#   scratch, so a newer pending run replacing an older one loses nothing, and
+#   two runs never create the same override box at once. The beta build `sync`
+#   job joins the same group.
+#
+# Secrets:  GITHUB_TOKEN only.
+# Permissions: `issues: write` (comments) and `pull-requests: write` (reading and
+#           changing labels on a PR is accepted only with pull-requests, checked
+#           on the first run: issues alone returned 403), plus `contents: read`.
+#           The same token reads `IssueComment.editor` through GraphQL (minimum
+#           permission not yet pinned down).
+#
+# Authority: the role of the box's LAST EDITOR (maintain or admin).
+#
+# Recovery: A run is a full recompute, so re-run the failed run or start a manual
+#           run; nothing else needs undoing. A failed step leaves the previous
+#           label and preview in place.
+#
+# Setup:    The labels `autorelease: pending` and `release-notes: override` must
+#           exist in the repository. A maintainer edits the override box; nobody
+#           sets the label by hand.
+#
+# Logic:    build/scripts/release-override.cjs (syncRelease), which uses
+#           release-box.cjs, release-label.cjs, release-preview.cjs,
+#           release-pr.cjs (listOpenReleasePrs: the open release PRs),
+#           release-comments.cjs and release-notes.cjs (notesFor:
+#           the generated and effective notes).
+# =============================================================================
+
+name: Release Notes Preview and Override
+
+on:
+  issue_comment:
+    types: [created, edited, deleted]
+  workflow_run:
+    workflows: ['Release PR']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Release PR number (empty = every open release PR)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  sync-release-notes:
+    name: Sync override box, label and preview
+    runs-on: ubuntu-24.04
+    # Comments on plain issues and on PRs that are not release PRs never matter; a failed
+    # release-please run changed nothing; the preview comment is written by this workflow
+    # and never an input.
+    if: >-
+      (github.event_name != 'issue_comment' || (github.event.issue.pull_request
+        && contains(github.event.issue.labels.*.name, 'autorelease: pending')
+        && !startsWith(github.event.comment.body, '<!-- release-notes-preview -->')))
+      && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    # On the job, so a skipped run never takes the pending slot.
+    concurrency:
+      group: release-notes-override
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      # Default branch only, also for a manual run started from another branch.
+      # The modules come from main.
+      - name: Checkout default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: build/scripts
+
+      - name: Sync the override box, label and preview
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DISPATCH_PR_NUMBER: ${{ inputs.pr_number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { syncRelease } = require(`${process.env.GITHUB_WORKSPACE}/build/scripts/release-override.cjs`);
+            const { owner, repo } = context.repo;
+
+            let prNumbers;
+            if (process.env.DISPATCH_PR_NUMBER) {
+              if (!/^\d+$/.test(process.env.DISPATCH_PR_NUMBER)) {
+                core.setFailed('pr_number must be a PR number (digits only)');
+                return;
+              }
+              prNumbers = [Number(process.env.DISPATCH_PR_NUMBER)];
+            } else {
+              const { listOpenReleasePrs } = require(`${process.env.GITHUB_WORKSPACE}/build/scripts/release-pr.cjs`);
+              prNumbers = (await listOpenReleasePrs({ github, owner, repo })).map((issue) => issue.number);
+              core.info(`Open release PRs: ${prNumbers.join(', ') || '(none)'}`);
+            }
+
+            // One failing PR must not skip the rest; fail the job at the end.
+            const failed = [];
+            for (const prNumber of prNumbers) {
+              try {
+                const result = await syncRelease({ github, owner, repo, prNumber, log: core.info });
+                core.info(`PR #${prNumber}: ${result.action}`);
+                if (result.summary) core.summary.addRaw(result.summary, true);
+                // A collection warning keeps the run green but is visible as an annotation.
+                for (const warning of result.warnings) core.warning(`PR #${prNumber}: ${warning}`);
+                if (result.failed.length > 0) failed.push(`#${prNumber} (${result.failed.join(', ')})`);
+              } catch (error) {
+                // Name the failing endpoint: a bare "Resource not accessible by integration" does not say which call.
+                const call = error.request ? ` [${error.request.method} ${error.request.url}, HTTP ${error.status}]` : '';
+                core.error(`PR #${prNumber}: ${error.message}${call}`);
+                if (error.response && error.response.headers) {
+                  core.info(`x-accepted-github-permissions: ${error.response.headers['x-accepted-github-permissions']}`);
+                }
+                failed.push(`#${prNumber}`);
+              }
+            }
+            await core.summary.write();
+            if (failed.length > 0) core.setFailed(`Sync failed for: ${failed.join(', ')}`);

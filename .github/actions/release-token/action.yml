@@ -1,0 +1,50 @@
+# =============================================================================
+# release-token - Token and git identity for release automation
+# =============================================================================
+# Purpose:  Returns the release token plus the git author of its owner.
+# Guard:    Fails unless the run is a push or workflow_dispatch on
+#           refs/heads/main, and when no token is configured.
+#
+# Usage:    Run the job in `environment: release` and pass the token as the
+#           `pat` input.
+# =============================================================================
+name: Release token
+description: The release token, with the git identity of its owner
+
+inputs:
+  pat:
+    description: Release token
+    required: false
+    default: ''
+
+outputs:
+  token:
+    description: The release token
+    value: ${{ inputs.pat }}
+  git-user:
+    description: Login of the token owner
+    value: ${{ steps.identity.outputs.git-user }}
+  git-email:
+    description: Noreply email of that login
+    value: ${{ steps.identity.outputs.git-email }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check event, ref and token input
+      shell: bash
+      env:
+        HAS_PAT: ${{ inputs.pat != '' }}
+      run: |
+        source "$GITHUB_ACTION_PATH/release-token.sh"
+        release_token_guard "$GITHUB_EVENT_NAME" "$GITHUB_REF"
+        release_token_require "$HAS_PAT"
+
+    - name: Resolve git identity
+      id: identity
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.pat }}
+      run: |
+        source "$GITHUB_ACTION_PATH/release-token.sh"
+        release_token_identity >> "$GITHUB_OUTPUT"

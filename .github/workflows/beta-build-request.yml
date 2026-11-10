@@ -1,0 +1,91 @@
+# =============================================================================
+# beta-build-request.yml - Request a beta build with a label
+# =============================================================================
+# Purpose:  A maintainer adds the label `release: build-beta` to the release PR
+#           (`autorelease: pending`) to ask for a beta build. This workflow first
+#           removes the label so adding it again asks again, then checks the
+#           request and dispatches beta-build.yml for that PR. A failed call
+#           fails the run with what to do. Everything else is refused
+#           with a notice and no dispatch:
+#             - a PR that is not an open `autorelease: pending` PR of this repo
+#             - a label sender below `maintain`
+#           beta-build.yml itself stays a plain manual dispatch for debugging.
+#
+# Triggers: pull_request_target (labeled) only. No workflow_dispatch, unlike the
+#           repo default: a manual run has
+#           no label event to check, and the manual path is beta-build.yml. The
+#           other event-driven workflows (pr-labels, ...) do the same.
+#
+# Concurrency:
+#   One group per PR and label. This workflow runs on every label event of the
+#   PR, and GitHub keeps one running and one pending run per group (a newer
+#   pending run replaces the older one), so a group per PR would let an
+#   unrelated label replace a pending build-beta request. With the label name in
+#   the key, only another build-beta request waits behind a running one, and a
+#   running run is never cancelled (cancel-in-progress: false).
+#
+# Inputs:   None. The label event carries the PR and the label.
+#
+# Secrets:  GITHUB_TOKEN only. Permissions: actions: write (start the dispatch),
+#           pull-requests: write (remove the label), contents: read.
+#
+# Recovery: A refusal or a failed dispatch fails the run with what to do; fix
+#           the cause and add the label again.
+#
+# Setup:    The label `release: build-beta` must exist in the repository.
+#
+# Logic:    build/scripts/release-beta.cjs (requestBetaBuild).
+# =============================================================================
+
+name: Beta Build Request
+
+concurrency:
+  group: beta-build-request-${{ github.event.pull_request.number }}-${{ github.event.label.name }}
+  cancel-in-progress: false
+
+on:
+  pull_request_target:
+    types: [labeled]
+
+permissions:
+  contents: read
+  actions: write
+  pull-requests: write
+
+jobs:
+  request:
+    name: Check the request and dispatch the build
+    # Quoted: the label name holds ": ", which ends a plain YAML scalar.
+    if: "github.event.label.name == 'release: build-beta'"
+    runs-on: ubuntu-24.04
+    steps:
+      # The module comes from the default branch.
+      - name: Checkout default branch (scripts)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: build/scripts
+
+      - name: Dispatch the beta build
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          SENDER: ${{ github.event.sender.login }}
+          LABEL_NAME: ${{ github.event.label.name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { requestBetaBuild } = require(`${process.env.GITHUB_WORKSPACE}/build/scripts/release-beta.cjs`);
+            const { owner, repo } = context.repo;
+            const result = await requestBetaBuild({
+              github, owner, repo,
+              pr: context.payload.pull_request,
+              labelName: process.env.LABEL_NAME,
+              sender: process.env.SENDER,
+              ref: process.env.DEFAULT_BRANCH,
+              log: core.info,
+            });
+            if (result.status === 'refused') core.warning(result.notice);
+            core.summary.addRaw(`${result.status}${result.notice ? `: ${result.notice}` : ''}`);
+            await core.summary.write();

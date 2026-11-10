@@ -3,7 +3,9 @@
 # ║ PURPOSE: Defines changelog categories for GitHub Release notes generation.   ║
 # ║          Maps PR labels to release note sections with emoji prefixes.        ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║ USED BY: .github/workflows/unlocked-package.yml (publish-release job)        ║
+# ║ USED BY: build/scripts/release-notes.cjs (mirrors these categories)          ║
+# ║          release-please (release-pr.yml): release PR body, because           ║
+# ║          release-please-config.json sets "changelog-type": "github"          ║
 # ║                                                                              ║
 # ║ CATEGORY MAPPING:                                                            ║
 # ║   - Breaking: breaking                                                       ║
