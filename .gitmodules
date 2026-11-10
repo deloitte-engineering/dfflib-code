@@ -1,0 +1,8 @@
+[submodule "dependencies/fflib-apex-common"]
+	path = dependencies/fflib-apex-common
+	url = https://github.com/apex-enterprise-patterns/fflib-apex-common
+	branch = master
+[submodule "dependencies/fflib-apex-mocks"]
+	path = dependencies/fflib-apex-mocks
+	url = https://github.com/apex-enterprise-patterns/fflib-apex-mocks
+	branch = master

@@ -1,0 +1,91 @@
+# =============================================================================
+# assemble-monolith - Build the Assembled tree (monolith/) from the pinned upstream submodules and force-app
+# =============================================================================
+# Purpose:  The one place that checks the .gitmodules allowlist, fetches the two pinned submodules, assembles the
+#           tree and runs the guards. It checks out the repository first unless the caller already did (see
+#           Another tree). Callers only add a step.
+# Order:    The allowlist is checked BEFORE any submodule is fetched.
+#           The fetch is shallow (one commit per submodule). The checkout does not fetch submodules itself.
+# Secrets:  None. Run this action before any login step.
+# Output:   monolith-path - the folder the Assembled tree was written to, relative to working-directory.
+#
+# Another tree: a caller that already checked out BOTH trees (the default branch for the scripts, another ref as data)
+#           sets checkout: 'false', working-directory (the tree to assemble) and script-root (where build/scripts
+#           is). The scripts of the default branch then run in the other tree.
+#           The defaults keep the plain case: check out the triggering ref and run its own scripts. The three
+#           inputs are independent: the checkout never depends on working-directory.
+#
+# Usage:
+#   steps:
+#     - uses: $/.github/actions/assemble-monolith
+#       with:
+#         path: monolith   # optional, relative to working-directory, must be gitignored; unsafe paths are refused
+#   # or, after checking out the default branch (scripts) and another ref into release/:
+#     - uses: $/.github/actions/assemble-monolith
+#       with:
+#         working-directory: release
+#         script-root: ${{ github.workspace }}
+#         checkout: 'false'
+# =============================================================================
+name: Assemble monolith
+description: Check out the repository (unless the caller did), fetch the pinned fflib submodules and build the Assembled tree with its guards
+
+inputs:
+  path:
+    description: Repo-relative output folder, deleted and rebuilt on every run
+    required: false
+    default: monolith
+  working-directory:
+    description: Folder (relative to the workspace) holding the tree to assemble
+    required: false
+    default: .
+  script-root:
+    description: Folder holding build/scripts, relative to working-directory or absolute. Pass the workspace when the tree is another checkout
+    required: false
+    default: .
+  checkout:
+    description: "Check out the repository first. Pass 'false' when the caller already checked out the tree and the scripts"
+    required: false
+    default: 'true'
+
+outputs:
+  monolith-path:
+    description: Folder the Assembled tree was written to
+    value: ${{ steps.assemble.outputs.monolith-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check out the repository
+      if: inputs.checkout == 'true'
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        submodules: false
+        persist-credentials: false
+
+    - name: Check the submodule allowlist
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        SCRIPT_ROOT: ${{ inputs.script-root }}
+      run: |
+        set -euo pipefail
+        node "$SCRIPT_ROOT/build/scripts/assemble-monolith.cjs" --check-allowlist
+
+    - name: Fetch the pinned submodules
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        git submodule update --init --depth 1
+
+    - name: Assemble the tree and run the guards
+      id: assemble
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        MONOLITH_PATH: ${{ inputs.path }}
+        SCRIPT_ROOT: ${{ inputs.script-root }}
+      run: |
+        set -euo pipefail
+        node "$SCRIPT_ROOT/build/scripts/assemble-monolith.cjs"

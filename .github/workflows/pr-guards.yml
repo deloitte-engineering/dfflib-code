@@ -1,0 +1,62 @@
+# =============================================================================
+# pr-guards.yml - Assemble guards on every pull request
+# =============================================================================
+# Purpose:  The check `assemble-guards`. It runs the guards of the assemble-monolith action on every pull
+#           request, so a mistake in dependencies/ or monolith/ shows up on the PR itself and not only
+#           in the builds that deploy. The guards, their verdicts and the `::error::<guard>: <item>`
+#           output belong to the action; this workflow adds none. The job fails when:
+#             gitmodules-allowlist  .gitmodules points at a URL outside the allowlist
+#             gitlinks-only         the PR edits dependencies/ other than a submodule pointer
+#             monolith-untracked    monolith/ (the assembled tree) is committed or not ignored
+#             twin-rule             a dfflib_ class references an fflib_ class that has a dfflib_ twin
+#             duplicate-names       two sources hold the same metadata name
+#
+# Triggers: - pull_request opened/synchronize/reopened, for any base branch and any changed file: there is
+#             no path or branch filter, so the check always reports a result (a check that never
+#             runs stays pending)
+#           - workflow_dispatch  (manual trigger, for a branch that has no pull request)
+#           No pull_request_target and no push trigger.
+#
+# Single step: the job is one `uses: $/.github/actions/assemble-monolith` step. `$/` resolves the action at
+#           the commit this workflow runs from, so the job needs no checkout step; the action checks out
+#           the repository (no submodules), fetches the pinned submodules, assembles
+#           the tree and runs the guards. The job has no checkout, assemble or run step of its own.
+#
+# Concurrency:
+#   A pull_request run is keyed on the PR number, a manual run on the branch name. A newer run in the
+#   same group cancels the one in progress.
+#
+# Timeout:  The job stops after 30 minutes.
+#
+# Inputs:   None.
+#
+# Permissions: contents: read
+#
+# Secrets:  None. The job never logs in to an org and never deploys.
+#
+# Setup:    Nothing to create.
+#
+# Runner:   ubuntu-24.04 (pinned)
+# =============================================================================
+
+name: PR Guards
+
+concurrency:
+  group: pr-guards-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  guards:
+    name: assemble-guards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: $/.github/actions/assemble-monolith
