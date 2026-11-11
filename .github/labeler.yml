@@ -11,9 +11,10 @@
 #
 # LABEL CATEGORIES:
 #   - framework:         Salesforce source code and manifest changes
-#   - ci:                CI/CD workflow changes, Markdown files
-#   - utils, database, application, trigger-framework, test-data-builder:
-#                        one label per force-app sub-folder
+#   - ci:                CI/CD workflow changes, build scripts, Markdown files
+#   - utilities, database, metadata-driven-application,
+#     trigger-handler-framework, test-data-builder-framework:
+#                        one label per force-app sub-folder, named after it
 #   - dependencies:      submodule pointer changes (dependencies/ and .gitmodules)
 #   - code-examples:     changes under the code-examples/ root folder
 # =============================================================================
@@ -30,19 +31,20 @@ framework:
 
 # -----------------------------------------------------------------------------
 # LABEL: ci
-# Applied when: Changes to CI/CD configuration, workflows, or markdown files
+# Applied when: Changes to CI/CD configuration, workflows, build scripts, or markdown files
 # -----------------------------------------------------------------------------
 ci:
   - changed-files:
       - any-glob-to-any-file:
           - '.github/**'
+          - 'build/**'
           - '**/*.md'
 
 # -----------------------------------------------------------------------------
-# LABEL: utils
+# LABEL: utilities
 # Applied when: Changes under force-app/utilities
 # -----------------------------------------------------------------------------
-utils:
+utilities:
   - changed-files:
       - any-glob-to-any-file:
           - 'force-app/utilities/**'
@@ -57,28 +59,28 @@ database:
           - 'force-app/database/**'
 
 # -----------------------------------------------------------------------------
-# LABEL: application
+# LABEL: metadata-driven-application
 # Applied when: Changes under force-app/metadata-driven-application (application factory, config objects)
 # -----------------------------------------------------------------------------
-application:
+metadata-driven-application:
   - changed-files:
       - any-glob-to-any-file:
           - 'force-app/metadata-driven-application/**'
 
 # -----------------------------------------------------------------------------
-# LABEL: trigger-framework
+# LABEL: trigger-handler-framework
 # Applied when: Changes under force-app/trigger-handler-framework (domain and trigger handling)
 # -----------------------------------------------------------------------------
-trigger-framework:
+trigger-handler-framework:
   - changed-files:
       - any-glob-to-any-file:
           - 'force-app/trigger-handler-framework/**'
 
 # -----------------------------------------------------------------------------
-# LABEL: test-data-builder
+# LABEL: test-data-builder-framework
 # Applied when: Changes under force-app/test-data-builder-framework (the unit test factory)
 # -----------------------------------------------------------------------------
-test-data-builder:
+test-data-builder-framework:
   - changed-files:
       - any-glob-to-any-file:
           - 'force-app/test-data-builder-framework/**'
