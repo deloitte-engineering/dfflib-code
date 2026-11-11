@@ -21,13 +21,21 @@ function listDirs(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() || e.isSymbolicLink()).map((e) => e.name).sort();
 }
 
-// The repo-relative parts of rel (a/b/c gives a, a/b, a/b/c) that are symlinks.
+// The repo-relative parts of rel (a/b/c gives a, a/b, a/b/c) that are symlinks. The walk ends at the
+// first part that does not exist (or whose parent is a file): nothing below it can be a link.
 function symlinkedParts(repoRoot, rel) {
   const parts = rel.split('/');
   const linked = [];
   for (let i = 1; i <= parts.length; i += 1) {
     const sub = parts.slice(0, i).join('/');
-    if (fs.lstatSync(path.join(repoRoot, sub)).isSymbolicLink()) linked.push(sub);
+    let stat;
+    try {
+      stat = fs.lstatSync(path.join(repoRoot, sub));
+    } catch (error) {
+      if (error.code === 'ENOENT' || error.code === 'ENOTDIR') break;
+      throw error;
+    }
+    if (stat.isSymbolicLink()) linked.push(sub);
   }
   return linked;
 }
@@ -93,8 +101,9 @@ function plan(repoRoot) {
 }
 
 // The output folder is deleted and rebuilt, so a bad path would delete real sources. Returns null when the
-// path is safe, otherwise the reason. roots: the repo-relative source roots; tracked: repo-relative tracked files.
-function checkOutputPath(out, { roots, tracked }) {
+// path is safe, otherwise the reason. roots: the repo-relative source roots; tracked: repo-relative tracked files;
+// repoRoot: the repository folder, where every existing part of the path is checked for a symlink or junction.
+function checkOutputPath(out, { roots, tracked, repoRoot }) {
   if (typeof out !== 'string' || out.trim() === '') return 'the output path is empty';
   if (/[\u0000-\u001f\u007f]/.test(out)) return 'the output path contains a control character';
   if (path.posix.isAbsolute(out) || path.win32.isAbsolute(out) || /^[A-Za-z]:/.test(out)) return `the output path is absolute or drive-relative: ${out}`;
@@ -108,6 +117,8 @@ function checkOutputPath(out, { roots, tracked }) {
     if (within(root, clean)) return `the output path is inside the source root ${root}`;
   }
   if (tracked.some((file) => within(clean, file))) return `the output path is, or contains, a tracked path: ${clean}`;
+  const linkedParts = symlinkedParts(repoRoot, clean);
+  if (linkedParts.length > 0) return `the output path goes through a symlink: ${linkedParts[0]}`;
   return null;
 }
 

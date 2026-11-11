@@ -28,7 +28,7 @@ function assemble({ repoRoot, repo, out = 'monolith', allowlistOnly = false }) {
   report('gitmodules-allowlist', guards.checkGitmodules(readIfExists(path.join(repoRoot, '.gitmodules'))));
   if (allowlistOnly) return stop();
 
-  const refused = checkOutputPath(out, { roots: sourceRoots(repoRoot), tracked: repo.tracked() });
+  const refused = checkOutputPath(out, { roots: sourceRoots(repoRoot), tracked: repo.tracked(), repoRoot });
   if (refused) {
     report('output-path', [refused]);
     return stop();
