@@ -20,10 +20,11 @@
 #             `pull_request` run has a refs/pull ref and would be refused.
 #           - workflow_dispatch with a required `pr_number`: the manual path to
 #             finish a partial release. The same publishRelease() call as
-#             a merge, so there is one release path. The workflow
-#             adds no check of its own: publishRelease refuses a PR that is not
-#             merged, carries neither release label, comes from a fork or was merged
-#             into another branch than the default branch; a complete release is a
+#             a merge, so there is one release path. A first step checks the PR
+#             before the Dev Hub login (checkPublishable: merged, carries a
+#             release label, not from a fork, merged into the default branch),
+#             so a wrong number never uses the Dev Hub secrets; publishRelease
+#             repeats the same checks. A complete release is a
 #             no-op ("Nothing to do"), a partial release is finished. Run it
 #             from `main`.
 #
@@ -46,7 +47,8 @@
 #           release-notes-override.yml).
 #
 # Secrets:  SF_CLIENT_ID, SF_USERNAME, SF_PRIVATE_KEY, SF_INSTANCE_URL (Dev Hub,
-#           passed to the sf-login action, which owns the CLI pin and the login);
+#           passed to the sf-login action, which owns the CLI pin and the login;
+#           the PR check before it uses GITHUB_TOKEN only);
 #           GITHUB_TOKEN for the tag, the GitHub
 #           Release and the labels. No release token.
 #
@@ -58,8 +60,8 @@
 #           release-please opens no new release PR until this release is
 #           published.
 #
-# Logic:    build/scripts/release-publish.cjs (publishRelease) with the Dev Hub
-#           adapter release-devhub.cjs.
+# Logic:    build/scripts/release-publish.cjs (checkPublishable, publishRelease) with
+#           the Dev Hub adapter release-devhub.cjs.
 # =============================================================================
 
 name: Release Publish
@@ -114,6 +116,47 @@ jobs:
             build/scripts
             .github/actions/sf-login
 
+      # The PR is checked with GITHUB_TOKEN before any Dev Hub secret is used. A merge
+      # run names its PR in the event; a manual run takes it from the input. A PR that
+      # cannot be published ends the run here, so the login below never runs.
+      - name: Check the release PR
+        id: gate
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DISPATCH_PR_NUMBER: ${{ inputs.pr_number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { checkPublishable } = require(`${process.env.GITHUB_WORKSPACE}/build/scripts/release-publish.cjs`);
+            const { owner, repo } = context.repo;
+            const defaultBranch = context.payload.repository.default_branch;
+
+            let prNumber;
+            if (context.eventName === 'workflow_dispatch') {
+              if (!/^\d+$/.test(process.env.DISPATCH_PR_NUMBER)) {
+                core.setFailed('pr_number must be a PR number (digits only)');
+                return;
+              }
+              prNumber = Number(process.env.DISPATCH_PR_NUMBER);
+            } else {
+              prNumber = context.payload.pull_request.number;
+            }
+            const next = 'To recover: fix the cause above, then re-run this failed run or start a manual run with the PR number.';
+
+            let gate;
+            try {
+              gate = await checkPublishable({ github, owner, repo, prNumber, defaultBranch });
+            } catch (error) {
+              const call = error.request ? ` [${error.request.method} ${error.request.url}, HTTP ${error.status}]` : '';
+              core.setFailed(`PR #${prNumber}: the check before the Dev Hub login failed: ${error.message}${call}. Nothing was changed. ${next}`);
+              return;
+            }
+            if (!gate.ok) {
+              core.setFailed(`${gate.message} ${next}`);
+              return;
+            }
+            core.setOutput('pr-number', String(prNumber));
+
       # The action comes from the default branch checked out above, never from PR code.
       - name: Install the Salesforce CLI and log in to the Dev Hub
         uses: ./.github/actions/sf-login
@@ -128,7 +171,7 @@ jobs:
       - name: Publish the release
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
-          DISPATCH_PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ steps.gate.outputs.pr-number }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -140,17 +183,8 @@ jobs:
             const { owner, repo } = context.repo;
             const defaultBranch = context.payload.repository.default_branch;
 
-            // A merge run names its PR in the event; a manual run takes it from the input.
-            let prNumber;
-            if (context.eventName === 'workflow_dispatch') {
-              if (!/^\d+$/.test(process.env.DISPATCH_PR_NUMBER)) {
-                core.setFailed('pr_number must be a PR number (digits only)');
-                return;
-              }
-              prNumber = Number(process.env.DISPATCH_PR_NUMBER);
-            } else {
-              prNumber = context.payload.pull_request.number;
-            }
+            // The number the check step accepted (digits only, from the event or the input).
+            const prNumber = Number(process.env.PR_NUMBER);
             const recovery = 'To recover: fix the cause above, then re-run this failed run or start a manual run with the PR number; publish is idempotent and only does what is missing. '
               + 'release-please opens no new release PR until this release is published.';
 

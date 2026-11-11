@@ -94,6 +94,30 @@ function renderSummary({ prNumber, tag, status, message, steps, box, effective, 
   return `${lines.join('\n')}\n`;
 }
 
+const refusalMessage = (reason, next) => `${reason}. Nothing was changed. ${next}.`;
+
+// The GitHub-only gate of a publish: the PR is merged, a release PR, from this repository and merged
+// into `defaultBranch`. It reads GitHub only (no Dev Hub), so the workflow runs it before the Dev Hub
+// login and publishRelease runs the same gate again. Returns { ok: true, pr, labels } or
+// { ok: false, message } where message is the refusal text of publishRelease. `defaultBranch` is
+// required (the workflow passes the repository's, never the dispatch input): a missing or empty
+// value throws, so the base gate cannot be skipped silently. An API failure throws.
+async function checkPublishable({ github, owner, repo, prNumber, defaultBranch }) {
+  if (typeof defaultBranch !== 'string' || defaultBranch.trim() === '') throw new Error('publish needs the default branch of the repository');
+  const refused = (reason, next) => ({ ok: false, message: refusalMessage(reason, next) });
+  const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+  if (pr.merged !== true) return refused(`PR #${prNumber} is not merged`, 'Publish runs once it is merged');
+  const labels = await listLabelNames({ github, owner, repo, prNumber });
+  if (!labels.includes(RELEASE_PR_LABEL) && !labels.includes(RELEASE_TAGGED_LABEL)) {
+    return refused(`PR #${prNumber} is not a release PR (no "${RELEASE_PR_LABEL}" or "${RELEASE_TAGGED_LABEL}" label)`, 'Run publish on a merged release PR');
+  }
+  if (!fromThisRepo(pr, { owner, repo })) return refused(`PR #${prNumber} comes from a fork`, 'A release PR comes from this repository; nothing is published from a fork');
+  if (pr.base.ref !== defaultBranch) {
+    return refused(`PR #${prNumber} was merged into "${plainText(pr.base.ref)}", not into the default branch "${defaultBranch}"`, 'Only a release PR merged into the default branch is published');
+  }
+  return { ok: true, pr, labels };
+}
+
 // Publish the merged release PR `prNumber`, idempotently. Steps, in order: promote the
 // recorded beta builds (each only if it is not promoted yet), tag the merge commit, create
 // the GitHub Release, swap the labels (tagged added before pending is removed, so a crash
@@ -115,7 +139,6 @@ function renderSummary({ prNumber, tag, status, message, steps, box, effective, 
 // summary, warnings }: the caller fails the job on refused and failed, writes `summary` to
 // the run summary and emits one warning annotation per `warnings` entry (one line each).
 async function publishRelease({ github, owner, repo, prNumber, defaultBranch, devHub, log = console.log }) {
-  if (typeof defaultBranch !== 'string' || defaultBranch.trim() === '') throw new Error('publishRelease needs the default branch of the repository');
   const ctx = { github, owner, repo, prNumber };
   const steps = {};
   let tag = '';
@@ -126,19 +149,12 @@ async function publishRelease({ github, owner, repo, prNumber, defaultBranch, de
     const warnings = effective ? effective.warnings : [];
     return { status, message, steps, warnings, summary: renderSummary({ prNumber, tag, status, message, steps, box, effective, warnings }) };
   };
-  const refuse = (reason, next) => finish(STATUS.REFUSED, `${reason}. Nothing was changed. ${next}.`);
+  const refuse = (reason, next) => finish(STATUS.REFUSED, refusalMessage(reason, next));
   const again = (cause) => `A maintainer resolves ${cause} and runs publish again`;
 
-  const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
-  if (pr.merged !== true) return refuse(`PR #${prNumber} is not merged`, 'Publish runs once it is merged');
-  const labels = await listLabelNames(ctx);
-  if (!labels.includes(RELEASE_PR_LABEL) && !labels.includes(RELEASE_TAGGED_LABEL)) {
-    return refuse(`PR #${prNumber} is not a release PR (no "${RELEASE_PR_LABEL}" or "${RELEASE_TAGGED_LABEL}" label)`, 'Run publish on a merged release PR');
-  }
-  if (!fromThisRepo(pr, { owner, repo })) return refuse(`PR #${prNumber} comes from a fork`, 'A release PR comes from this repository; nothing is published from a fork');
-  if (pr.base.ref !== defaultBranch) {
-    return refuse(`PR #${prNumber} was merged into "${plainText(pr.base.ref)}", not into the default branch "${defaultBranch}"`, 'Only a release PR merged into the default branch is published');
-  }
+  const gate = await checkPublishable({ github, owner, repo, prNumber, defaultBranch });
+  if (!gate.ok) return finish(STATUS.REFUSED, gate.message);
+  const { pr, labels } = gate;
   const mergeSha = pr.merge_commit_sha;
   const reads = githubReads({ github, owner, repo });
   const projectText = await readProjectText({ github, owner, repo, ref: pr.head.sha });
@@ -248,4 +264,4 @@ async function publishRelease({ github, owner, repo, prNumber, defaultBranch, de
   return finish(STATUS.PUBLISHED, `${tag} is published`);
 }
 
-module.exports = { STATUS, publishRelease };
+module.exports = { STATUS, publishRelease, checkPublishable };
