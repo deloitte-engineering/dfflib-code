@@ -154,12 +154,12 @@ async function pushAliasCommit({ github, owner, repo, branch, baseSha, projectTe
 }
 
 // The actor check of beta-build.yml: who may run the build. A person needs the
-// Maintainer role (checkMaintainer in release-pr.cjs). A login that ends in [bot]
+// Maintainer role (checkMaintainer in release-pr.cjs). Exactly github-actions[bot]
 // is allowed without a lookup: the label path starts the build with GITHUB_TOKEN,
-// so its actor is github-actions[bot].
+// so that is its actor. Any other bot goes through the same role rule as a person.
 // Returns { allowed, notice? }.
 async function canStartBeta({ github, owner, repo, actor }) {
-  if (String(actor).endsWith('[bot]')) return { allowed: true };
+  if (actor === 'github-actions[bot]') return { allowed: true };
   return checkMaintainer({ github, owner, repo, login: actor });
 }
 

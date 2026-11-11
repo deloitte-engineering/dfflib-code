@@ -40,8 +40,8 @@
 # Who and where:
 #           The workflow runs from `main` only (the `release` environment on the
 #           build and push-alias jobs allows `main`). The first step after the
-#           checkout checks the actor (a person needs maintain or admin; a
-#           [bot] login passes: the label path runs as github-actions[bot]).
+#           checkout checks the actor (a person or another bot needs maintain
+#           or admin; github-actions[bot] passes: the label path runs as it).
 #
 # Concurrency:
 #   One group for every run, whoever started it, so a manual and a label-started
@@ -129,8 +129,8 @@ jobs:
             .github/actions/assemble-monolith
 
       # Policy check: a person needs maintain or admin (the role rule is in
-      # release-beta.cjs). Logins ending in [bot] pass: the label path starts this
-      # workflow with GITHUB_TOKEN.
+      # release-beta.cjs). Only github-actions[bot] passes without a lookup: the
+      # label path starts this workflow with GITHUB_TOKEN.
       - name: Check who started the build
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:

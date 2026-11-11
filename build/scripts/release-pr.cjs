@@ -60,7 +60,7 @@ const MAINTAINER_ROLES = ['maintain', 'admin'];
 
 // Does `login` hold a Maintainer role? Returns { allowed, notice? }. A 404 means the
 // login is not a collaborator: a refusal, not an error. Any other failed lookup throws:
-// it must not turn into a refusal. The [bot] allowance of beta-build.yml is not part of
+// it must not turn into a refusal. The github-actions[bot] allowance of beta-build.yml is not part of
 // this rule (canStartBeta in release-beta.cjs).
 async function checkMaintainer({ github, owner, repo, login }) {
   let level;
