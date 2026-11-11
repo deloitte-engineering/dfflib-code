@@ -1,0 +1,96 @@
+# =============================================================================
+# release-readiness.yml - Release readiness check
+# =============================================================================
+# Purpose:  The check `Release readiness`. It fails a release PR
+#           (`autorelease: pending`) whose head does not record a current beta
+#           build, and passes every other PR. The recorded beta build is read
+#           from git at the event's head SHA (release-record.cjs), so the check
+#           answers for the commit it reports on:
+#             none     no package alias for the version: fails, asks for a beta
+#                      build (label `release: build-beta`)
+#             stale    the package directory changed since the beta build, for
+#                      example after "Update branch": fails, asks for a new one
+#             current  passes
+#           It never reads the conclusion of a beta-build.yml run (R7: its sync
+#           job can end "cancelled" although a replacement did the work) or the Dev Hub. A beta
+#           build whose content differs from `main` is the publish guard.
+#
+# Triggers: pull_request_target (opened, synchronize, reopened, labeled,
+#           unlabeled): every new head SHA (the alias commit, a release-please
+#           rebuild and "Update branch" all push with a token that runs
+#           workflows) and every change of the release label. No
+#           workflow_dispatch, unlike the repo default: a manual run has no PR to report on.
+#
+# Concurrency:
+#   release-readiness-<PR number>-<head SHA>, cancel-in-progress: true. The
+#   answer for a head SHA depends only on the PR's labels (read fresh) and that
+#   SHA, so the newest event for the same SHA holds what an older run would
+#   check. The SHA is in the key so a late event for an older head never
+#   cancels the run of a newer head (which would leave its check cancelled).
+#   Never the `release-notes-override` group, which drops pending runs (R7).
+#
+# Status:   The job has no `if:`, so every PR gets a result, never "pending".
+#           Check name: `Release readiness`.
+#
+# Inputs:   None.
+#
+# Permissions: contents: read (checkout, git reads), pull-requests: read (the
+#           PR's labels).
+#
+# Secrets:  GITHUB_TOKEN only.
+#
+# Recovery: Follow the message of the failed check (add the label
+#           `release: build-beta`, or wait for the beta build); the check runs
+#           again on the next event for the PR.
+#
+# Logic:    build/scripts/release-readiness.cjs (checkReleaseReadiness), which
+#           takes the release PR from release-pr.cjs and the state from
+#           release-record.cjs.
+# =============================================================================
+
+name: Release Readiness
+
+concurrency:
+  group: release-readiness-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  readiness:
+    name: Release readiness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # The module comes from the default branch.
+      - name: Checkout default branch (scripts)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: build/scripts
+
+      - name: Check the recorded beta build
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { checkReleaseReadiness } = require(`${process.env.GITHUB_WORKSPACE}/build/scripts/release-readiness.cjs`);
+            const { owner, repo } = context.repo;
+            const result = await checkReleaseReadiness({
+              github, owner, repo,
+              prNumber: context.payload.pull_request.number,
+              headSha: context.payload.pull_request.head.sha,
+            });
+            core.info(result.message);
+            // The packages share X.Y.Z; each keeps its own BUILD, so the numbers can differ: shown, never a failure.
+            if (result.warning) core.warning(result.warning);
+            core.summary.addRaw(result.message);
+            await core.summary.write();
+            if (!result.ready) core.setFailed(result.message);

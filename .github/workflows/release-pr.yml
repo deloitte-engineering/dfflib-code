@@ -1,0 +1,89 @@
+# =============================================================================
+# release-pr.yml - Release PR (release-please)
+# =============================================================================
+# Purpose:  Opens or updates ONE release PR that bumps versionNumber in
+#           sfdx-project.json and lists the PRs merged since the last release
+#           tag. Merging it publishes the release (release-publish.yml).
+#           A manual publish of a merged release PR is a workflow_dispatch run
+#           of release-publish.yml.
+#
+# Triggers: - push to main touching a content input: force-app/**, dependencies/**, .gitmodules
+#             or the assemble scripts, so an upstream pin bump proposes a release too (exclude-paths cannot exclude
+#             root files, so the path filter is the loop guard: the release PR
+#             only changes sfdx-project.json and the manifest)
+#           - workflow_dispatch (no inputs): a deliberate run; release-please
+#             itself skips commits under exclude-paths and non-releasable types
+#
+# Inputs:   None.
+#
+# Concurrency:
+#   Group release-please-<branch>: one run at a time per branch, queued, NEVER
+#   cancelled (cancel-in-progress: false): cancelling release-please mid-run can
+#   leave the release branch and the PR out of sync.
+#
+# Token:    Release token from ./.github/actions/release-token, not
+#           GITHUB_TOKEN, so checks run on the release PR. Only the
+#           release-please step receives it.
+#
+# Config:   release-please-config.json and .release-please-manifest.json are
+#           read from the default branch via the GitHub API: both must be on
+#           main before the first run. The manifest version must match an
+#           existing tag (v1.1.2 is the bootstrap alias of v1.1.2.0).
+#
+# Bumps:    release-please bumps the default package entry of sfdx-project.json itself; `extra-files` in the config bumps the
+#           other entries, so both packages get one version. An upstream pin bump committed as `fix(deps):` is a
+#           releasing type outside `exclude-paths`, so it opens a release PR on its own.
+#
+# Secrets:  RELEASE_TOKEN, in environment `release`
+#
+# Recovery: Fix the cause and re-run the run or dispatch it again; release-please
+#           is idempotent and recomputes the PR from the commits on main.
+#
+# =============================================================================
+
+name: Release PR
+
+concurrency:
+  group: release-please-${{ github.ref_name }}
+  cancel-in-progress: false
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'force-app/**'
+      - 'dependencies/**'
+      - '.gitmodules'
+      - 'build/scripts/assemble-*.cjs'
+      - 'build/scripts/tracked-tree.cjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-pr:
+    runs-on: ubuntu-24.04
+    environment: release
+    steps:
+      # The release token goes only to release-please.
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve release token
+        id: release-token
+        uses: ./.github/actions/release-token
+        with:
+          pat: ${{ secrets.RELEASE_TOKEN }}
+
+      # release-please-action v5.0.0 (node24; its only breaking change). In
+      # manifest mode the action ignores the release-as input: force a version
+      # with a Release-As commit footer.
+      - name: Open or update the release PR
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.release-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

@@ -1,0 +1,31 @@
+{
+    "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+    "release-type": "sfdx",
+    "include-component-in-tag": false,
+    "include-v-in-tag": true,
+    "packages": {
+        ".": {
+            "package-name": "dfflib",
+            "skip-changelog": true,
+            "skip-github-release": true,
+            "changelog-type": "github",
+            "extra-files": [
+                {
+                    "type": "json",
+                    "path": "sfdx-project.json",
+                    "jsonpath": "$.packageDirectories[?(@.default!=true)].versionNumber"
+                }
+            ],
+            "pull-request-header": "## Description\n\nAutomated release PR opened by release-please.",
+            "pull-request-footer": "## Checklist\n\n- [x] My PR title follows the Conventional Commits format\n- [x] My code follows the project's coding standards\n- [x] I have tested my changes locally\n- [x] I have updated documentation if needed",
+            "exclude-paths": [
+                ".claude",
+                ".github",
+                "build",
+                "code-examples",
+                "docs",
+                "manifest"
+            ]
+        }
+    }
+}

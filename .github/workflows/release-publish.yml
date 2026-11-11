@@ -1,0 +1,209 @@
+# =============================================================================
+# release-publish.yml - Publish the release when the release PR merges
+# =============================================================================
+# Purpose:  A thin caller of publishRelease() (release-publish.cjs) for a
+#           merged release PR: promote the recorded beta builds (every package, the
+#           monolith first), tag the merge commit vX.Y.Z, publish the GitHub
+#           Release and swap `autorelease: pending` for `autorelease: tagged`.
+#           Every step is probed first, so a re-run finishes a partial release
+#           and a complete one is a no-op.
+#
+# Triggers: - pull_request_target (closed) into `main`; the job runs only when
+#             the PR was merged, carried `autorelease: pending` and comes from
+#             this repository (publishRelease repeats the checks and also
+#             checks the PR merged into the default branch). pull_request_target,
+#             not push: the event names the merged PR and its merge commit, so
+#             no later push to `main`
+#             can replace or cancel the run for this merge (a push-triggered
+#             run would share a group with the next push). Its ref is the base
+#             branch (`main`), which the `release` environment allows; a
+#             `pull_request` run has a refs/pull ref and would be refused.
+#           - workflow_dispatch with a required `pr_number`: the manual path to
+#             finish a partial release. The same publishRelease() call as
+#             a merge, so there is one release path. A first step checks the PR
+#             before the Dev Hub login (checkPublishable: merged, carries a
+#             release label, not from a fork, merged into the default branch),
+#             so a wrong number never uses the Dev Hub secrets; publishRelease
+#             repeats the same checks. A complete release is a
+#             no-op ("Nothing to do"), a partial release is finished. Run it
+#             from `main`.
+#
+# Concurrency:
+#   release-publish-<PR number>, cancel-in-progress: false: a promote cancelled
+#   midway leaves a partial release. Keyed on the PR (the dispatch input for a
+#   manual run), so a manual run and the merge run of the same PR never run at
+#   once. Every PR closed into `main` starts this workflow: with one static
+#   group, closing two other PRs could replace a pending publish run. Two
+#   release PRs never publish at once: release-please opens the next one only
+#   after `autorelease: pending` is removed, the last step of publish.
+#
+# Inputs:   pr_number (required, workflow_dispatch only): the merged release PR.
+#
+# Environment: `release` (deployment branch policy: `main`).
+#
+# Permissions: workflow level contents: read; the publish job adds contents:
+#           write (tag, GitHub Release), issues: write and pull-requests: write
+#           (labels on a PR: issues alone returned 403, see
+#           release-notes-override.yml).
+#
+# Secrets:  SF_CLIENT_ID, SF_USERNAME, SF_PRIVATE_KEY, SF_INSTANCE_URL (Dev Hub,
+#           passed to the sf-login action, which owns the CLI pin and the login;
+#           the PR check before it uses GITHUB_TOKEN only);
+#           GITHUB_TOKEN for the tag, the GitHub
+#           Release and the labels. No release token.
+#
+# Setup:    The labels `autorelease: pending` and `autorelease: tagged` exist in
+#           the repository.
+#
+# Recovery: a refusal or a failed step fails the job with what to fix; fix it,
+#           then re-run this run, or start a manual run with the PR number.
+#           release-please opens no new release PR until this release is
+#           published.
+#
+# Logic:    build/scripts/release-publish.cjs (checkPublishable, publishRelease) with
+#           the Dev Hub adapter release-devhub.cjs.
+# =============================================================================
+
+name: Release Publish
+
+concurrency:
+  group: release-publish-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+on:
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Number of the merged release PR to publish (finishes a partial release)'
+        required: true
+
+permissions:
+  contents: read
+
+# The alias the Dev Hub login gets in this run; every sf call below targets it.
+env:
+  DEVHUB_ALIAS: devhub
+
+jobs:
+  publish:
+    name: Publish the release
+    # A manual run is checked by publishRelease (merged, release label, not a fork,
+    # merged into the default branch). The condition is a folded scalar because the
+    # label name holds ": ", which ends a plain YAML scalar.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.pull_request.merged == true
+      && contains(github.event.pull_request.labels.*.name, 'autorelease: pending')
+      && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      # The modules come from the default branch.
+      - name: Checkout default branch (scripts)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            build/scripts
+            .github/actions/sf-login
+
+      # The PR is checked with GITHUB_TOKEN before any Dev Hub secret is used. A merge
+      # run names its PR in the event; a manual run takes it from the input. A PR that
+      # cannot be published ends the run here, so the login below never runs.
+      - name: Check the release PR
+        id: gate
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          DISPATCH_PR_NUMBER: ${{ inputs.pr_number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { checkPublishable } = require(`${process.env.GITHUB_WORKSPACE}/build/scripts/release-publish.cjs`);
+            const { owner, repo } = context.repo;
+            const defaultBranch = context.payload.repository.default_branch;
+
+            let prNumber;
+            if (context.eventName === 'workflow_dispatch') {
+              if (!/^\d+$/.test(process.env.DISPATCH_PR_NUMBER)) {
+                core.setFailed('pr_number must be a PR number (digits only)');
+                return;
+              }
+              prNumber = Number(process.env.DISPATCH_PR_NUMBER);
+            } else {
+              prNumber = context.payload.pull_request.number;
+            }
+            const next = 'To recover: fix the cause above, then re-run this failed run or start a manual run with the PR number.';
+
+            let gate;
+            try {
+              gate = await checkPublishable({ github, owner, repo, prNumber, defaultBranch });
+            } catch (error) {
+              const call = error.request ? ` [${error.request.method} ${error.request.url}, HTTP ${error.status}]` : '';
+              core.setFailed(`PR #${prNumber}: the check before the Dev Hub login failed: ${error.message}${call}. Nothing was changed. ${next}`);
+              return;
+            }
+            if (!gate.ok) {
+              core.setFailed(`${gate.message} ${next}`);
+              return;
+            }
+            core.setOutput('pr-number', String(prNumber));
+
+      # The action comes from the default branch checked out above, never from PR code.
+      - name: Install the Salesforce CLI and log in to the Dev Hub
+        uses: ./.github/actions/sf-login
+        with:
+          instance-url: ${{ secrets.SF_INSTANCE_URL }}
+          client-id: ${{ secrets.SF_CLIENT_ID }}
+          username: ${{ secrets.SF_USERNAME }}
+          private-key: ${{ secrets.SF_PRIVATE_KEY }}
+          alias: ${{ env.DEVHUB_ALIAS }}
+          set-default-dev-hub: 'true'
+
+      - name: Publish the release
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_NUMBER: ${{ steps.gate.outputs.pr-number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { promisify } = require('util');
+            const execFile = promisify(require('child_process').execFile);
+            const root = `${process.env.GITHUB_WORKSPACE}/build/scripts`;
+            const { STATUS, publishRelease } = require(`${root}/release-publish.cjs`);
+            const { sfDevHub } = require(`${root}/release-devhub.cjs`);
+            const { owner, repo } = context.repo;
+            const defaultBranch = context.payload.repository.default_branch;
+
+            // The number the check step accepted (digits only, from the event or the input).
+            const prNumber = Number(process.env.PR_NUMBER);
+            const recovery = 'To recover: fix the cause above, then re-run this failed run or start a manual run with the PR number; publish is idempotent and only does what is missing. '
+              + 'release-please opens no new release PR until this release is published.';
+
+            // A rejected execFile carries sf's JSON error on error.stdout, as the adapter expects.
+            const run = async (args) => (await execFile('sf', args, { maxBuffer: 16 * 1024 * 1024 })).stdout;
+            const devHub = sfDevHub({ run, targetDevHub: process.env.DEVHUB_ALIAS });
+
+            let result;
+            try {
+              result = await publishRelease({ github, owner, repo, prNumber, defaultBranch, devHub, log: core.info });
+            } catch (error) {
+              // Thrown only before promote: nothing was changed.
+              const call = error.request ? ` [${error.request.method} ${error.request.url}, HTTP ${error.status}]` : '';
+              core.setFailed(`PR #${prNumber}: publish failed before any change: ${error.message}${call}. ${recovery}`);
+              return;
+            }
+            const stopped = result.status === STATUS.REFUSED || result.status === STATUS.FAILED;
+            core.summary.addRaw(result.summary, true);
+            if (stopped) core.summary.addRaw(`\n**${recovery}**\n`, true);
+            await core.summary.write();
+            for (const warning of result.warnings) core.warning(`PR #${prNumber}: ${warning}`);
+            if (stopped) core.setFailed(`${result.message} ${recovery}`);
