@@ -16,11 +16,18 @@
 # Default owners for everything in the repo.
 *                                @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
 
-# D'fflib framework layer classes (source + metadata).
-/force-app/main/default/classes/ @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
+# D'fflib framework layer: every force-app sub-folder (source + metadata).
+/force-app/                      @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
 
-# Unit Test Factory classes (source + metadata).
-/force-app/test-factory/classes/ @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
+# Submodule pointers: a pointer change or a change to the submodule list needs the owners' review.
+/dependencies/                   @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
+
+# The submodule list, and the workflows and actions (the allowlist and guards cannot change without the owners).
+/.gitmodules                     @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
+/.github/                        @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
+
+# Build scripts, including the assemble script and guards the assemble action runs.
+/build/                          @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum
 
 # Documentation.
 *.md                             @deloitte-engineering/d-fflib-team @rfernandesdossantos @rvandenassum

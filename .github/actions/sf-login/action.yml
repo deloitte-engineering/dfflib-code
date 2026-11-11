@@ -1,0 +1,117 @@
+# =============================================================================
+# sf-login - Pinned Salesforce CLI from a cache, then a login to one org
+# =============================================================================
+# Purpose:  The one place that knows the Salesforce CLI pin and the login
+#           commands. A CLI bump is the one `version=` line below.
+# Cache:    ~/.npm-global, keyed on the pin and the runner OS. On a miss the
+#           pinned CLI is installed. After a restore or an install, `sf --version`
+#           must report the pin or the step fails. Release jobs run on main and
+#           restore only caches written on main.
+# CLI:      `@salesforce/cli`; the deprecated `sfdx-cli` package is never used.
+#
+# Usage:
+#   - The caller passes the login values in as inputs. This action reads no
+#     secrets context.
+#   - A job that checks out the default branch sparsely adds
+#     `.github/actions/sf-login` to the sparse list.
+#
+#   steps:
+#     - uses: ./.github/actions/sf-login
+#       with:
+#         instance-url: <login URL of the org>
+#         client-id: <client ID>
+#         username: <username>
+#         private-key: <key>
+#         alias: devhub
+#         set-default-dev-hub: 'true'
+# =============================================================================
+name: Salesforce login
+description: Install the pinned Salesforce CLI from a cache and log in to an org
+
+inputs:
+  instance-url:
+    description: Login URL of the org
+    required: true
+  client-id:
+    description: Client ID
+    required: true
+  username:
+    description: Username to log in as
+    required: true
+  private-key:
+    description: Key for the login
+    required: true
+  alias:
+    description: Alias to give the org
+    required: true
+  set-default-dev-hub:
+    description: "'true' makes the org the default Dev Hub; otherwise it becomes the default org"
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Pin the Salesforce CLI version
+      id: pin
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "version=2.156.8" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the Salesforce CLI cache
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.npm-global
+        key: sf-cli-${{ steps.pin.outputs.version }}-${{ runner.os }}
+
+    - name: Install the Salesforce CLI
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        SF_CLI_VERSION: ${{ steps.pin.outputs.version }}
+      run: |
+        set -euo pipefail
+        npm config set prefix "$HOME/.npm-global"
+        npm install -g "@salesforce/cli@$SF_CLI_VERSION"
+
+    - name: Check the Salesforce CLI version
+      shell: bash
+      env:
+        SF_CLI_VERSION: ${{ steps.pin.outputs.version }}
+      run: |
+        set -euo pipefail
+        echo "$HOME/.npm-global/bin" >> "$GITHUB_PATH"
+        reported="$("$HOME/.npm-global/bin/sf" --version)"
+        echo "$reported"
+        case "$reported" in
+          "@salesforce/cli/$SF_CLI_VERSION "*) ;;
+          *) echo "::error::Expected @salesforce/cli/$SF_CLI_VERSION, got: $reported"; exit 1 ;;
+        esac
+
+    - name: Log in to the org
+      shell: bash
+      env:
+        SF_INSTANCE_URL: ${{ inputs.instance-url }}
+        SF_CLIENT_ID: ${{ inputs.client-id }}
+        SF_USERNAME: ${{ inputs.username }}
+        SF_PRIVATE_KEY: ${{ inputs.private-key }}
+        SF_ALIAS: ${{ inputs.alias }}
+        SF_DEV_HUB: ${{ inputs.set-default-dev-hub }}
+      run: |
+        set -euo pipefail
+        if [ "$SF_DEV_HUB" != "true" ] && [ "$SF_DEV_HUB" != "false" ]; then
+          echo "::error::set-default-dev-hub must be true or false, got: $SF_DEV_HUB"; exit 1
+        fi
+        default_flag="--set-default"
+        if [ "$SF_DEV_HUB" = "true" ]; then default_flag="--set-default-dev-hub"; fi
+        sf org login jwt \
+          --instance-url "$SF_INSTANCE_URL" \
+          --client-id "$SF_CLIENT_ID" \
+          --jwt-key-file <(echo "$SF_PRIVATE_KEY") \
+          --username "$SF_USERNAME" \
+          "$default_flag" \
+          -a "$SF_ALIAS" \
+          && echo "Authentication successful." \
+          || { echo "::error::Authentication failed."; exit 1; }

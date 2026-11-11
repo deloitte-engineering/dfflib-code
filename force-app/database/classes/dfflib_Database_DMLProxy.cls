@@ -1,0 +1,351 @@
+/**
+ * Copyright (c) 2019, Deloitte Consultative Services B.V.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * See LICENSE in the repository root for the full license text.
+ */
+/**
+ * Centralised class to group all Database DML operations:
+ * 1) Allowing to easily apply different database security models, through sharing modes and access levels (AccessLevel)
+ * 2) Allowing optimal separation of concerns where UOW focuses on registration and dfflib_Database_DMLProxy on database interactions
+ *      This allows to simplify Test methods, and make the framework more environment-independent (test-classes not failing on added validations)
+ *      Lastly, this enables unlocked packages where framework code is not needed to be touched by project developers
+ */
+public abstract class dfflib_Database_DMLProxy{
+
+    /**
+     * Getter providing a DMLProxy implementation for the security enforcement model provided
+     *
+     * @param   securityContext     Database security context for DML operations to be executed on
+     * @return  DMLProxy implementation for the security context provided
+     */
+    public static dfflib_Database_IDML getDMLProxyImplementation( dfflib_Database.Context securityContext ){
+        return SECURITY_ENFORCEMENT_DML.get( securityContext );
+    }
+
+    /**
+     * Database context models supported by the unit of work.
+     */
+    private final static Map<dfflib_Database.Context, dfflib_Database_IDML> SECURITY_ENFORCEMENT_DML = new Map<dfflib_Database.Context, dfflib_Database_IDML>{
+        dfflib_Database.Context.FULL => new WithSimpleDML(),
+        dfflib_Database.Context.SHARING_SKIP_PERMISSIONS => new WithSimpleDML(),
+        dfflib_Database.Context.NONE => new WithoutSimpleDML(),
+        dfflib_Database.Context.INHERIT => new InheritSimpleDML()
+    };
+
+    /**
+     * All standard transactions will implement the security model when saving.
+     */
+    @TestVisible
+    private with sharing class WithSimpleDML implements dfflib_Database_IDML{
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Database.DMLOptions options, AccessLevel accessLevel ){
+            if( options != null && options.optAllOrNone != true ){
+                System.debug( LoggingLevel.WARN, 'fflib - IMPORTANT: AllOrNone is FALSE, developer is responsible for handling save errors' );
+            }
+
+            switch on action{
+                when dNEW, dNEW_PRIO{
+                    return ( options == null ) ? Database.insert( objList, accessLevel ) : Database.insert( objList, options, accessLevel );
+                }
+                when dUPDATE, dUPDATE_PRIO{
+                    return ( options == null ) ? Database.update( objList, accessLevel ) : Database.update( objList, options, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with DMLOptions ' + action );
+                }
+            }
+        }
+
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Boolean allOrNone, AccessLevel accessLevel ){
+            if( !allOrNone ){
+                System.debug( LoggingLevel.WARN, 'fflib - IMPORTANT: AllOrNone is FALSE, developer is responsible for handling save errors' );
+            }
+
+            switch on action{
+                when dDELETE, dDELETE_PRIO{
+                    return Database.delete( objList, allOrNone, accessLevel );
+                }
+                when dUNDELETE{
+                    return Database.undelete( objList, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with AllOrNone Boolean ' + action );
+                }
+            }
+        }
+
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, AccessLevel accessLevel ){
+            if( objList != null && !objList.isEmpty() ){
+                switch on action{
+                    when dPUB_BEFORE, dPUB_AFTER_SUCCESS, dPUB_AFTER_FAILURE{
+                        return EventBus.publish( objList );
+                    }
+                    when dEMPTY_RECBIN{
+                        return Database.emptyRecycleBin( objList );
+                    }
+                    when dNEW_IMMEDIATE{
+                        return Database.insertImmediate( objList, accessLevel );
+                    }
+                    when dUPDATE_IMMEDIATE{
+                        return Database.updateImmediate( objList, accessLevel );
+                    }
+                    when dDELETE_IMMEDIATE{
+                        return Database.deleteImmediate( objList, accessLevel );
+                    }
+                    when else{
+                        throw new InvalidDMLActionException( 'Invalid Action for DMLAction without additional parameters ' + action );
+                    }
+                }
+            }
+            return null;
+        }
+
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel ){
+            switch on action{
+                when dUPSERT, dUPSERT_PRIO{
+                    return Database.upsert( objList, externalIdField, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with ExternalIdField ' + action );
+                }
+            }
+        }
+
+        public List<Object> performOperation( dfflib_SObjectUnitOfWork.Operations operation, List<Object> objList ){
+            if( objList != null && !objList.isEmpty() ){
+                // Per operation convert List<Any> to right format by looping per record to prevent "Invalid conversion" exception
+                switch on operation{
+                    when SEND_EMAIL{
+                        List<Messaging.Email> emailList = new List<Messaging.Email>();
+                        for( Integer i = 0, j = objList.size(); i < j; i++ ){
+                            emailList.add( ( Messaging.Email ) objList[ i ] );
+                        }
+                        return Messaging.sendEmail( emailList );
+                    }
+                    when PROCESS_APPROVAL_PROCESS{
+                        List<Approval.ProcessRequest> approvalList = new List<Approval.ProcessRequest>();
+                        for( Integer i = 0, j = objList.size(); i < j; i++ ){
+                            approvalList.add( ( Approval.ProcessRequest ) objList[ i ] );
+                        }
+                        return Approval.process( approvalList );
+                    }
+                    when else{
+                        throw new InvalidDMLActionException( 'Invalid Operation ' + operation );
+                    }
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Allows specific transactions to override the security model when saving.
+     */
+    @TestVisible
+    private without sharing class WithoutSimpleDML implements dfflib_Database_IDML{
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Database.DMLOptions options, AccessLevel accessLevel ){
+            if( options != null && options.optAllOrNone != true ){
+                System.debug( LoggingLevel.WARN, 'fflib - IMPORTANT: AllOrNone is FALSE, developer is responsible for handling save errors' );
+            }
+
+            switch on action{
+                when dNEW, dNEW_PRIO{
+                    return ( options == null ) ? Database.insert( objList, accessLevel ) : Database.insert( objList, options, accessLevel );
+                }
+                when dUPDATE, dUPDATE_PRIO{
+                    return ( options == null ) ? Database.update( objList, accessLevel ) : Database.update( objList, options, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with DMLOptions ' + action );
+                }
+            }
+        }
+
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Boolean allOrNone, AccessLevel accessLevel ){
+            if( !allOrNone ){
+                System.debug( LoggingLevel.WARN, 'fflib - IMPORTANT: AllOrNone is FALSE, developer is responsible for handling save errors' );
+            }
+
+            switch on action{
+                when dDELETE, dDELETE_PRIO{
+                    return Database.delete( objList, allOrNone, accessLevel );
+                }
+                when dUNDELETE{
+                    return Database.undelete( objList, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with AllOrNone Boolean ' + action );
+                }
+            }
+        }
+
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, AccessLevel accessLevel ){
+            if( objList != null && !objList.isEmpty() && accessLevel != null ){
+                switch on action{
+                    when dPUB_BEFORE, dPUB_AFTER_SUCCESS, dPUB_AFTER_FAILURE{
+                        return EventBus.publish( objList );
+                    }
+                    when dEMPTY_RECBIN{
+                        return Database.emptyRecycleBin( objList );
+                    }
+                    when dNEW_IMMEDIATE{
+                        return Database.insertImmediate( objList, accessLevel );
+                    }
+                    when dUPDATE_IMMEDIATE{
+                        return Database.updateImmediate( objList, accessLevel );
+                    }
+                    when dDELETE_IMMEDIATE{
+                        return Database.deleteImmediate( objList, accessLevel );
+                    }
+                    when else{
+                        throw new InvalidDMLActionException( 'Invalid Action for DMLAction without additional parameters ' + action );
+                    }
+                }
+            }
+            return null;
+        }
+
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel ){
+            switch on action{
+                when dUPSERT, dUPSERT_PRIO{
+                    return Database.upsert( objList, externalIdField, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with ExternalIdField ' + action );
+                }
+            }
+        }
+
+        public List<Object> performOperation( dfflib_SObjectUnitOfWork.Operations operation, List<Object> objList ){
+            if( objList != null && !objList.isEmpty() ){
+                // Per operation convert List<Any> to right format by looping per record to prevent "Invalid conversion" exception
+                switch on operation{
+                    when SEND_EMAIL{
+                        List<Messaging.Email> emailList = new List<Messaging.Email>();
+                        for( Integer i = 0, j = objList.size(); i < j; i++ ){
+                            emailList.add( ( Messaging.Email ) objList[ i ] );
+                        }
+                        return Messaging.sendEmail( emailList );
+                    }
+                    when PROCESS_APPROVAL_PROCESS{
+                        List<Approval.ProcessRequest> approvalList = new List<Approval.ProcessRequest>();
+                        for( Integer i = 0, j = objList.size(); i < j; i++ ){
+                            approvalList.add( ( Approval.ProcessRequest ) objList[ i ] );
+                        }
+                        return Approval.process( approvalList );
+                    }
+                    when else{
+                        throw new InvalidDMLActionException( 'Invalid Operation ' + operation );
+                    }
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Inherits the sharing model when saving.
+     */
+    @TestVisible
+    private inherited sharing class InheritSimpleDML implements dfflib_Database_IDML{
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Database.DMLOptions options, AccessLevel accessLevel ){
+            if( options != null && options.optAllOrNone != true ){
+                System.debug( LoggingLevel.WARN, 'fflib - IMPORTANT: AllOrNone is FALSE, developer is responsible for handling save errors' );
+            }
+
+            switch on action{
+                when dNEW, dNEW_PRIO{
+                    return ( options == null ) ? Database.insert( objList, accessLevel ) : Database.insert( objList, options, accessLevel );
+                }
+                when dUPDATE, dUPDATE_PRIO{
+                    return ( options == null ) ? Database.update( objList, accessLevel ) : Database.update( objList, options, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with DMLOptions ' + action );
+                }
+            }
+        }
+
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Boolean allOrNone, AccessLevel accessLevel ){
+            if( !allOrNone ){
+                System.debug( LoggingLevel.WARN, 'fflib - IMPORTANT: AllOrNone is FALSE, developer is responsible for handling save errors' );
+            }
+
+            switch on action{
+                when dDELETE, dDELETE_PRIO{
+                    return Database.delete( objList, allOrNone, accessLevel );
+                }
+                when dUNDELETE{
+                    return Database.undelete( objList, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with AllOrNone Boolean ' + action );
+                }
+            }
+        }
+
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, AccessLevel accessLevel ){
+            if( objList != null && !objList.isEmpty() && accessLevel != null ){
+                switch on action{
+                    when dPUB_BEFORE, dPUB_AFTER_SUCCESS, dPUB_AFTER_FAILURE{
+                        return EventBus.publish( objList );
+                    }
+                    when dEMPTY_RECBIN{
+                        return Database.emptyRecycleBin( objList );
+                    }
+                    when dNEW_IMMEDIATE{
+                        return Database.insertImmediate( objList, accessLevel );
+                    }
+                    when dUPDATE_IMMEDIATE{
+                        return Database.updateImmediate( objList, accessLevel );
+                    }
+                    when dDELETE_IMMEDIATE{
+                        return Database.deleteImmediate( objList, accessLevel );
+                    }
+                    when else{
+                        throw new InvalidDMLActionException( 'Invalid Action for DMLAction without additional parameters ' + action );
+                    }
+                }
+            }
+            return null;
+        }
+
+        public List<Object> performDMLAction( dfflib_SObjectUnitOfWork.DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel ){
+            switch on action{
+                when dUPSERT, dUPSERT_PRIO{
+                    return Database.upsert( objList, externalIdField, allOrNone, accessLevel );
+                }
+                when else{
+                    throw new InvalidDMLActionException( 'Invalid Action for DMLAction with ExternalIdField ' + action );
+                }
+            }
+        }
+
+        public List<Object> performOperation( dfflib_SObjectUnitOfWork.Operations operation, List<Object> objList ){
+            if( objList != null && !objList.isEmpty() ){
+                // Per operation convert List<Any> to right format by looping per record to prevent "Invalid conversion" exception
+                switch on operation{
+                    when SEND_EMAIL{
+                        List<Messaging.Email> emailList = new List<Messaging.Email>();
+                        for( Integer i = 0, j = objList.size(); i < j; i++ ){
+                            emailList.add( ( Messaging.Email ) objList[ i ] );
+                        }
+                        return Messaging.sendEmail( emailList );
+                    }
+                    when PROCESS_APPROVAL_PROCESS{
+                        List<Approval.ProcessRequest> approvalList = new List<Approval.ProcessRequest>();
+                        for( Integer i = 0, j = objList.size(); i < j; i++ ){
+                            approvalList.add( ( Approval.ProcessRequest ) objList[ i ] );
+                        }
+                        return Approval.process( approvalList );
+                    }
+                    when else{
+                        throw new InvalidDMLActionException( 'Invalid Operation ' + operation );
+                    }
+                }
+            }
+            return null;
+        }
+    }
+
+    public class InvalidDMLActionException extends Exception{}
+}

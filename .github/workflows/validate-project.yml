@@ -1,34 +1,45 @@
 # =============================================================================
 # validate-project.yml - Salesforce Project Validation Workflow
 # =============================================================================
-# Purpose:  Validates the full Salesforce project (force-app/main/default and
-#           force-app/test-factory) against the buildcheck org on feature and
-#           release branches. Runs deployment validation with tests.
+# Purpose:  Validates the assembled tree (monolith/: force-app plus the fflib
+#           submodules, built by the assemble-monolith action) against the
+#           validation org for pull requests (and on demand for any branch).
+#           Runs deployment validation with tests.
 #
-# Triggers: - workflow_dispatch  (manual trigger via GitHub Actions UI)
-#           - push to feature/* or release/* branches
-#             (when force-app/** changes)
+# Triggers: - workflow_dispatch  (manual trigger via GitHub Actions UI; the way to
+#             validate a branch that has no pull request)
 #           - pull_request opened/synchronize/reopened targeting main or master
-#             (when force-app/** changes)
+#             (when force-app/**, dependencies/**, .gitmodules, sfdx-project.json
+#             or the assemble script changes, so a submodule bump alone triggers it)
+#           There is no push trigger: a push run is keyed on the branch name and a
+#           pull_request run on the PR number, so both would run against the
+#           validation org for one push.
+#           The deployment validation enforces the 75% code coverage gate.
 #
 # Concurrency:
-#   PR-scoped concurrency — both push and pull_request triggers for the same PR
-#   share a concurrency group (keyed on PR number), so the second run cancels the first.
-#   Pushes to branches without an open PR are keyed on branch name.
-#   Different branches/PRs run in parallel.
+#   A pull_request run is keyed on the PR number, a manual run on the branch name.
+#   A newer run in the same group cancels the one in progress; different PRs and
+#   branches run in parallel.
 #
-# Permissions: contents: read (workflow-level; least-privilege — this job only
-#              reads code and deploys to an org, never writes to the repo)
+# Timeout:  The validate job stops after 90 minutes (the 60 minute --wait plus
+#           setup), so a hung CLI install or auth cannot run for 6 hours.
 #
-# Secrets:  - SF_BUILDCHECK_CLIENT_ID     Consumer Key from Connected App (buildcheck org)
-#            - SF_BUILDCHECK_USERNAME      Salesforce username to authenticate as (buildcheck org)
-#            - SF_BUILDCHECK_PRIVATE_KEY   Private key (RSA) for JWT signing (buildcheck org)
-#            - SF_BUILDCHECK_INSTANCE_URL  Instance URL of the buildcheck org
+# Permissions: contents: read (workflow-level; the job never writes to the repo)
+#
+# Secrets:  SF_BUILDCHECK_INSTANCE_URL, SF_BUILDCHECK_CLIENT_ID,
+#           SF_BUILDCHECK_USERNAME and SF_BUILDCHECK_PRIVATE_KEY, read from the
+#           buildcheck environment (the validate job declares it).
+#
+# Inputs:   None.
+#
+# Recovery: Fix the cause and re-run the run, or push again. A manual run
+#           validates any branch.
 #
 # Runner:   ubuntu-24.04 (pinned)
+#
 # =============================================================================
 
-# Allow parallel runs across different branches, but cancel concurrent runs on the same branch
+# Allow parallel runs across different PRs/branches, but cancel the in-progress run of the same PR/branch
 concurrency:
   group: validate-project-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
@@ -40,18 +51,6 @@ permissions:
 
 on:
   workflow_dispatch:
-    inputs:
-      debug:
-        description: 'Enable debug output (org details, verbose auth). Default: false'
-        required: false
-        type: boolean
-        default: false
-  push:
-    branches:
-      - 'feature/*'
-      - 'release/*'
-    paths:
-      - 'force-app/**'
   pull_request:
     types: [ opened, synchronize, reopened ]
     branches:
@@ -59,11 +58,16 @@ on:
       - master
     paths:
       - 'force-app/**'
+      - 'dependencies/**'
+      - '.gitmodules'
+      - 'sfdx-project.json'
+      - 'build/scripts/assemble-*.cjs'
+      - 'build/scripts/tracked-tree.cjs'
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║ JOB PIPELINE                                                                  ║
 # ╠══════════════════════════════════════════════════════════════════════════════╣
-# ║ validate ─── Validates deployment against buildcheck org with tests          ║
+# ║ validate ─── Validates deployment against validation org with tests          ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 jobs:
@@ -71,8 +75,8 @@ jobs:
   # │ JOB: validate                                                                │
   # ├──────────────────────────────────────────────────────────────────────────────┤
   # │ PURPOSE:                                                                     │
-  # │   Validates the full Salesforce project (force-app/main/default and         │
-  # │   force-app/test-factory) against the buildcheck org with RunLocalTests.    │
+  # │   Validates the assembled tree (monolith/: force-app plus the fflib         │
+  # │   submodules) against the validation org, RunLocalTests.                    │
   # │                                                                              │
   # │ DEPENDENCIES: None (first and only job)                                      │
   # │                                                                              │
@@ -82,81 +86,53 @@ jobs:
   # │   Blocks — validation failure indicates code issues that must be fixed.     │
   # │                                                                              │
   # │ TECHNICAL NOTES:                                                             │
-  # │   - Uses JWT Bearer flow for authentication                                  │
-  # │   - Validates force-app/main/default and force-app/test-factory             │
+  # │   - Logs in through the sf-login action                                      │
+  # │   - Validates the assembled tree (monolith/)                                │
   # │   - Test level: RunLocalTests (runs all local tests)                        │
-  # │   - CLI pinned to @salesforce/cli@2.137.6 for reproducible builds           │
-  # │   - Authenticates against the buildcheck org (not the packaging org)        │
+  # │   - CLI pin and login come from the sf-login action                         │
+  # │   - Authenticates against the validation org                                │
+  # │   - Times out after 90 minutes (60 minute --wait plus setup)                 │
   # └──────────────────────────────────────────────────────────────────────────────┘
   validate:
     name: validate-deployment
     runs-on: ubuntu-24.04
-    env:
-      DEBUG: ${{ github.event.inputs.debug || 'false' }}
+    environment: buildcheck
+    timeout-minutes: 90
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      # Install Salesforce CLI (sf) - pinned to 2.137.6 for reproducible builds
-      # Sets a predictable npm prefix and writes it to $GITHUB_PATH once — all
-      # subsequent steps in this job inherit the path without re-exporting.
-      - name: Install and Setup Salesforce CLI
-        run: |
-          set -euo pipefail
-          npm config set prefix "$HOME/.npm-global"
-          echo "$HOME/.npm-global/bin" >> "$GITHUB_PATH"
-          npm install -g @salesforce/cli@2.137.6
-          "$HOME/.npm-global/bin/sf" --version
+      # The composite action fetches the pinned submodules and assembles monolith/.
+      - name: Assemble the monolith
+        uses: ./.github/actions/assemble-monolith
 
-      # Authenticate to Buildcheck Org using JWT Bearer flow
-      - name: Authenticate to Buildcheck Org
-        env:
-          SF_CLIENT_ID: ${{ secrets.SF_BUILDCHECK_CLIENT_ID }}
-          SF_USERNAME: ${{ secrets.SF_BUILDCHECK_USERNAME }}
-          SF_PRIVATE_KEY: ${{ secrets.SF_BUILDCHECK_PRIVATE_KEY }}
-          SF_INSTANCE_URL: ${{ secrets.SF_BUILDCHECK_INSTANCE_URL }}
-        run: |
-          set -euo pipefail
-          echo "🔐 Authenticating to buildcheck org..."
-          sf org login jwt \
-            --instance-url "$SF_INSTANCE_URL" \
-            --client-id "$SF_CLIENT_ID" \
-            --jwt-key-file <(echo "$SF_PRIVATE_KEY") \
-            --username "$SF_USERNAME" \
-            --set-default \
-            -a dfflib-buildcheck \
-            && echo "✅ Authentication successful." \
-            || { echo "::error::Authentication failed."; exit 1; }
+      # The pinned Salesforce CLI (from a cache) and the login live in the
+      # sf-login action, the one place that knows the pin.
+      - name: Install the Salesforce CLI and log in to the buildcheck org
+        uses: ./.github/actions/sf-login
+        with:
+          instance-url: ${{ secrets.SF_BUILDCHECK_INSTANCE_URL }}
+          client-id: ${{ secrets.SF_BUILDCHECK_CLIENT_ID }}
+          username: ${{ secrets.SF_BUILDCHECK_USERNAME }}
+          private-key: ${{ secrets.SF_BUILDCHECK_PRIVATE_KEY }}
+          alias: dfflib-buildcheck
 
-          if [[ "$DEBUG" == "true" ]]; then
-            echo ""
-            echo "🔍 Auth details:"
-            sf org display --target-org dfflib-buildcheck
-          fi
-
-      # Validate deployment including test factory (lives under force-app/test-factory)
+      # Validate the assembled tree
       - name: Validate Deployment
         run: |
           set -euo pipefail
           echo "🚀 Starting deployment validation..."
-          echo "   Source: force-app/main/default + force-app/test-factory"
+          echo "   Source: monolith"
           echo "   Test level: RunLocalTests"
           echo ""
           # --wait 60 polls until the deployment completes before returning.
           # Exit code 0 = Succeeded, non-zero = any failure. No jq parsing needed.
           sf project deploy validate \
-            --source-dir force-app/main/default \
-            --source-dir force-app/test-factory \
+            --source-dir monolith \
             --test-level RunLocalTests \
             --target-org dfflib-buildcheck \
             --wait 60
           echo ""
           echo "✅ Deployment validation passed"
-
-      # Informational only — coverage is enforced by Salesforce's own 75% gate
-      # during sf project deploy validate above. This step does not block the pipeline.
-      - name: Coverage Note (Informational)
-        run: |
-          echo "ℹ️  Coverage enforcement: Salesforce requires minimum 75% org-wide coverage."
-          echo "    If the deployment validation above passed, the coverage threshold was met."
-          echo "    Full per-class coverage metrics are available in the Salesforce org."

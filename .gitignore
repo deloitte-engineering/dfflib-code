@@ -29,3 +29,6 @@ src/*
 # Miscellaneous
 node_modules
 /.cod*
+
+# The Assembled tree, rebuilt by build/scripts/assemble-monolith.cjs on every run
+monolith/
