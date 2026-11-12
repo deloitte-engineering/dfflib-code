@@ -26,32 +26,32 @@ private with sharing class dfflib_ApplicationTest{
     private static final String accountSrvImplTypeText = String.valueOf( IAccountService.class );
     private static final String oppSrvImplTypeText = String.valueOf( IOpportunitiesService.class );
 
-    private static final List<FFLIB_Domain_Config__mdt> accountDomainImpls = new List<FFLIB_Domain_Config__mdt>{
-        new FFLIB_Domain_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.AccountsConstructor', SObjectType__c = accountSObjTypeText )
+    private static final List<Dfflib_Domain_Config__mdt> accountDomainImpls = new List<Dfflib_Domain_Config__mdt>{
+        new Dfflib_Domain_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.AccountsConstructor', SObjectType__c = accountSObjTypeText )
     };
 
-    private static final List<FFLIB_Domain_Config__mdt> contactDomainImpls = new List<FFLIB_Domain_Config__mdt>{
-        new FFLIB_Domain_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.ContactsConstructor', SObjectType__c = contactSObjTypeText )
+    private static final List<Dfflib_Domain_Config__mdt> contactDomainImpls = new List<Dfflib_Domain_Config__mdt>{
+        new Dfflib_Domain_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.ContactsConstructor', SObjectType__c = contactSObjTypeText )
     };
 
-    private static final List<FFLIB_Domain_Config__mdt> oppDomainImpls = new List<FFLIB_Domain_Config__mdt>{
-        new FFLIB_Domain_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.OpportunitiesConstructor', SObjectType__c = oppSObjTypeText )
+    private static final List<Dfflib_Domain_Config__mdt> oppDomainImpls = new List<Dfflib_Domain_Config__mdt>{
+        new Dfflib_Domain_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.OpportunitiesConstructor', SObjectType__c = oppSObjTypeText )
     };
 
-    private static final List<FFLIB_Selector_Config__mdt> accountSelImpls = new List<FFLIB_Selector_Config__mdt>{
-        new FFLIB_Selector_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.AccountsSelector', SObjectType__c = accountSObjTypeText )
+    private static final List<Dfflib_Selector_Config__mdt> accountSelImpls = new List<Dfflib_Selector_Config__mdt>{
+        new Dfflib_Selector_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.AccountsSelector', SObjectType__c = accountSObjTypeText )
     };
 
-    private static final List<FFLIB_Selector_Config__mdt> oppSelImpls = new List<FFLIB_Selector_Config__mdt>{
-        new FFLIB_Selector_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.OpportunitiesSelector', SObjectType__c = oppSObjTypeText )
+    private static final List<Dfflib_Selector_Config__mdt> oppSelImpls = new List<Dfflib_Selector_Config__mdt>{
+        new Dfflib_Selector_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.OpportunitiesSelector', SObjectType__c = oppSObjTypeText )
     };
 
-    private static final List<FFLIB_Service_Config__mdt> accountSrvImpls = new List<FFLIB_Service_Config__mdt>{
-        new FFLIB_Service_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.AccountsServiceImpl', Interface_Type__c = accountSrvImplTypeText )
+    private static final List<Dfflib_Service_Config__mdt> accountSrvImpls = new List<Dfflib_Service_Config__mdt>{
+        new Dfflib_Service_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.AccountsServiceImpl', Interface_Type__c = accountSrvImplTypeText )
     };
 
-    private static final List<FFLIB_Service_Config__mdt> oppSrvImpls = new List<FFLIB_Service_Config__mdt>{
-        new FFLIB_Service_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.OpportunitiesServiceImpl', Interface_Type__c = oppSrvImplTypeText )
+    private static final List<Dfflib_Service_Config__mdt> oppSrvImpls = new List<Dfflib_Service_Config__mdt>{
+        new Dfflib_Service_Config__mdt( Implementation_Type__c = 'dfflib_ApplicationTest.OpportunitiesServiceImpl', Interface_Type__c = oppSrvImplTypeText )
     };
 
     /**
@@ -86,7 +86,7 @@ private with sharing class dfflib_ApplicationTest{
         dfflib_ApplicationConfig m_ApplicationConfig = ( dfflib_ApplicationConfig ) mocks.mock( dfflib_ApplicationConfig.class );
         mocks.startStubbing();
         mocks.when( m_ApplicationConfig.getUnitOfWorkConfigs() ).thenReturn(
-            new List<FFLIB_UOW_Config__mdt>{ new FFLIB_UOW_Config__mdt( SObjectType__c = accountSObjTypeText, SortOrder__c = 1 ) }
+            new List<Dfflib_UOW_Config__mdt>{ new Dfflib_UOW_Config__mdt( SObjectType__c = accountSObjTypeText, SortOrder__c = 1 ) }
         );
         mocks.stopStubbing();
         dfflib_Application.appConfig = m_ApplicationConfig;
@@ -139,7 +139,7 @@ private with sharing class dfflib_ApplicationTest{
         mocks.startStubbing();
         mocks.when( appConfigMock.getServiceConfig( accountSrvImplTypeText ) ).thenReturn( accountSrvImpls );
         mocks.when( appConfigMock.getServiceConfig( oppSrvImplTypeText ) ).thenReturn( oppSrvImpls );
-        mocks.when( appConfigMock.getServiceConfig( contactSrvImplText ) ).thenReturn( new List<FFLIB_Service_Config__mdt>() );
+        mocks.when( appConfigMock.getServiceConfig( contactSrvImplText ) ).thenReturn( new List<Dfflib_Service_Config__mdt>() );
         mocks.stopStubbing();
         // Injecting the application config mock
         dfflib_Application.appConfig = appConfigMock;
@@ -184,7 +184,7 @@ private with sharing class dfflib_ApplicationTest{
         // Set mocks
         mocks.startStubbing();
         mocks.when( appConfigMock.getServiceConfig( contactSrvImplText ) ).thenReturn(
-            new List<FFLIB_Service_Config__mdt>{ new FFLIB_Service_Config__mdt( Implementation_Type__c = 'ContactService', Interface_Type__c = contactSrvImplText ) }
+            new List<Dfflib_Service_Config__mdt>{ new Dfflib_Service_Config__mdt( Implementation_Type__c = 'ContactService', Interface_Type__c = contactSrvImplText ) }
         );
         mocks.stopStubbing();
         // Injecting the application config mock
@@ -228,7 +228,7 @@ private with sharing class dfflib_ApplicationTest{
         System.Assert.areEqual( serviceMock2, serviceTestFactory.newInstance( IAccountService.class ), 'SM2 - Expected the mocked Service class to be returned for Interface, given the setting of mock' );
         try{
             serviceTestFactory.newInstance( dfflib_AggregateResult.class );
-            System.Assert.fail( 'An Exception should have thrown, given no mock to be set, as mock was set on Interface and not on class, nor an fflib_Service_Config__mdt to exist' );
+            System.Assert.fail( 'An Exception should have thrown, given no mock to be set, as mock was set on Interface and not on class, nor a Dfflib_Service_Config__mdt to exist' );
         } catch( dfflib_Application.DeveloperException ex ){
             System.Assert.areEqual(
                 'No implementation registered for service interface dfflib_AggregateResult',
@@ -253,7 +253,7 @@ private with sharing class dfflib_ApplicationTest{
         mocks.startStubbing();
         mocks.when( appConfigMock.getSelectorConfig( accountSObjTypeText ) ).thenReturn( accountSelImpls );
         mocks.when( appConfigMock.getSelectorConfig( oppSObjTypeText ) ).thenReturn( oppSelImpls );
-        mocks.when( appConfigMock.getSelectorConfig( apexSObjTypeText ) ).thenReturn( new List<FFLIB_Selector_Config__mdt>() );
+        mocks.when( appConfigMock.getSelectorConfig( apexSObjTypeText ) ).thenReturn( new List<Dfflib_Selector_Config__mdt>() );
         mocks.stopStubbing();
         // Injecting the application config mock
         dfflib_Application.appConfig = appConfigMock;
@@ -293,7 +293,7 @@ private with sharing class dfflib_ApplicationTest{
         // Set mocks
         mocks.startStubbing();
         mocks.when( appConfigMock.getSelectorConfig( apexSObjTypeText ) ).thenReturn(
-            new List<FFLIB_Selector_Config__mdt>{ new FFLIB_Selector_Config__mdt( Implementation_Type__c = 'ApexClassSelector', SObjectType__c = accountSObjTypeText ) }
+            new List<Dfflib_Selector_Config__mdt>{ new Dfflib_Selector_Config__mdt( Implementation_Type__c = 'ApexClassSelector', SObjectType__c = accountSObjTypeText ) }
         );
         mocks.stopStubbing();
         // Injecting the application config mock
@@ -532,7 +532,7 @@ private with sharing class dfflib_ApplicationTest{
         // Set mocks
         mocks.startStubbing();
         mocks.when( appConfigMock.getDomainConfig( apexSObjTypeText ) ).thenReturn(
-            new List<FFLIB_Domain_Config__mdt>{ new FFLIB_Domain_Config__mdt( Implementation_Type__c = 'ApexClassDomain', SObjectType__c = apexSObjTypeText ) }
+            new List<Dfflib_Domain_Config__mdt>{ new Dfflib_Domain_Config__mdt( Implementation_Type__c = 'ApexClassDomain', SObjectType__c = apexSObjTypeText ) }
         );
         mocks.stopStubbing();
         // Injecting the application config mock

@@ -117,7 +117,7 @@ private with sharing class dfflib_SObjectDomainTest{
         fflib_ApexMocks mocks = new fflib_ApexMocks();
         dfflib_ApplicationConfig configMock = ( dfflib_ApplicationConfig ) mocks.mock( dfflib_ApplicationConfig.class );
         mocks.startStubbing();
-        mocks.when( configMock.getUnitOfWorkConfigs() ).thenReturn( new List<FFLIB_UOW_Config__mdt>() );
+        mocks.when( configMock.getUnitOfWorkConfigs() ).thenReturn( new List<Dfflib_UOW_Config__mdt>() );
         mocks.stopStubbing();
         dfflib_Application.appConfig = configMock;
 

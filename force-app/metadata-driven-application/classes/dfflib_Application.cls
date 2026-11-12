@@ -44,7 +44,7 @@ public with sharing virtual class dfflib_Application{
 
         /**
          * Constructor for a dfflib_ISObjectUnitOfWork with prepopulated SObjectType list.
-         * This could be used to deviate from the SortOrder specified in fflib_UOW_Config__mdt
+         * This could be used to deviate from the SortOrder specified in Dfflib_UOW_Config__mdt
          * Note, when one tries to register a record of an SObjectType nót in this provided list, an Exception will be thrown
          *
          * @param   sObjTypes   Ordered list of SObjectTypes to be allowed in the new UOW instance
@@ -141,7 +141,7 @@ public with sharing virtual class dfflib_Application{
                 // Try to get it from the custom metadata
                 String serviceInterfaceTypeText = serviceInterfaceType.toString();
                 // Retrieve the Service implementation for the interface type provided
-                List<FFLIB_Service_Config__mdt> serviceTypeToImplMapping = appConfig.getServiceConfig( serviceInterfaceTypeText );
+                List<Dfflib_Service_Config__mdt> serviceTypeToImplMapping = appConfig.getServiceConfig( serviceInterfaceTypeText );
                 if( !serviceTypeToImplMapping.isEmpty() ){
                     serviceImpl = Type.forName( serviceTypeToImplMapping[ 0 ].Implementation_Type__c );
                     if( serviceImpl == null ){
@@ -249,7 +249,7 @@ public with sharing virtual class dfflib_Application{
                 // Try to get it from the custom metadata
                 String selectorSObjectTypeText = String.valueOf( sObjectType );
                 // Retrieve the Selector implementation for the SObjectType provided
-                List<FFLIB_Selector_Config__mdt> sObjectTypeToImplMapping = appConfig.getSelectorConfig( selectorSObjectTypeText );
+                List<Dfflib_Selector_Config__mdt> sObjectTypeToImplMapping = appConfig.getSelectorConfig( selectorSObjectTypeText );
                 if( !sObjectTypeToImplMapping.isEmpty() ){
                     selectorClass = Type.forName( sObjectTypeToImplMapping[ 0 ].Implementation_Type__c );
                     if( selectorClass == null ){
@@ -420,7 +420,7 @@ public with sharing virtual class dfflib_Application{
                 // Try to get it from the custom metadata
                 String domainSObjectTypeText = String.valueOf( domainSObjectType );
                 // Retrieve the Domain implementation for the SObjectType provided
-                List<FFLIB_Domain_Config__mdt> sObjectTypeToImplMapping = appConfig.getDomainConfig( domainSObjectTypeText );
+                List<Dfflib_Domain_Config__mdt> sObjectTypeToImplMapping = appConfig.getDomainConfig( domainSObjectTypeText );
                 if( !sObjectTypeToImplMapping.isEmpty() ){
                     domainConstructorClass = Type.forName( sObjectTypeToImplMapping[ 0 ].Implementation_Type__c );
                     if( domainConstructorClass == null ){

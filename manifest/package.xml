@@ -9,11 +9,11 @@
         <name>CustomLabel</name>
     </types>
     <types>
-        <members>FFLIB_Config__mdt</members>
-        <members>FFLIB_Domain_Config__mdt</members>
-        <members>FFLIB_Selector_Config__mdt</members>
-        <members>FFLIB_Service_Config__mdt</members>
-        <members>FFLIB_UOW_Config__mdt</members>
+        <members>Dfflib_Config__mdt</members>
+        <members>Dfflib_Domain_Config__mdt</members>
+        <members>Dfflib_Selector_Config__mdt</members>
+        <members>Dfflib_Service_Config__mdt</members>
+        <members>Dfflib_UOW_Config__mdt</members>
         <name>CustomObject</name>
     </types>
     <types>
