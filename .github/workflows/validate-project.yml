@@ -2,15 +2,18 @@
 # validate-project.yml - Salesforce Project Validation Workflow
 # =============================================================================
 # Purpose:  Validates the assembled tree (monolith/: force-app plus the fflib
-#           submodules, built by the assemble-monolith action) against the
-#           validation org for pull requests (and on demand for any branch).
-#           Runs deployment validation with tests.
+#           submodules, built by the assemble-monolith action) together with
+#           code-examples/ against the validation org for pull requests (and on
+#           demand for any branch). Runs deployment validation with tests.
+#           code-examples/ is validation-only: it is not a package directory in
+#           sfdx-project.json and is never part of any package version.
 #
 # Triggers: - workflow_dispatch  (manual trigger via GitHub Actions UI; the way to
 #             validate a branch that has no pull request)
 #           - pull_request opened/synchronize/reopened targeting main or master
-#             (when force-app/**, dependencies/**, .gitmodules, sfdx-project.json
-#             or the assemble script changes, so a submodule bump alone triggers it)
+#             (when force-app/**, code-examples/**, dependencies/**, .gitmodules,
+#             sfdx-project.json or the assemble script changes, so a submodule
+#             bump alone triggers it)
 #           There is no push trigger: a push run is keyed on the branch name and a
 #           pull_request run on the PR number, so both would run against the
 #           validation org for one push.
@@ -58,6 +61,7 @@ on:
       - master
     paths:
       - 'force-app/**'
+      - 'code-examples/**'
       - 'dependencies/**'
       - '.gitmodules'
       - 'sfdx-project.json'
@@ -76,7 +80,8 @@ jobs:
   # ├──────────────────────────────────────────────────────────────────────────────┤
   # │ PURPOSE:                                                                     │
   # │   Validates the assembled tree (monolith/: force-app plus the fflib         │
-  # │   submodules) against the validation org, RunLocalTests.                    │
+  # │   submodules) and code-examples/ in one deployment against the              │
+  # │   validation org, RunLocalTests.                                            │
   # │                                                                              │
   # │ DEPENDENCIES: None (first and only job)                                      │
   # │                                                                              │
@@ -87,7 +92,8 @@ jobs:
   # │                                                                              │
   # │ TECHNICAL NOTES:                                                             │
   # │   - Logs in through the sf-login action                                      │
-  # │   - Validates the assembled tree (monolith/)                                │
+  # │   - Validates the assembled tree (monolith/) plus code-examples/            │
+  # │   - code-examples/ is validation-only, never packaged                       │
   # │   - Test level: RunLocalTests (runs all local tests)                        │
   # │   - CLI pin and login come from the sf-login action                         │
   # │   - Authenticates against the validation org                                │
@@ -119,18 +125,21 @@ jobs:
           private-key: ${{ secrets.SF_BUILDCHECK_PRIVATE_KEY }}
           alias: dfflib-buildcheck
 
-      # Validate the assembled tree
+      # Validate the assembled tree and code-examples together in one deployment,
+      # so the examples act as a regression check on dependencies + force-app.
+      # code-examples is deliberately NOT a package directory (never packaged).
       - name: Validate Deployment
         run: |
           set -euo pipefail
           echo "🚀 Starting deployment validation..."
-          echo "   Source: monolith"
+          echo "   Source: monolith + code-examples"
           echo "   Test level: RunLocalTests"
           echo ""
           # --wait 60 polls until the deployment completes before returning.
           # Exit code 0 = Succeeded, non-zero = any failure. No jq parsing needed.
           sf project deploy validate \
             --source-dir monolith \
+            --source-dir code-examples \
             --test-level RunLocalTests \
             --target-org dfflib-buildcheck \
             --wait 60
