@@ -375,6 +375,21 @@ public virtual inherited sharing class dfflib_SObjectUnitOfWork implements dffli
     }
 
     /**
+     * Constructs a new Unit Of Work running on an existing fflib_SObjectUnitOfWork.IDML implementation, with pre-defined SObjectTypes list
+     * Note, only DML actions available in fflib are supported, others throw an Exception on commitWork(); DMLOptions, AllOrNone and SaveResults are not applied
+     * @param sObjTypes List of SObjectTypes to be registered for this Unit Of Work
+     * @param dml       Legacy fflib IDML implementation performing the DML; Email and Approval operations use the default INHERIT proxy
+     */
+    @NamespaceAccessible
+    public dfflib_SObjectUnitOfWork( List<SObjectType> sObjTypes, fflib_SObjectUnitOfWork.IDML dml ){
+        this( sObjTypes, dfflib_Database.Context.INHERIT );
+        if( dml == null ){
+            throw new UnitOfWorkException( 'A legacy IDML implementation is required' );
+        }
+        this.m_dml = new LegacyDMLAdapter( dml );
+    }
+
+    /**
      * Fluent method to set the UOW Config metadata records on this instance.
      * Called by dfflib_Application.UnitOfWorkFactory inline during construction to inject pre-resolved configs,
      * keeping dfflib_SObjectUnitOfWork free of any upward dependency on dfflib_Application.
@@ -2092,16 +2107,63 @@ public virtual inherited sharing class dfflib_SObjectUnitOfWork implements dffli
     public class UnitOfWorkException extends Exception{}
 
     /**
-     * Deprecated IDML since referenced in fflib_IUnitOfWorkFactory and dfflib_ISObjectUnitOfWork for old method signatures
-     * @deprecated Use dfflib_Database_IDML instead.
+     * Adapter exposing a legacy fflib_SObjectUnitOfWork.IDML implementation as dfflib_Database_IDML
+     * DMLOptions, AllOrNone and AccessLevel arguments are ignored and no SaveResults are returned
      */
-    @NamespaceAccessible
-    public interface IDML
-    {
-        void dmlInsert( List<SObject> objList );
-        void dmlUpdate( List<SObject> objList );
-        void dmlDelete( List<SObject> objList );
-        void eventPublish( List<SObject> objList );
-	    void emptyRecycleBin( List<SObject> objList );
+    @TestVisible
+    private inherited sharing class LegacyDMLAdapter implements dfflib_Database_IDML{
+        @TestVisible private final fflib_SObjectUnitOfWork.IDML legacyDML;
+        @TestVisible private dfflib_Database_IDML operationProxy = dfflib_Database.getDMLProxy( dfflib_Database.Context.INHERIT );
+
+        public LegacyDMLAdapter( fflib_SObjectUnitOfWork.IDML legacyDML ){
+            this.legacyDML = legacyDML;
+        }
+
+        public List<Object> performDMLAction( DMLActions action, List<SObject> objList, Database.DMLOptions options, AccessLevel accessLevel ){
+            return perform( action, objList, null );
+        }
+
+        public List<Object> performDMLAction( DMLActions action, List<SObject> objList, Boolean allOrNone, AccessLevel accessLevel ){
+            return perform( action, objList, null );
+        }
+
+        public List<Object> performDMLAction( DMLActions action, List<SObject> objList, AccessLevel accessLevel ){
+            return perform( action, objList, null );
+        }
+
+        public List<Object> performDMLAction( DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField, Boolean allOrNone, AccessLevel accessLevel ){
+            return perform( action, objList, externalIdField );
+        }
+
+        public List<Object> performOperation( Operations operation, List<Object> objList ){
+            return operationProxy.performOperation( operation, objList );
+        }
+
+        private List<Object> perform( DMLActions action, List<SObject> objList, Schema.SObjectField externalIdField ){
+            switch on action{
+                when dNEW{
+                    legacyDML.dmlInsert( objList );
+                }
+                when dUPDATE{
+                    legacyDML.dmlUpdate( objList );
+                }
+                when dDELETE{
+                    legacyDML.dmlDelete( objList );
+                }
+                when dEMPTY_RECBIN{
+                    legacyDML.emptyRecycleBin( objList );
+                }
+                when dPUB_BEFORE, dPUB_AFTER_SUCCESS, dPUB_AFTER_FAILURE{
+                    legacyDML.eventPublish( objList );
+                }
+                when dUPSERT{
+                    ( ( fflib_SObjectUnitOfWork.IDMLUpsertable ) legacyDML ).dmlUpsert( objList, externalIdField );
+                }
+                when else{
+                    throw new UnitOfWorkException( action + ' is not supported with a legacy IDML. Migrate to dfflib_Database.Context.' );
+                }
+            }
+            return null;
+        }
     }
 }
