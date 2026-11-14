@@ -225,7 +225,9 @@ public with sharing virtual class dfflib_Application{
         @NamespaceAccessible
         public virtual dfflib_ISObjectSelector newInstance( SObjectType sObjectType ){
             System.debug( LoggingLevel.INFO, 'fflib - No dfflib_Database.Context was specified, therefore defaulting to (legacy) INHERIT' );
-            return this.newInstance( sObjectType, dfflib_Database.Context.INHERIT );
+            // Passing null to avoid calling setContext(), allowing developer to call setContext() after instantiation (e.g. when migrating)
+            // Defaults to INHERIT lazily
+            return this.newInstance( sObjectType, null );
         }
 
         /**
@@ -261,8 +263,9 @@ public with sharing virtual class dfflib_Application{
                 }
             }
 
-            // Construct Selector class and set the default database context
-            return ( ( dfflib_ISObjectSelector ) selectorClass.newInstance() ).setContext( context );
+            // Construct Selector class and set the database context, when provided
+            dfflib_ISObjectSelector selector = ( dfflib_ISObjectSelector ) selectorClass.newInstance();
+            return context == null ? selector : selector.setContext( context );
         }
 
         /**
