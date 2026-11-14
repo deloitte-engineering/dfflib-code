@@ -14,10 +14,11 @@
 const { parseTitle } = require('./pr-title.cjs');
 
 // title type -> label. `ci` is NOT managed here; the file labeler (labeler.yml) owns it.
-// docs, test, build and revert have no label.
+// test, build and revert have no label.
 const LABEL_BY_TYPE = {
   feat: 'enhancement',
   fix: 'bug',
+  docs: 'documentation',
   chore: 'chore',
   style: 'style',
   refactor: 'refactor',

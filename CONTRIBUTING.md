@@ -121,7 +121,7 @@ docs(code-examples): add code-examples folder for reference
 |---|---|---|---|
 | `feat` | A new functionality/feature | `enhancement` | New features |
 | `fix` | A resolution for a bug | `bug` | Bug fixes |
-| `docs` | Changes to documentation | *(none)* | Miscellaneous updates |
+| `docs` | Changes to documentation | `documentation` | Miscellaneous updates |
 | `style` | Formatting, with no change in behaviour | `style` | Miscellaneous updates |
 | `refactor` | A code change with no change in behaviour | `refactor` | Miscellaneous updates |
 | `perf` | A performance improvement | `performance` | Miscellaneous updates |
