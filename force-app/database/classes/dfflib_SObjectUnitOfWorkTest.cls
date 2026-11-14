@@ -106,9 +106,9 @@ private with sharing class dfflib_SObjectUnitOfWorkTest{
         dfflib_ApplicationConfig m_ApplicationConfig = ( dfflib_ApplicationConfig ) mocks.mock( dfflib_ApplicationConfig.class );
 
         // Given - create data
-        List<FFLIB_UOW_Config__mdt> uowConfigsMocked = new List<FFLIB_UOW_Config__mdt>{
-            new FFLIB_UOW_Config__mdt( SObjectType__c = 'Account', SortOrder__c = 0 ),
-            new FFLIB_UOW_Config__mdt( SObjectType__c = 'Contact', SortOrder__c = 1 )
+        List<Dfflib_UOW_Config__mdt> uowConfigsMocked = new List<Dfflib_UOW_Config__mdt>{
+            new Dfflib_UOW_Config__mdt( SObjectType__c = 'Account', SortOrder__c = 0 ),
+            new Dfflib_UOW_Config__mdt( SObjectType__c = 'Contact', SortOrder__c = 1 )
         };
 
         // Set mocks and inject into application config
@@ -131,10 +131,10 @@ private with sharing class dfflib_SObjectUnitOfWorkTest{
         fflib_ApexMocks mocks = new fflib_ApexMocks();
         dfflib_ApplicationConfig m_ApplicationConfig = ( dfflib_ApplicationConfig ) mocks.mock( dfflib_ApplicationConfig.class );
         mocks.startStubbing();
-        mocks.when( m_ApplicationConfig.getUnitOfWorkConfigs() ).thenReturn( new List<FFLIB_UOW_Config__mdt>{
-            new FFLIB_UOW_Config__mdt( SObjectType__c = 'Account', SortOrder__c = 1 ),
-            new FFLIB_UOW_Config__mdt( SObjectType__c = 'Contact', SortOrder__c = 2 ),
-            new FFLIB_UOW_Config__mdt( SObjectType__c = 'Case', SortOrder__c = 3 )
+        mocks.when( m_ApplicationConfig.getUnitOfWorkConfigs() ).thenReturn( new List<Dfflib_UOW_Config__mdt>{
+            new Dfflib_UOW_Config__mdt( SObjectType__c = 'Account', SortOrder__c = 1 ),
+            new Dfflib_UOW_Config__mdt( SObjectType__c = 'Contact', SortOrder__c = 2 ),
+            new Dfflib_UOW_Config__mdt( SObjectType__c = 'Case', SortOrder__c = 3 )
         } );
         mocks.stopStubbing();
         dfflib_Application.appConfig = m_ApplicationConfig;

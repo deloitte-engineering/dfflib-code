@@ -149,7 +149,7 @@ public virtual inherited sharing class dfflib_SObjectUnitOfWork implements dffli
      * Injected by factory layer (dfflib_Application.UnitOfWorkFactory) via setConfigs()
      */
     @TestVisible
-    private List<FFLIB_UOW_Config__mdt> uowConfigs;
+    private List<Dfflib_UOW_Config__mdt> uowConfigs;
 
     /**
      * Method to enable Maps for newly requested DMLAction-SObjectType combi
@@ -269,18 +269,18 @@ public virtual inherited sharing class dfflib_SObjectUnitOfWork implements dffli
     }
 
     /**
-     * Method to check the FFLIB_UOW_Config__mdt for SortOrder and whether or not SObjectType is defined and update order properly
+     * Method to check the Dfflib_UOW_Config__mdt for SortOrder and whether or not SObjectType is defined and update order properly
      */
-    // Set of Strings to allow more efficient comparison with fflib_UOW_Config__mdt SObjectType (String) on whether it is already part of this UnitOfWork
+    // Set of Strings to allow more efficient comparison with Dfflib_UOW_Config__mdt SObjectType (String) on whether it is already part of this UnitOfWork
     // This also avoids the need to transform Config SObjectType strings to SObjectTypes which could cause issues for restricted/licensed objects like Knowledge__kav for users without access
     private Set<String> m_sObjectTypesStrings = new Set<String>();
     private void addSObjectTypeInCorrectOrder( Schema.SObjectType sObjType ){
-        // Determine String of SObjectType to allow easier and more efficient fflib_UOW_Config__mdt comparison and logging
+        // Determine String of SObjectType to allow easier and more efficient Dfflib_UOW_Config__mdt comparison and logging
         String sObjTypeString = String.valueOf( sObjType );
         if( constructorDefinedSObjectTypesList ){
             throw new UnitOfWorkException(
                 'SObjectType ' + sObjTypeString + ' was not specified in the Constructor-list. '
-                    + 'Either migrate to use fflib_UOW_Config__mdt, or add this SObjectType to the Constructor-list.'
+                    + 'Either migrate to use Dfflib_UOW_Config__mdt, or add this SObjectType to the Constructor-list.'
             );
         }
 
@@ -303,7 +303,7 @@ public virtual inherited sharing class dfflib_SObjectUnitOfWork implements dffli
         // If the requested SObjectType isn't setup, throw Exception
         if( !foundInConfig ){
             throw new UnitOfWorkException( 'SObjectType ' + sObjTypeString + ' is not (yet) registered for this Unit of Work.' +
-                'You can insert a fflib_UOW_Config__mdt or specify this in the Constructor (dfflib.unitOfWork.newInstance( new List<SObjectType>{ ... }, dfflib_Database.Context.FULL ); )' );
+                'You can insert a Dfflib_UOW_Config__mdt or specify this in the Constructor (dfflib.unitOfWork.newInstance( new List<SObjectType>{ ... }, dfflib_Database.Context.FULL ); )' );
         }
 
         // In the loop a counter was kept of the number of SObjectType sequentially occurring before the new requested SObjectType
@@ -338,7 +338,7 @@ public virtual inherited sharing class dfflib_SObjectUnitOfWork implements dffli
     }
 
     /**
-     * Constructs a new Unit Of Work with pre-defined SObjectTypes list to deviate from fflib_UOW_Config__mdt SortOrder
+     * Constructs a new Unit Of Work with pre-defined SObjectTypes list to deviate from Dfflib_UOW_Config__mdt SortOrder
      * Note, when using this option, an Exception is thrown when a record is registered which is not listed in this Constructor-list.
      * @param sObjTypes List of SObjectTypes to be registered for this Unit Of Work
      */
@@ -357,7 +357,7 @@ public virtual inherited sharing class dfflib_SObjectUnitOfWork implements dffli
     }
 
     /**
-     * Constructs a new Unit Of Work with specified database security model and pre-defined SObjectTypes list to deviate from fflib_UOW_Config__mdt (SortOrder)
+     * Constructs a new Unit Of Work with specified database security model and pre-defined SObjectTypes list to deviate from Dfflib_UOW_Config__mdt (SortOrder)
      * @param sObjTypes       List of SObjectTypes to be registered for this Unit Of Work
      * @param securityContext Database Context to be applied for all records and operations within this Unit Of Work
      */
@@ -379,11 +379,11 @@ public virtual inherited sharing class dfflib_SObjectUnitOfWork implements dffli
      * Called by dfflib_Application.UnitOfWorkFactory inline during construction to inject pre-resolved configs,
      * keeping dfflib_SObjectUnitOfWork free of any upward dependency on dfflib_Application.
      *
-     * @param   uowConfigRecords    Pre-resolved list of FFLIB_UOW_Config__mdt records
+     * @param   uowConfigRecords    Pre-resolved list of Dfflib_UOW_Config__mdt records
      * @return  This dfflib_SObjectUnitOfWork instance (fluent interface)
      */
     @NamespaceAccessible
-    public dfflib_SObjectUnitOfWork setConfigs( List<FFLIB_UOW_Config__mdt> uowConfigRecords ){
+    public dfflib_SObjectUnitOfWork setConfigs( List<Dfflib_UOW_Config__mdt> uowConfigRecords ){
         this.uowConfigs = uowConfigRecords;
         return this;
     }
