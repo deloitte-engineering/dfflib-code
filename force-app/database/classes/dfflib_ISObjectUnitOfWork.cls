@@ -143,6 +143,17 @@ public interface dfflib_ISObjectUnitOfWork{
     void registerUpsert( List<SObject> records, Schema.SObjectField externalIdField );
 
     /**
+     * Register a record to be upserted by a specified ExternalId field during the commitWork method,
+     * with a relationship to a parent record that is resolved when the upsert is performed.
+     *
+     * @param   record                  The record to be upserted; either inserted or updated based on the ExternalId field's value
+     * @param   externalIdField         The ExternalId (or Id) field to match the record on
+     * @param   relatedToParentField    A SObjectField reference to the child field that associates the child record with its parent
+     * @param   relatedToParentRecord   A SObject instance of the parent record (optional)
+     */
+    void registerUpsert( SObject record, Schema.SObjectField externalIdField, Schema.SObjectField relatedToParentField, SObject relatedToParentRecord );
+
+    /**
      * For specific scenarios you may wish to register records to be upserted by ExternalId field into the database before
      * other records within the same transaction are inserted/updated.
      *

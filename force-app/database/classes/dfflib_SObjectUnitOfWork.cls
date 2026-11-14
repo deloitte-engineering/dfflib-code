@@ -802,6 +802,23 @@ public virtual inherited sharing class dfflib_SObjectUnitOfWork implements dffli
     }
 
     /**
+     * Register a record to be upserted by a specified ExternalId field during commitWork(), with a relationship to a
+     * parent record that is resolved when the upsert is performed.
+     *
+     * @param   record                  The record to be upserted; either inserted or updated based on the ExternalId field's value
+     * @param   externalIdField         The ExternalId (or Id) field to match the record on
+     * @param   relatedToParentField    A SObjectField reference to the child field that associates the child record with its parent
+     * @param   relatedToParentRecord   A SObject instance of the parent record (optional)
+     */
+    @NamespaceAccessible
+    public void registerUpsert( SObject record, Schema.SObjectField externalIdField, Schema.SObjectField relatedToParentField, SObject relatedToParentRecord ){
+        this.registerUpsert( record, externalIdField );
+        if( relatedToParentRecord != null && relatedToParentField != null ){
+            this.registerRelationship( record, relatedToParentField, relatedToParentRecord, DMLActions.dUPSERT );
+        }
+    }
+
+    /**
      * For specific scenarios you may wish to register records to be upserted by ExternalId field into the database before
      * other records within the same transaction are inserted/updated, in Priority - thus before Priority Delete and after
      * Priority Update. See {@link #registerUpsert( SObject, Schema.SObjectField )} for the general behaviour.
