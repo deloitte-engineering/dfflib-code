@@ -96,7 +96,6 @@ public virtual with sharing class dfflib_SObjectDomain extends fflib_SObjects im
      */
     private static Map<Type, TriggerEventState> triggerEventByClass;
 
-    // TODO: To be moved to parent fflib_SObjects -> https://github.com/deloitte-engineering/dfflib/issues/3
     static{
         Errors = new dfflib_SObjectDomain.ErrorFactory();
         Test = new TestFactory();
