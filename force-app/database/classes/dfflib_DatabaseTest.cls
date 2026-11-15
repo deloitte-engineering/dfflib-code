@@ -110,8 +110,8 @@ private with sharing class dfflib_DatabaseTest{
     private static List<Solution> setupSolutionSampleData( Integer numberOfSamples ){
         List<Solution> sampleDataList = new List<Solution>();
         // Retrieve sample data for Solution SObject.
-        // If a project has any custom required fields, or validation rules, a custom sample record can be provided in FFLIB_Config__mdt
-        List<FFLIB_Config__mdt> mockDataConfig = FFLIB_Config__mdt.getAll().values();
+        // If a project has any custom required fields, or validation rules, a custom sample record can be provided in Dfflib_Config__mdt
+        List<Dfflib_Config__mdt> mockDataConfig = Dfflib_Config__mdt.getAll().values();
         Solution sampleObject = ( mockDataConfig.isEmpty() || String.isBlank( mockDataConfig[ 0 ]?.Test_Solution_Sample_Record_Data__c ) )
             ? new Solution( SolutionName = sampleSolutionName, IsPublished = false )
             : ( Solution ) JSON.deserialize( mockDataConfig[ 0 ].Test_Solution_Sample_Record_Data__c, Solution.class );
@@ -126,7 +126,7 @@ private with sharing class dfflib_DatabaseTest{
     private static List<ContactRequest> setupContactRequestSampleData( Integer numberOfSamples ){
         List<ContactRequest> sampleDataList = new List<ContactRequest>();
         // Retrieve sample data for ContactRequest SObject. Any specific project required fields should be added to the sample custom metadata record
-        List<FFLIB_Config__mdt> mockDataConfig = FFLIB_Config__mdt.getAll().values();
+        List<Dfflib_Config__mdt> mockDataConfig = Dfflib_Config__mdt.getAll().values();
         ContactRequest sampleObject = ( mockDataConfig.isEmpty() || String.isBlank( mockDataConfig[ 0 ]?.Test_Contact_Request_Sample_Record_Data__c ) )
             ? new ContactRequest()
             : ( ContactRequest ) JSON.deserialize( mockDataConfig[ 0 ].Test_Contact_Request_Sample_Record_Data__c, ContactRequest.class );
@@ -491,7 +491,7 @@ private with sharing class dfflib_DatabaseTest{
     /**
      * @todo
      * -- successful delete, query combination
-     * -- Logic to validate Event Publish in case fflib_Config.Test_PlatformEvent_Type__c is populated?
+     * -- Logic to validate Event Publish in case Dfflib_Config.Test_PlatformEvent_Type__c is populated?
      */
 
 
