@@ -112,6 +112,38 @@ private with sharing class dfflib_ApplicationTest{
     }
 
     @IsTest
+    private static void unitOfWorkFactory_newInstance_LegacyIDML(){
+        // Given - inject UOW configs via the factory's appConfig mock (avoids real metadata query)
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        dfflib_ApplicationConfig m_ApplicationConfig = ( dfflib_ApplicationConfig ) mocks.mock( dfflib_ApplicationConfig.class );
+        mocks.startStubbing();
+        mocks.when( m_ApplicationConfig.getUnitOfWorkConfigs() ).thenReturn(
+            new List<Dfflib_UOW_Config__mdt>{ new Dfflib_UOW_Config__mdt( SObjectType__c = accountSObjTypeText, SortOrder__c = 1 ) }
+        );
+        mocks.stopStubbing();
+        dfflib_Application.appConfig = m_ApplicationConfig;
+
+        // When
+        dfflib_SObjectUnitOfWork unitOfWork = ( dfflib_SObjectUnitOfWork ) unitOfWorkTestFactory.newInstance( new fflib_SObjectUnitOfWork.SimpleDML() );
+
+        // Then - validate the legacy IDML is wrapped and the default context applies
+        System.Assert.isInstanceOfType( unitOfWork.m_dml, dfflib_SObjectUnitOfWork.LegacyDMLAdapter.class, 'Expected the legacy IDML adapter' );
+        System.Assert.areEqual( dfflib_Database.Context.INHERIT, unitOfWork.m_securityContext );
+    }
+
+    @IsTest
+    private static void unitOfWorkFactory_newInstance_CustomObjectTypesAndLegacyIDML(){
+        // When - List<SObjectType> constructor bypasses uowConfigs entirely
+        dfflib_SObjectUnitOfWork unitOfWork = ( dfflib_SObjectUnitOfWork ) unitOfWorkTestFactory.newInstance(
+            new List<SObjectType>{ Account.SObjectType },
+            new fflib_SObjectUnitOfWork.SimpleDML()
+        );
+
+        // Then - validate the legacy IDML is wrapped
+        System.Assert.isInstanceOfType( unitOfWork.m_dml, dfflib_SObjectUnitOfWork.LegacyDMLAdapter.class, 'Expected the legacy IDML adapter' );
+    }
+
+    @IsTest
     private static void unitOfWorkFactory_defineMock(){
         fflib_ApexMocks mocks = new fflib_ApexMocks();
 
