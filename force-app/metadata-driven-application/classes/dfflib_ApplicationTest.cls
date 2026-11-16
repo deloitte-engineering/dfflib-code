@@ -342,6 +342,55 @@ private with sharing class dfflib_ApplicationTest{
     }
 
     @IsTest
+    private static void selectorFactory_newInstanceWithoutContext_keepsConstructorContext(){
+        // Given - a selector whose constructor defines Context.NONE
+        injectSelectorConfigs();
+
+        // When
+        dfflib_SObjectSelector selector = ( dfflib_SObjectSelector ) selectorTestFactory.newInstance( Opportunity.SObjectType );
+
+        // Then - validate
+        System.Assert.isInstanceOfType( selector, OpportunitiesSelector.class );
+        System.Assert.areEqual( dfflib_Database.Context.NONE, selector.getContext(), 'Expected the constructor context to be kept' );
+    }
+
+    @IsTest
+    private static void selectorFactory_newInstanceWithoutContext_allowsSetDataAccess(){
+        // Given - a selector without a constructor context
+        injectSelectorConfigs();
+
+        // When - the fflib pattern: factory instance first, data access applied afterwards
+        dfflib_SObjectSelector selector = ( dfflib_SObjectSelector ) selectorTestFactory.newInstance( Account.SObjectType );
+        System.Assert.areEqual( dfflib_Database.Context.INHERIT, selector.getContext(), 'Expected the lazy INHERIT default' );
+        selector.setDataAccess( dfflib_SObjectSelector.DataAccess.USER_MODE );
+
+        // Then - validate
+        System.Assert.areEqual( dfflib_Database.Context.FULL, selector.getContext(), 'Expected USER_MODE to map to FULL' );
+    }
+
+    @IsTest
+    private static void selectorFactory_newInstanceWithContext_setsContext(){
+        // Given - a selector without a constructor context
+        injectSelectorConfigs();
+
+        // When
+        dfflib_SObjectSelector selector = ( dfflib_SObjectSelector ) selectorTestFactory.newInstance( Account.SObjectType, dfflib_Database.Context.FULL );
+
+        // Then - validate
+        System.Assert.areEqual( dfflib_Database.Context.FULL, selector.getContext(), 'Expected the factory context to be applied' );
+    }
+
+    private static void injectSelectorConfigs(){
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        dfflib_ApplicationConfig appConfigMock = ( dfflib_ApplicationConfig ) mocks.mock( dfflib_ApplicationConfig.class );
+        mocks.startStubbing();
+        mocks.when( appConfigMock.getSelectorConfig( accountSObjTypeText ) ).thenReturn( accountSelImpls );
+        mocks.when( appConfigMock.getSelectorConfig( oppSObjTypeText ) ).thenReturn( oppSelImpls );
+        mocks.stopStubbing();
+        dfflib_Application.appConfig = appConfigMock;
+    }
+
+    @IsTest
     private static void selectorFactory_selectByIdWithEmptyListShouldGiveException(){
         try{
             selectorTestFactory.selectById( null );
@@ -808,6 +857,10 @@ private with sharing class dfflib_ApplicationTest{
     public class ContactsConstructor{}
 
     public class OpportunitiesSelector extends dfflib_SObjectSelector{
+        public OpportunitiesSelector(){
+            super( dfflib_Database.Context.NONE );
+        }
+
         public override List<Schema.SObjectField> getSObjectFieldList(){
             return new List<Schema.SObjectField>{
                 Opportunity.Name,
