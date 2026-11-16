@@ -689,6 +689,60 @@ private with sharing class dfflib_SObjectUnitOfWorkTest{
     }
 
     @IsTest
+    private static void registerUpsert_ExternalId_WithParent_resolvesRelationship(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        dfflib_Database_IDML m_IDML = ( dfflib_Database_IDML ) mocks.mock( dfflib_Database_IDML.class );
+
+        // Given - create data
+        Account acc = new Account( Id = ID_ACCOUNT, Name = 'Parent' );
+        Contact con = new Contact( LastName = 'Child' );
+        dfflib_SObjectUnitOfWork uow = new dfflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType, Contact.SObjectType } );
+        uow.m_dml = m_IDML;
+
+        // When - register the parent and the child by upsert with its parent
+        uow.registerDirty( acc );
+        uow.registerUpsert( con, Contact.Id, Contact.AccountId, acc );
+
+        // Then - validate the relationship was registered on the Contact, before commitWork() resets the UOW
+        List<dfflib_SObjectUnitOfWork.IRelationship> relations = uow.m_relationships.get( Contact.SObjectType );
+        System.Assert.areEqual( 1, relations?.size(), 'Expected one relationship registered for Contact' );
+        System.Assert.areEqual( con, relations[ 0 ].getRecord(), 'Expected the relationship on the upserted Contact' );
+        System.Assert.isNull( con.AccountId, 'Expected the relationship not to be resolved before commitWork()' );
+
+        // When
+        uow.commitWork();
+
+        // Then - validate the relationship was resolved for the upsert and the upsert was performed
+        System.Assert.isTrue( relations[ 0 ].wasResolved(), 'Expected the relationship to be resolved during the upsert' );
+        System.Assert.areEqual( ID_ACCOUNT, con.AccountId, 'Expected Contact.AccountId to be set to the parent Id' );
+        ( ( dfflib_Database_IDML ) mocks.verify( m_IDML, 1 ) ).performDMLAction( dfflib_SObjectUnitOfWork.DMLActions.dUPSERT, new List<Contact>{ con }, Contact.Id, true, dfflib_Database.getAccessLevel( uow.m_securityContext ) );
+    }
+
+    @IsTest
+    private static void registerUpsert_ExternalId_WithoutParent_registersNoRelationship(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        dfflib_Database_IDML m_IDML = ( dfflib_Database_IDML ) mocks.mock( dfflib_Database_IDML.class );
+
+        // Given - create data
+        Contact con1 = new Contact( LastName = 'Child 1' );
+        Contact con2 = new Contact( LastName = 'Child 2' );
+        dfflib_SObjectUnitOfWork uow = new dfflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType, Contact.SObjectType } );
+        uow.m_dml = m_IDML;
+
+        // When - parent record and parent field left null
+        uow.registerUpsert( con1, Contact.Id, Contact.AccountId, null );
+        uow.registerUpsert( con2, Contact.Id, null, new Account( Id = ID_ACCOUNT ) );
+
+        // Then - validate no relationship was registered and both records were upserted
+        System.Assert.isFalse( uow.m_relationships.containsKey( Contact.SObjectType ), 'Expected no relationship to be registered' );
+        uow.commitWork();
+        ( ( dfflib_Database_IDML ) mocks.verify( m_IDML, 1 ) ).performDMLAction( dfflib_SObjectUnitOfWork.DMLActions.dUPSERT, new List<Contact>{ con1, con2 }, Contact.Id, true, dfflib_Database.getAccessLevel( uow.m_securityContext ) );
+        System.Assert.isNull( con2.AccountId, 'Expected no parent Id to be set' );
+    }
+
+    @IsTest
     private static void registerUpsert_InvalidInputs(){
         // Given - create data - explicit SObjectType list, since the last sub-case proceeds into implementSObjectType()
         // which needs metadata-driven config; a directly-constructed UOW without a list has no injected uowConfigs
@@ -1572,5 +1626,216 @@ private with sharing class dfflib_SObjectUnitOfWorkTest{
         System.Assert.areEqual( null, uow.getEmailResults(), 'Expected reset Email Results' );
         System.Assert.areEqual( null, uow.getApprovalProcessResults(), 'Expected reset Email Results' );
         System.Assert.areEqual( null, uow.getUpsertResults( Account.SObjectType ), 'Expected reset Upsert Account Results' );
+    }
+
+    private static final String LEGACY_UNSUPPORTED_SUFFIX = ' is not supported with a legacy IDML. Migrate to dfflib_Database.Context.';
+
+    // Test.createStub() cannot stub inner classes such as fflib_SObjectUnitOfWork.IDML, hence recording test doubles
+    private virtual class RecordingIDML implements fflib_SObjectUnitOfWork.IDML{
+        public Map<String, List<List<SObject>>> calls = new Map<String, List<List<SObject>>>();
+
+        public void record( String method, List<SObject> objList ){
+            if( !calls.containsKey( method ) ){
+                calls.put( method, new List<List<SObject>>() );
+            }
+            calls.get( method ).add( objList );
+        }
+        public void dmlInsert( List<SObject> objList ){ record( 'dmlInsert', objList ); }
+        public void dmlUpdate( List<SObject> objList ){ record( 'dmlUpdate', objList ); }
+        public void dmlDelete( List<SObject> objList ){ record( 'dmlDelete', objList ); }
+        public void eventPublish( List<SObject> objList ){ record( 'eventPublish', objList ); }
+        public void emptyRecycleBin( List<SObject> objList ){ record( 'emptyRecycleBin', objList ); }
+    }
+
+    private class RecordingUpsertableIDML extends RecordingIDML implements fflib_SObjectUnitOfWork.IDMLUpsertable{
+        public Schema.SObjectField upsertExternalId;
+
+        public void dmlUpsert( List<SObject> objList, Schema.SObjectField externalId ){
+            record( 'dmlUpsert', objList );
+            upsertExternalId = externalId;
+        }
+    }
+
+    @IsTest
+    private static void legacyIDML_routesDMLToLegacyMethods(){
+        RecordingIDML m_legacyIDML = new RecordingIDML();
+
+        // Given - UOW wrapping a legacy IDML and records for each supported DML action
+        dfflib_SObjectUnitOfWork uow = new dfflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType }, m_legacyIDML );
+        Account accNew = new Account( Name = 'new' );
+        Account accDirty = new Account( Id = ID_ACCOUNT, Name = 'dirty' );
+        Account accDelete = new Account( Id = ID_ACCOUNT2, Name = 'delete' );
+        Account accPermanent = new Account( Id = fflib_IDGenerator.generate( Account.SObjectType ), Name = 'permanent' );
+
+        // When
+        uow.registerNew( accNew );
+        uow.registerDirty( accDirty );
+        uow.registerDeleted( accDelete );
+        uow.registerPermanentlyDeleted( accPermanent );
+        uow.commitWork();
+
+        // Then
+        System.Assert.isTrue( uow.m_dml instanceof dfflib_SObjectUnitOfWork.LegacyDMLAdapter, 'Expected the legacy IDML to be wrapped in the LegacyDMLAdapter' );
+        System.Assert.areEqual( new List<List<SObject>>{ new List<SObject>{ accNew } }, m_legacyIDML.calls.get( 'dmlInsert' ), 'Expected one dmlInsert with the new Account' );
+        System.Assert.areEqual( new List<List<SObject>>{ new List<SObject>{ accDirty } }, m_legacyIDML.calls.get( 'dmlUpdate' ), 'Expected one dmlUpdate with the dirty Account' );
+        System.Assert.areEqual( new List<List<SObject>>{ new List<SObject>{ accDelete, accPermanent } }, m_legacyIDML.calls.get( 'dmlDelete' ), 'Expected one dmlDelete with the deleted Accounts' );
+        System.Assert.areEqual( new List<List<SObject>>{ new List<SObject>{ accPermanent } }, m_legacyIDML.calls.get( 'emptyRecycleBin' ), 'Expected one emptyRecycleBin with the permanently deleted Account' );
+    }
+
+    @IsTest
+    private static void legacyIDML_publishRoutesToEventPublish(){
+        RecordingIDML m_legacyIDML = new RecordingIDML();
+
+        // Given
+        SObjectType eventSObjectType = BatchApexErrorEvent.SObjectType;
+        dfflib_SObjectUnitOfWork uow = new dfflib_SObjectUnitOfWork( new List<SObjectType>{ eventSObjectType }, m_legacyIDML );
+        List<SObject> evtList = new List<SObject>{ eventSObjectType.newSObject() };
+
+        // When - the three publish actions are registered, where only before and after success are performed
+        uow.registerPublishBeforeTransaction( evtList );
+        uow.registerPublishAfterSuccessTransaction( evtList );
+        uow.registerPublishAfterFailureTransaction( evtList );
+        uow.commitWork();
+
+        // Then
+        System.Assert.areEqual( new List<List<SObject>>{ evtList, evtList }, m_legacyIDML.calls.get( 'eventPublish' ), 'Expected eventPublish for before and after success' );
+    }
+
+    @IsTest
+    private static void legacyIDML_upsertRoutesToDmlUpsert(){
+        RecordingUpsertableIDML m_legacyDML = new RecordingUpsertableIDML();
+
+        // Given
+        dfflib_SObjectUnitOfWork uow = new dfflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType }, m_legacyDML );
+        Account accUpsert = new Account( Name = 'upsert' );
+
+        // When
+        uow.registerUpsert( accUpsert, Account.Id );
+        uow.commitWork();
+
+        // Then
+        System.Assert.areEqual( new List<List<SObject>>{ new List<SObject>{ accUpsert } }, m_legacyDML.calls.get( 'dmlUpsert' ), 'Expected one dmlUpsert with the Account' );
+        System.Assert.areEqual( Account.Id, m_legacyDML.upsertExternalId, 'Expected the upsert by Account.Id' );
+    }
+
+    @IsTest
+    private static void legacyIDML_unsupportedFeatures_throw(){
+        RecordingIDML m_legacyIDML = new RecordingIDML();
+
+        // Given
+        dfflib_SObjectUnitOfWork uow = new dfflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType }, m_legacyIDML );
+
+        // When & Then - a DML action without fflib equivalent throws on commitWork()
+        uow.registerPriorityNew( new Account( Name = 'prio' ) );
+        try{
+            uow.commitWork();
+            System.Assert.fail( 'Expected an Exception for a priority registration' );
+        } catch( dfflib_SObjectUnitOfWork.UnitOfWorkException ex ){
+            System.Assert.areEqual( 'dNEW_PRIO' + LEGACY_UNSUPPORTED_SUFFIX, ex.getMessage(), 'Expected different exception message for registerPriorityNew' );
+        }
+        System.Assert.isTrue( m_legacyIDML.calls.isEmpty(), 'Expected the legacy IDML not to be called' );
+    }
+
+    @IsTest
+    private static void legacyIDML_nullIDML_throws(){
+        // When & Then
+        try{
+            new dfflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType }, ( fflib_SObjectUnitOfWork.IDML ) null );
+            System.Assert.fail( 'Expected an Exception for a null legacy IDML' );
+        } catch( dfflib_SObjectUnitOfWork.UnitOfWorkException ex ){
+            System.Assert.areEqual( 'A legacy IDML implementation is required', ex.getMessage(), 'Expected different exception message' );
+        }
+    }
+
+    @IsTest
+    private static void legacyIDML_emailSentViaDefaultProxy(){
+        RecordingIDML m_legacyIDML = new RecordingIDML();
+
+        // Given
+        dfflib_SObjectUnitOfWork uow = new dfflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType }, m_legacyIDML );
+        Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();
+        email.setToAddresses( new List<String>{ 'legacy.idml@example.com' } );
+        email.setSubject( 'Legacy IDML' );
+        email.setPlainTextBody( 'Sent via the default DML proxy' );
+
+        // Then - the adapter sends Operations through the default INHERIT proxy
+        dfflib_SObjectUnitOfWork.LegacyDMLAdapter adapter = ( dfflib_SObjectUnitOfWork.LegacyDMLAdapter ) uow.m_dml;
+        System.Assert.areEqual( dfflib_Database.getDMLProxy( dfflib_Database.Context.INHERIT ), adapter.operationProxy, 'Expected the default INHERIT proxy for Operations' );
+
+        // Given - mock the operation proxy, as sending email depends on the org settings
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        dfflib_Database_IDML m_operationProxy = ( dfflib_Database_IDML ) mocks.mock( dfflib_Database_IDML.class );
+        adapter.operationProxy = m_operationProxy;
+
+        // When
+        uow.registerEmail( email );
+        Test.startTest();
+        uow.commitWork();
+        Test.stopTest();
+
+        // Then - the email is sent by the operation proxy and the legacy IDML is not touched
+        ( ( dfflib_Database_IDML ) mocks.verify( m_operationProxy, 1 ) ).performOperation( dfflib_SObjectUnitOfWork.Operations.SEND_EMAIL, new List<Object>{ email } );
+        System.Assert.isTrue( m_legacyIDML.calls.isEmpty(), 'Expected the legacy IDML not to be called' );
+    }
+
+    @IsTest
+    private static void legacyIDML_endToEnd_LegacyBackCompatDML(){
+        // Given - first UOW inserting a parent and child with a relationship
+        LegacyBackCompat_DML insertDML = new LegacyBackCompat_DML();
+        dfflib_SObjectUnitOfWork uowInsert = new dfflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType, Contact.SObjectType }, insertDML );
+        Account acc = new Account( Name = 'Legacy parent' );
+        Contact con = new Contact( LastName = 'Legacy child' );
+
+        // When
+        Test.startTest();
+        uowInsert.registerNew( acc );
+        uowInsert.registerNew( con, Contact.AccountId, acc );
+        uowInsert.commitWork();
+        Test.stopTest();
+
+        // Then
+        System.Assert.areEqual( acc.Id, [ SELECT AccountId FROM Contact WHERE Id = :con.Id ].AccountId, 'Expected the Contact to be related to the inserted Account' );
+        System.Assert.areEqual( new List<String>{ 'insert:1', 'insert:1' }, insertDML.calls, 'Expected one insert per SObjectType in dependency order' );
+
+        // Given - second UOW updating, upserting and deleting
+        LegacyBackCompat_DML changeDML = new LegacyBackCompat_DML();
+        dfflib_SObjectUnitOfWork uowChange = new dfflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType, Contact.SObjectType }, changeDML );
+        acc.Name = 'Legacy parent updated';
+
+        // When
+        uowChange.registerDirty( acc );
+        uowChange.registerUpsert( new Account( Name = 'Upserted' ), Account.Id );
+        uowChange.registerDeleted( con );
+        uowChange.commitWork();
+
+        // Then - commitWork() performs upserts before updates, followed by deletes
+        System.Assert.areEqual( 'Legacy parent updated', [ SELECT Name FROM Account WHERE Id = :acc.Id ].Name, 'Expected the Account to be updated' );
+        System.Assert.areEqual( 1, [ SELECT COUNT() FROM Account WHERE Name = 'Upserted' ], 'Expected the Account to be upserted' );
+        System.Assert.areEqual( 0, [ SELECT COUNT() FROM Contact WHERE Id = :con.Id ], 'Expected the Contact to be deleted' );
+        System.Assert.areEqual( new List<String>{ 'upsert:1', 'update:1', 'delete:1' }, changeDML.calls, 'Expected DML calls in commit order' );
+    }
+
+    private class LegacyBackCompat_DML extends fflib_SObjectUnitOfWork.SimpleDML{
+        public List<String> calls = new List<String>();
+
+        public override void dmlInsert( List<SObject> objList ){
+            calls.add( 'insert:' + objList.size() );
+            super.dmlInsert( objList );
+        }
+
+        public override void dmlUpdate( List<SObject> objList ){
+            calls.add( 'update:' + objList.size() );
+            super.dmlUpdate( objList );
+        }
+
+        public override void dmlUpsert( List<SObject> objList, Schema.SObjectField externalId ){
+            calls.add( 'upsert:' + objList.size() );
+            super.dmlUpsert( objList, externalId );
+        }
+
+        public override void dmlDelete( List<SObject> objList ){
+            calls.add( 'delete:' + objList.size() );
+            super.dmlDelete( objList );
+        }
     }
 }

@@ -79,6 +79,29 @@ public with sharing virtual class dfflib_Application{
         }
 
         /**
+         * Constructor for a metadata-driven dfflib_ISObjectUnitOfWork running a legacy fflib IDML implementation
+         *
+         * @param   dml     Legacy fflib IDML implementation performing the DML operations
+         * @return  UnitOfWorkInterface to allow a fluent interface
+         */
+        @NamespaceAccessible
+        public dfflib_ISObjectUnitOfWork newInstance( fflib_SObjectUnitOfWork.IDML dml ){
+            return m_mockUow ?? new dfflib_SObjectUnitOfWork( ( List<SObjectType> ) null, dml ).setConfigs( appConfig.getUnitOfWorkConfigs() );
+        }
+
+        /**
+         * Constructor for a dfflib_ISObjectUnitOfWork with prepopulated SObjectType list running a legacy fflib IDML implementation
+         *
+         * @param   sObjTypes   Ordered list of SObjectTypes to be allowed in the new UOW instance
+         * @param   dml         Legacy fflib IDML implementation performing the DML operations
+         * @return  UnitOfWorkInterface to allow a fluent interface
+         */
+        @NamespaceAccessible
+        public dfflib_ISObjectUnitOfWork newInstance( List<SObjectType> sObjTypes, fflib_SObjectUnitOfWork.IDML dml ){
+            return m_mockUow ?? new dfflib_SObjectUnitOfWork( sObjTypes, dml );
+        }
+
+        /**
           * @param mockUow Instance of UnitOfWork class to mock
           * @deprecated Deprecated method as this can be replaced by `defineMock( fflib_ApexMocks mocks );`
           */

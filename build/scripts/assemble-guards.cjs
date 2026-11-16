@@ -162,7 +162,16 @@ function checkDuplicateNames(files) {
 // The scan is a case-insensitive whole-word search of the raw source: comments and string literals count
 // (Type.forName('fflib_X') is a real reference; a stale name in a comment is a documentation bug).
 // A file name is untrusted input: escape it before it becomes part of a pattern.
+// TWIN_ALLOWED_REFERENCES are the exact nested fflib types a dfflib_ class may reference for backward compatibility
+// (legacy IDML implementations): they are removed before the scan, so any other reference to the twin still fails.
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, (c) => '\\' + c);
+const TWIN_ALLOWED_REFERENCES = [
+  'fflib_SObjectUnitOfWork.IDML',
+  'fflib_SObjectUnitOfWork.IDMLUpsertable',
+  'fflib_SObjectUnitOfWork.SimpleDML',
+  'fflib_SObjectUnitOfWork.UserModeDML',
+];
+const ALLOWED_REFERENCE_PATTERN = new RegExp(`\\b(?:${TWIN_ALLOWED_REFERENCES.map(escapeRegExp).join('|')})\\b`, 'gi');
 
 function checkTwins(files) {
   const base = (p) => p.split(/[\\/]/).pop().replace(/\.(cls|trigger)$/i, '');
@@ -172,8 +181,9 @@ function checkTwins(files) {
   for (const file of files) {
     const name = base(file.path);
     if (!name.toLowerCase().startsWith('dfflib_')) continue;
+    const content = file.content.replace(ALLOWED_REFERENCE_PATTERN, '');
     for (const [lower, original] of twins) {
-      if (new RegExp(`\\b${escapeRegExp(lower)}\\b`, 'i').test(file.content)) findings.push(`${name} references ${original}, which has the twin ${names.get(`d${lower}`)}`);
+      if (new RegExp(`\\b${escapeRegExp(lower)}\\b`, 'i').test(content)) findings.push(`${name} references ${original}, which has the twin ${names.get(`d${lower}`)}`);
     }
   }
   return findings;

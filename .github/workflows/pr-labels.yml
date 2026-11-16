@@ -41,7 +41,7 @@
 #                       type, plus `breaking` from a title `!` or a
 #                       `BREAKING CHANGE:` description line. Non-destructive: a
 #                       title that does not follow the format, or a type with no
-#                       mapped label (docs/test/build/ci/revert), leaves the conventional
+#                       mapped label (test/build/ci/revert), leaves the conventional
 #                       labels untouched, so a stale title read can never strip a
 #                       correctly-applied label. pr-template-validation.yml is the
 #                       single BLOCKING title check. `ci` is NOT managed here; the
