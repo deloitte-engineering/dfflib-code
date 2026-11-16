@@ -79,6 +79,29 @@ public with sharing virtual class dfflib_Application{
         }
 
         /**
+         * Constructor for a metadata-driven dfflib_ISObjectUnitOfWork running a legacy fflib IDML implementation
+         *
+         * @param   dml     Legacy fflib IDML implementation performing the DML operations
+         * @return  UnitOfWorkInterface to allow a fluent interface
+         */
+        @NamespaceAccessible
+        public dfflib_ISObjectUnitOfWork newInstance( fflib_SObjectUnitOfWork.IDML dml ){
+            return m_mockUow ?? new dfflib_SObjectUnitOfWork( ( List<SObjectType> ) null, dml ).setConfigs( appConfig.getUnitOfWorkConfigs() );
+        }
+
+        /**
+         * Constructor for a dfflib_ISObjectUnitOfWork with prepopulated SObjectType list running a legacy fflib IDML implementation
+         *
+         * @param   sObjTypes   Ordered list of SObjectTypes to be allowed in the new UOW instance
+         * @param   dml         Legacy fflib IDML implementation performing the DML operations
+         * @return  UnitOfWorkInterface to allow a fluent interface
+         */
+        @NamespaceAccessible
+        public dfflib_ISObjectUnitOfWork newInstance( List<SObjectType> sObjTypes, fflib_SObjectUnitOfWork.IDML dml ){
+            return m_mockUow ?? new dfflib_SObjectUnitOfWork( sObjTypes, dml );
+        }
+
+        /**
           * @param mockUow Instance of UnitOfWork class to mock
           * @deprecated Deprecated method as this can be replaced by `defineMock( fflib_ApexMocks mocks );`
           */
@@ -225,7 +248,9 @@ public with sharing virtual class dfflib_Application{
         @NamespaceAccessible
         public virtual dfflib_ISObjectSelector newInstance( SObjectType sObjectType ){
             System.debug( LoggingLevel.INFO, 'fflib - No dfflib_Database.Context was specified, therefore defaulting to (legacy) INHERIT' );
-            return this.newInstance( sObjectType, dfflib_Database.Context.INHERIT );
+            // Passing null to avoid calling setContext(), allowing developer to call setContext() after instantiation (e.g. when migrating)
+            // Defaults to INHERIT lazily
+            return this.newInstance( sObjectType, null );
         }
 
         /**
@@ -261,8 +286,9 @@ public with sharing virtual class dfflib_Application{
                 }
             }
 
-            // Construct Selector class and set the default database context
-            return ( ( dfflib_ISObjectSelector ) selectorClass.newInstance() ).setContext( context );
+            // Construct Selector class and set the database context, when provided
+            dfflib_ISObjectSelector selector = ( dfflib_ISObjectSelector ) selectorClass.newInstance();
+            return context == null ? selector : selector.setContext( context );
         }
 
         /**

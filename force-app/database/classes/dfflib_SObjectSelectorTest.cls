@@ -193,7 +193,38 @@ private with sharing class dfflib_SObjectSelectorTest{
         System.Assert.isTrue( selector.isIncludeFieldSetFields(), 'Expected fields to be included as passed via constructor' );
         System.Assert.isFalse( selector.isIncludeRelatedFieldSetFields() );
         System.Assert.isFalse( selector.isSortingSelectedFields() );
-        System.Assert.areEqual( dfflib_Database.Context.NONE, selector.getContext() );
+        System.Assert.areEqual( dfflib_Database.Context.INHERIT, selector.getContext(), 'Expected SYSTEM_MODE to map to INHERIT, as fflib leaves sharing to the selector class' );
+        System.Assert.isInstanceOfType( selector.m_queryProxy, dfflib_Database_QueryProxy.QueryInheritedSharing.class );
+    }
+
+    @IsTest
+    private static void constructor_systemModeDataAccess_shouldMapToInherit(){
+        // Given, When
+        Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector( true, dfflib_SObjectSelector.DataAccess.SYSTEM_MODE );
+
+        // Then - validate
+        System.Assert.areEqual( dfflib_Database.Context.INHERIT, selector.getContext(), 'Expected SYSTEM_MODE to map to INHERIT' );
+        System.Assert.isInstanceOfType( selector.m_queryProxy, dfflib_Database_QueryProxy.QueryInheritedSharing.class );
+    }
+
+    @IsTest
+    private static void constructorAllArgs_systemModeDataAccess_shouldMapToInherit(){
+        // Given, When
+        Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector( true, false, false, true, false, dfflib_SObjectSelector.DataAccess.SYSTEM_MODE );
+
+        // Then - validate
+        System.Assert.areEqual( dfflib_Database.Context.INHERIT, selector.getContext(), 'Expected SYSTEM_MODE to map to INHERIT' );
+        System.Assert.isInstanceOfType( selector.m_queryProxy, dfflib_Database_QueryProxy.QueryInheritedSharing.class );
+    }
+
+    @IsTest
+    private static void constructorAllArgs_userModeDataAccess_shouldMapToFull(){
+        // Given, When
+        Testfflib_SObjectSelector selector = new Testfflib_SObjectSelector( true, false, false, true, false, dfflib_SObjectSelector.DataAccess.USER_MODE );
+
+        // Then - validate
+        System.Assert.areEqual( dfflib_Database.Context.FULL, selector.getContext(), 'Expected USER_MODE to map to FULL' );
+        System.Assert.isInstanceOfType( selector.m_queryProxy, dfflib_Database_QueryProxy.QueryWithSharing.class );
     }
 
     @IsTest
@@ -1109,6 +1140,10 @@ private with sharing class dfflib_SObjectSelectorTest{
 
         public Testfflib_SObjectSelector( Boolean includeFieldSetFields, Boolean enforceCRUD, Boolean enforceFLS, Boolean sortSelectFields, Boolean includeRelatedFieldSetFields ){
             super( includeFieldSetFields, enforceCRUD, enforceFLS, sortSelectFields, includeRelatedFieldSetFields );
+        }
+
+        public Testfflib_SObjectSelector( Boolean includeFieldSetFields, Boolean enforceCRUD, Boolean enforceFLS, Boolean sortSelectFields, Boolean includeRelatedFieldSetFields, DataAccess access ){
+            super( includeFieldSetFields, enforceCRUD, enforceFLS, sortSelectFields, includeRelatedFieldSetFields, access );
         }
 
         public Testfflib_SObjectSelector( Boolean includeFieldSetFields, Boolean sortSelectFields, Boolean includeRelatedFieldSetFields, dfflib_Database.Context securityContext ){

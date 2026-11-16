@@ -24,7 +24,7 @@ public abstract inherited sharing class dfflib_SObjectSelector implements dfflib
     private static final Map<DataAccess, dfflib_Database.Context> ACCESS_TO_CONTEXT_MAP = new Map<DataAccess, dfflib_Database.Context>{
         DataAccess.LEGACY => dfflib_Database.Context.INHERIT,
         DataAccess.USER_MODE => dfflib_Database.Context.FULL,
-        DataAccess.SYSTEM_MODE => dfflib_Database.Context.NONE
+        DataAccess.SYSTEM_MODE => dfflib_Database.Context.INHERIT
     };
 
     /**
