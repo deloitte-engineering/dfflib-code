@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>SpecialRequests__c</fullName>
+    <description>Optional special requests from the guest (e.g., late check-in, extra pillows, dietary requirements).</description>
+    <externalId>false</externalId>
+    <label>Special Requests</label>
+    <length>500</length>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>3</visibleLines>
+</CustomField>
