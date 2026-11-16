@@ -876,10 +876,9 @@ public virtual inherited sharing class dfflib_QueryFactory{
 
         // The child queryFactory should be configured in the same way as the parent by default - can override after if required
         subSelectQuery.setSortSelectFields( sortSelectFields );
-        // TODO: Remove legacy enforceFLS/enforceCRUD boolean parameters (migrate to dfflib_Database.Context).
-        //  Child queries inherit the parent's FLS enforcement level to ensure field path resolution behaves consistently -
-        //  specifically, field name casing (lowercase for USER_MODE/SYSTEM_MODE vs. case-preserving for LEGACY) must match across the query hierarchy to prevent duplicate fields in SELECT clauses.
-        //  The database context (queryProxy) is intentionally not propagated: the parent QueryFactory owns the execution context, and child subqueries are embedded in the parent's SOQL - they cannot specify independent access levels.
+        // Child queries inherit the parent's FLS enforcement level to ensure field path resolution behaves consistently -
+        // specifically, field name casing (lowercase for USER_MODE/SYSTEM_MODE vs. case-preserving for LEGACY) must match across the query hierarchy to prevent duplicate fields in SELECT clauses.
+        // The database context (queryProxy) is intentionally not propagated: the parent QueryFactory owns the execution context, and child subqueries are embedded in the parent's SOQL - they cannot specify independent access levels.
         subSelectQuery.setEnforceFLS( this.mFlsEnforcement );
         if( assertIsAccessible ){
             subSelectQuery.assertIsAccessible();
