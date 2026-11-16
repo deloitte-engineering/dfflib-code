@@ -689,6 +689,60 @@ private with sharing class dfflib_SObjectUnitOfWorkTest{
     }
 
     @IsTest
+    private static void registerUpsert_ExternalId_WithParent_resolvesRelationship(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        dfflib_Database_IDML m_IDML = ( dfflib_Database_IDML ) mocks.mock( dfflib_Database_IDML.class );
+
+        // Given - create data
+        Account acc = new Account( Id = ID_ACCOUNT, Name = 'Parent' );
+        Contact con = new Contact( LastName = 'Child' );
+        dfflib_SObjectUnitOfWork uow = new dfflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType, Contact.SObjectType } );
+        uow.m_dml = m_IDML;
+
+        // When - register the parent and the child by upsert with its parent
+        uow.registerDirty( acc );
+        uow.registerUpsert( con, Contact.Id, Contact.AccountId, acc );
+
+        // Then - validate the relationship was registered on the Contact, before commitWork() resets the UOW
+        List<dfflib_SObjectUnitOfWork.IRelationship> relations = uow.m_relationships.get( Contact.SObjectType );
+        System.Assert.areEqual( 1, relations?.size(), 'Expected one relationship registered for Contact' );
+        System.Assert.areEqual( con, relations[ 0 ].getRecord(), 'Expected the relationship on the upserted Contact' );
+        System.Assert.isNull( con.AccountId, 'Expected the relationship not to be resolved before commitWork()' );
+
+        // When
+        uow.commitWork();
+
+        // Then - validate the relationship was resolved for the upsert and the upsert was performed
+        System.Assert.isTrue( relations[ 0 ].wasResolved(), 'Expected the relationship to be resolved during the upsert' );
+        System.Assert.areEqual( ID_ACCOUNT, con.AccountId, 'Expected Contact.AccountId to be set to the parent Id' );
+        ( ( dfflib_Database_IDML ) mocks.verify( m_IDML, 1 ) ).performDMLAction( dfflib_SObjectUnitOfWork.DMLActions.dUPSERT, new List<Contact>{ con }, Contact.Id, true, dfflib_Database.getAccessLevel( uow.m_securityContext ) );
+    }
+
+    @IsTest
+    private static void registerUpsert_ExternalId_WithoutParent_registersNoRelationship(){
+        // Create mocks
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        dfflib_Database_IDML m_IDML = ( dfflib_Database_IDML ) mocks.mock( dfflib_Database_IDML.class );
+
+        // Given - create data
+        Contact con1 = new Contact( LastName = 'Child 1' );
+        Contact con2 = new Contact( LastName = 'Child 2' );
+        dfflib_SObjectUnitOfWork uow = new dfflib_SObjectUnitOfWork( new List<SObjectType>{ Account.SObjectType, Contact.SObjectType } );
+        uow.m_dml = m_IDML;
+
+        // When - parent record and parent field left null
+        uow.registerUpsert( con1, Contact.Id, Contact.AccountId, null );
+        uow.registerUpsert( con2, Contact.Id, null, new Account( Id = ID_ACCOUNT ) );
+
+        // Then - validate no relationship was registered and both records were upserted
+        System.Assert.isFalse( uow.m_relationships.containsKey( Contact.SObjectType ), 'Expected no relationship to be registered' );
+        uow.commitWork();
+        ( ( dfflib_Database_IDML ) mocks.verify( m_IDML, 1 ) ).performDMLAction( dfflib_SObjectUnitOfWork.DMLActions.dUPSERT, new List<Contact>{ con1, con2 }, Contact.Id, true, dfflib_Database.getAccessLevel( uow.m_securityContext ) );
+        System.Assert.isNull( con2.AccountId, 'Expected no parent Id to be set' );
+    }
+
+    @IsTest
     private static void registerUpsert_InvalidInputs(){
         // Given - create data - explicit SObjectType list, since the last sub-case proceeds into implementSObjectType()
         // which needs metadata-driven config; a directly-constructed UOW without a list has no injected uowConfigs
