@@ -9,9 +9,10 @@
 #   applies a label for every group of files the PR changes. Several labels
 #   can apply to one PR.
 #
-# LABEL CATEGORIES:
-#   - framework:         Salesforce source code and manifest changes
-#   - ci:                CI/CD workflow changes, build scripts, Markdown files
+# LABEL CATEGORIES (scope labels):
+#   - framework:         changes under force-app/ or manifest/
+#   - ci:                workflows, build scripts and the release-please config
+#   - documentation:     Markdown files, anywhere
 #   - utilities, database, metadata-driven-application,
 #     trigger-handler-framework, test-data-builder-framework:
 #                        one label per force-app sub-folder, named after it
@@ -31,13 +32,22 @@ framework:
 
 # -----------------------------------------------------------------------------
 # LABEL: ci
-# Applied when: Changes to CI/CD configuration, workflows, build scripts, or markdown files
+# Applied when: Changes to workflows, build scripts or the release-please config
 # -----------------------------------------------------------------------------
 ci:
   - changed-files:
       - any-glob-to-any-file:
           - '.github/**'
           - 'build/**'
+          - 'release-please-config.json'
+
+# -----------------------------------------------------------------------------
+# LABEL: documentation
+# Applied when: Changes to any Markdown file
+# -----------------------------------------------------------------------------
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
           - '**/*.md'
 
 # -----------------------------------------------------------------------------
