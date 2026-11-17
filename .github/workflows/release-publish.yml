@@ -3,7 +3,7 @@
 # =============================================================================
 # Purpose:  A thin caller of publishRelease() (release-publish.cjs) for a
 #           merged release PR: promote the recorded beta builds (every package, the
-#           monolith first), tag the merge commit vX.Y.Z, publish the GitHub
+#           standalone package first), tag the merge commit vX.Y.Z, publish the GitHub
 #           Release and swap `autorelease: pending` for `autorelease: tagged`.
 #           Every step is probed first, so a re-run finishes a partial release
 #           and a complete one is a no-op.

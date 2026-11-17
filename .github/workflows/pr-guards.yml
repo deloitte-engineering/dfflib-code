@@ -1,13 +1,13 @@
 # =============================================================================
 # pr-guards.yml - Assemble guards on every pull request
 # =============================================================================
-# Purpose:  The check `assemble-guards`. It runs the guards of the assemble-monolith action on every pull
-#           request, so a mistake in dependencies/ or monolith/ shows up on the PR itself and not only
+# Purpose:  The check `assemble-guards`. It runs the guards of the assemble action on every pull
+#           request, so a mistake in dependencies/ or assembled/ shows up on the PR itself and not only
 #           in the builds that deploy. The guards, their verdicts and the `::error::<guard>: <item>`
 #           output belong to the action; this workflow adds none. The job fails when:
 #             gitmodules-allowlist  .gitmodules points at a URL outside the allowlist
 #             gitlinks-only         the PR edits dependencies/ other than a submodule pointer
-#             monolith-untracked    monolith/ (the assembled tree) is committed or not ignored
+#             assembled-untracked   assembled/ (the assembled tree) is committed or not ignored
 #             twin-rule             a dfflib_ class references an fflib_ class that has a dfflib_ twin
 #             duplicate-names       two sources hold the same metadata name
 #
@@ -17,7 +17,7 @@
 #           - workflow_dispatch  (manual trigger, for a branch that has no pull request)
 #           No pull_request_target and no push trigger.
 #
-# Single step: the job is one `uses: $/.github/actions/assemble-monolith` step. `$/` resolves the action at
+# Single step: the job is one `uses: $/.github/actions/assemble` step. `$/` resolves the action at
 #           the commit this workflow runs from, so the job needs no checkout step; the action checks out
 #           the repository (no submodules), fetches the pinned submodules, assembles
 #           the tree and runs the guards. The job has no checkout, assemble or run step of its own.
@@ -59,4 +59,4 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: $/.github/actions/assemble-monolith
+      - uses: $/.github/actions/assemble

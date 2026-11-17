@@ -70,7 +70,7 @@
 # Logic:    build/scripts/release-beta.cjs (selectBetaPr, checkBetaPr, planBeta,
 #           buildBeta, pushAliasCommit), release-devhub.cjs (the Dev Hub adapter:
 #           the sf list and create command lines), release-rules.cjs
-#           (buildCheckFailures, the promotable rule), the assemble-monolith action
+#           (buildCheckFailures, the promotable rule), the assemble action
 #           (the Assembled tree of the release branch, built before the login), release-pr.cjs
 #           (listOpenReleasePrs: which PR is the release PR), release-record.cjs
 #           (readBetaBuildState: whether the recorded beta build is current;
@@ -126,7 +126,7 @@ jobs:
           sparse-checkout: |
             build/scripts
             .github/actions/sf-login
-            .github/actions/assemble-monolith
+            .github/actions/assemble
 
       # Policy check: a person needs maintain or admin (the role rule is in
       # release-beta.cjs). Only github-actions[bot] passes without a lookup: the
@@ -237,12 +237,12 @@ jobs:
             core.setOutput('needed', 'true');
             core.setOutput('plan', JSON.stringify(plan));
 
-      # The monolith package is built from the Assembled tree (monolith/, gitignored), so it is assembled in release/
+      # The standalone package is built from the Assembled tree (assembled/, gitignored), so it is assembled in release/
       # before the build, by the composite action. The action and its script are the default branch's.
       # The action checks the .gitmodules allowlist before it fetches any submodule and runs before the login.
-      - name: Assemble the monolith
+      - name: Assemble the tree
         if: steps.plan.outputs.needed == 'true'
-        uses: ./.github/actions/assemble-monolith
+        uses: ./.github/actions/assemble
         with:
           working-directory: release
           script-root: ${{ github.workspace }}

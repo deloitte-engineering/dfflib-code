@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // =============================================================================
-// assemble-monolith.cjs - builds the Assembled tree (monolith/) from the two upstream pins and force-app
+// assemble.cjs - builds the Assembled tree (assembled/) from the two upstream pins and force-app
 // =============================================================================
 // Run from the repository root after `git submodule update --init --depth 1`:
-//   node build/scripts/assemble-monolith.cjs                    plan, check, rebuild monolith/, run every guard
-//   node build/scripts/assemble-monolith.cjs --check-allowlist  guard 1 only (.gitmodules), before any submodule is fetched
+//   node build/scripts/assemble.cjs                    plan, check, rebuild assembled/, run every guard
+//   node build/scripts/assemble.cjs --check-allowlist  guard 1 only (.gitmodules), before any submodule is fetched
 // Environment:
-//   MONOLITH_PATH   output folder, repo-relative (default monolith); refused when absolute, containing .., equal to,
+//   ASSEMBLED_PATH  output folder, repo-relative (default assembled); refused when absolute, containing .., equal to,
 //                   containing or inside a source root, or tracked; git must ignore it (guard 3 checks this path)
-//   GITHUB_OUTPUT   when set, `monolith-path=<folder>` is appended to it
+//   GITHUB_OUTPUT   when set, `assembled-path=<folder>` is appended to it
 // Output: one `::error::<guard>: <item>` line per finding. Exit 0 = no findings, 1 = at least one.
 // The modules: assemble-run.cjs (the run: repository in, findings out), tracked-tree.cjs (the git facts),
 // assemble-tree.cjs (which files are copied) and assemble-guards.cjs (the five guards).
@@ -22,10 +22,10 @@ function main(argv, env, repoRoot) {
   const { findings, outputPath } = assemble({
     repoRoot,
     repo: gitRepo(repoRoot),
-    out: env.MONOLITH_PATH || 'monolith',
+    out: env.ASSEMBLED_PATH || 'assembled',
     allowlistOnly: argv.includes('--check-allowlist'),
   });
-  if (outputPath !== null && env.GITHUB_OUTPUT) fs.appendFileSync(env.GITHUB_OUTPUT, `monolith-path=${outputPath}\n`);
+  if (outputPath !== null && env.GITHUB_OUTPUT) fs.appendFileSync(env.GITHUB_OUTPUT, `assembled-path=${outputPath}\n`);
   findings.forEach((line) => console.log(line));
   return findings.length === 0 ? 0 : 1;
 }

@@ -3,7 +3,7 @@
     {
       "versionName": "D'fflib",
       "versionNumber": "0.9.1.NEXT",
-      "path": "monolith",
+      "path": "assembled",
       "default": true,
       "package": "D'fflib",
       "versionDescription": ""

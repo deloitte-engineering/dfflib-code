@@ -2,7 +2,7 @@
 // assemble-guards.cjs - the guards of the Assembled tree
 // =============================================================================
 // Each guard is a pure function: file contents and listings in, an array of findings (strings) out.
-// An empty array is a pass. The CLI (assemble-monolith.cjs) collects every finding, prints one
+// An empty array is a pass. The CLI (assemble.cjs) collects every finding, prints one
 // annotation per finding and exits 1 when there is any.
 // A guard exists only when neither the compiler nor the deploy validation would catch the problem.
 // =============================================================================
@@ -93,9 +93,9 @@ function checkGitlinks({ staged, status }) {
   return findings;
 }
 
-// Guard 3: the output folder (monolith by default) is never committed and git ignores it. tracked: `git ls-files -- <folder>`;
+// Guard 3: the output folder (assembled by default) is never committed and git ignores it. tracked: `git ls-files -- <folder>`;
 // ignored: whether `git check-ignore` reports the folder as ignored (git's own answer, so negations and nested rules count).
-function checkMonolithUntracked({ folder = 'monolith', tracked, ignored }) {
+function checkAssembledUntracked({ folder = 'assembled', tracked, ignored }) {
   const findings = [];
   const files = tracked.split(/\r?\n/).filter((l) => l.trim() !== '');
   if (files.length > 0) findings.push(`${folder}/ has tracked files (${files.length}), first: ${files[0]}`);
@@ -195,4 +195,4 @@ function annotate(guard, item) {
   return `::error::${escaped}`;
 }
 
-module.exports = { SUBMODULES, parseGitmodules, checkGitmodules, checkGitlinks, checkMonolithUntracked, checkDuplicateNames, checkTwins, annotate };
+module.exports = { SUBMODULES, parseGitmodules, checkGitmodules, checkGitlinks, checkAssembledUntracked, checkDuplicateNames, checkTwins, annotate };

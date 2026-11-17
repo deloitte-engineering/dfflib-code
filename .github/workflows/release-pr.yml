@@ -54,7 +54,7 @@ on:
       - 'force-app/**'
       - 'dependencies/**'
       - '.gitmodules'
-      - 'build/scripts/assemble-*.cjs'
+      - 'build/scripts/assemble*.cjs'
       - 'build/scripts/tracked-tree.cjs'
   workflow_dispatch:
 

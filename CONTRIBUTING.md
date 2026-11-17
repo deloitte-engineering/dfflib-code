@@ -23,7 +23,7 @@ Thank you for contributing to D'fflib. This guide takes you from a clone to a me
 - New classes in `force-app/` should have a `dfflib_` prefix.
 - Each new functionality should be unit tested.
 - Update the documentation when behaviour changes.
-- Never edit `dependencies/` (the upstream fflib libraries) or `monolith/` (built for you) by hand.
+- Never edit `dependencies/` (the upstream fflib libraries) or `assembled/` (built for you) by hand.
 - Write every commit as a [conventional commit](#commit-messages), and fold corrections to your own branch into the commit they correct before you push (see [Fixups](#fixups-before-the-first-push)).
 
 ## Local setup
@@ -33,10 +33,10 @@ You need Git and Node.js. The Salesforce CLI (`sf`) and an org you can deploy to
 | Step | Command | Why |
 |---|---|---|
 | 1. Clone with submodules | `git clone --recurse-submodules --shallow-submodules <repository-url>`<br>`cd <repository-folder>`<br>`git config submodule.recurse true` | Fetches the two upstream fflib libraries into `dependencies/`, and keeps them on the commits each branch pins when you switch or pull |
-| 2. Assemble | `node build/scripts/assemble-monolith.cjs` | Builds the combined package content and runs guards the pull request runs too |
-| 3. Validate (optional) | `sf project deploy validate --source-dir monolith --source-dir code-examples --test-level RunLocalTests --target-org <alias> --wait 60` | Runs the same deployment validation, with tests, as the pull request check |
+| 2. Assemble | `node build/scripts/assemble.cjs` | Builds the combined package content and runs guards the pull request runs too |
+| 3. Validate (optional) | `sf project deploy validate --source-dir assembled --source-dir code-examples --test-level RunLocalTests --target-org <alias> --wait 60` | Runs the same deployment validation, with tests, as the pull request check |
 
-The assembled tree (`monolith/`) is our `force-app/` source plus the pinned upstream fflib sources: it is what the full package is built from.
+The assembled tree (`assembled/`) is our `force-app/` source plus the pinned upstream fflib sources: it is what the standalone package is built from.
 
 <details>
 <summary>More on the setup</summary>
@@ -44,9 +44,9 @@ The assembled tree (`monolith/`) is our `force-app/` source plus the pinned upst
 - A clone made without `--recurse-submodules` needs `git submodule update --init --depth 1` before step 2. The command does nothing after `--recurse-submodules`.
 - After a branch moves an upstream pin, run step 2 again. When you switch between branches that pin different upstream commits, `git status` shows a submodule as modified until it is checked out at the new pin: with `submodule.recurse true` the switch does it, otherwise run `git submodule update --init --depth 1` after the switch.
 - `git add dependencies/` stages a pin, so never run it by accident.
-- The script deletes and rebuilds `monolith/` (gitignored, never edited by hand) and runs the guards: it prints one `::error::` line per finding and exits 1 when there is any. The guards fail a duplicate class name and a `dfflib_` class that references an `fflib_` class which has a `dfflib_` twin.
-- `MONOLITH_PATH` changes the output folder (a repo-relative path that is not a source folder and that git ignores).
-- There is no `package.json`, so there is no `npm run` shortcut. No formatter, lint or analyser config exists for Apex, so nothing excludes `dependencies/` or `monolith/`.
+- The script deletes and rebuilds `assembled/` (gitignored, never edited by hand) and runs the guards: it prints one `::error::` line per finding and exits 1 when there is any. The guards fail a duplicate class name and a `dfflib_` class that references an `fflib_` class which has a `dfflib_` twin.
+- `ASSEMBLED_PATH` changes the output folder (a repo-relative path that is not a source folder and that git ignores).
+- There is no `package.json`, so there is no `npm run` shortcut. No formatter, lint or analyser config exists for Apex, so nothing excludes `dependencies/` or `assembled/`.
 - The deployment validation enforces 75% code coverage.
 
 </details>

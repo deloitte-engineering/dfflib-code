@@ -15,7 +15,7 @@
 const { effectiveNotes, previousReleaseTag } = require('./release-rules.cjs');
 const { githubPinReader, pinsAt } = require('./release-pins.cjs');
 const { LINKS_PENDING, installUrls, renderHeader } = require('./release-notes-header.cjs');
-const { monolithFirst } = require('./release-package-set.cjs');
+const { standaloneFirst } = require('./release-package-set.cjs');
 
 // A code fence longer than any backtick run in `text`, so the text cannot close it.
 function fenceFor(text) {
@@ -174,12 +174,12 @@ function buildReleaseNotes(meta) {
 //               (for every package set); a failed read is a warning (a failed previous read drops only
 //               the compare and unchanged notes), a missing pin is no bullet.
 // Returns { base, builds, prs, warnings, generated, effective }: base is the previous release
-// tag ('' for a first release), builds the package set monolith first, warnings
+// tag ('' for a first release), builds the package set (standalone package first), warnings
 // what collecting the PRs could not read (plain one-line text), generated the notes built from
 // the PRs and effective what the release publishes (null without a box).
 async function notesFor({ github, owner, repo, version, head, compareTo = head, builds, tagNames, box, pinReader = githubPinReader({ github, owner, repo }), log = console.log }) {
   const base = previousReleaseTag(tagNames, `v${version}`);
-  const packages = monolithFirst(builds);
+  const packages = standaloneFirst(builds);
   const { prs, newContributors, warnings: collected } = await collectReleasePrs({ github, owner, repo, base, head, log });
   let pins = [];
   try {

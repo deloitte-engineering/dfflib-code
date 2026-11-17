@@ -16,10 +16,10 @@ function baseVersion(versionNumber) {
   return versionNumber.split('.').slice(0, 3).join('.');
 }
 
-// The two package kinds. The default entry is the monolith package; every other entry is the
+// The two package kinds. The default entry is the standalone package; every other entry is the
 // BYO package (bring your own fflib; org-dependent, so it has no coverage figure). The kind never
 // comes from a name; it is recomputed from the project file on every run and never persisted.
-const PACKAGE_KIND = Object.freeze({ MONOLITH: 'monolith', BYO: 'byo' });
+const PACKAGE_KIND = Object.freeze({ STANDALONE: 'standalone', BYO: 'byo' });
 
 // The entries of `projectText` (sfdx-project.json) as
 // [{ name, path, versionNumber, baseVersion, isDefault, kind }] in file order; exactly one is the
@@ -37,14 +37,14 @@ function packageSet(projectText) {
     versionNumber: dir.versionNumber,
     baseVersion: dir.versionNumber ? baseVersion(dir.versionNumber) : null,
     isDefault: index === defaultIndex,
-    kind: index === defaultIndex ? PACKAGE_KIND.MONOLITH : PACKAGE_KIND.BYO,
+    kind: index === defaultIndex ? PACKAGE_KIND.STANDALONE : PACKAGE_KIND.BYO,
   }));
 }
 
-// `list` (anything with a `kind`) with the monolith first, the others after it in the order given.
-const monolithFirst = (list) => [
-  ...list.filter((each) => each.kind === PACKAGE_KIND.MONOLITH),
-  ...list.filter((each) => each.kind !== PACKAGE_KIND.MONOLITH),
+// `list` (anything with a `kind`) with the standalone package first, the others after it in the order given.
+const standaloneFirst = (list) => [
+  ...list.filter((each) => each.kind === PACKAGE_KIND.STANDALONE),
+  ...list.filter((each) => each.kind !== PACKAGE_KIND.STANDALONE),
 ];
 
-module.exports = { packageSet, baseVersion, PACKAGE_KIND, monolithFirst };
+module.exports = { packageSet, baseVersion, PACKAGE_KIND, standaloneFirst };

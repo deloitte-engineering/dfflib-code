@@ -4,12 +4,12 @@
 // assemble({ repoRoot, repo, out, allowlistOnly }) returns { findings, outputPath }:
 //   repoRoot       the repository folder; its files are read here, its git facts come from repo
 //   repo           a repo adapter of tracked-tree.cjs (gitRepo(repoRoot) in the command line, fixtureRepo in a test)
-//   out            output folder, repo-relative (default monolith)
+//   out            output folder, repo-relative (default assembled)
 //   allowlistOnly  run guard 1 (.gitmodules) alone, before any submodule is fetched
 //   findings       annotated lines, one per finding, in guard order; empty = pass
 //   outputPath     the output folder when the run got to the end, else null (the output is not published)
 // A refused output path or a symlink stops the run before anything is written. The command line is
-// assemble-monolith.cjs; the modules are assemble-tree.cjs (which files are copied) and
+// assemble.cjs; the modules are assemble-tree.cjs (which files are copied) and
 // assemble-guards.cjs (the five guards).
 // =============================================================================
 
@@ -20,7 +20,7 @@ const guards = require('./assemble-guards.cjs');
 
 const readIfExists = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '');
 
-function assemble({ repoRoot, repo, out = 'monolith', allowlistOnly = false }) {
+function assemble({ repoRoot, repo, out = 'assembled', allowlistOnly = false }) {
   const findings = [];
   const report = (guard, items) => items.forEach((item) => findings.push(guards.annotate(guard, item)));
   const stop = () => ({ findings, outputPath: null });
@@ -40,7 +40,7 @@ function assemble({ repoRoot, repo, out = 'monolith', allowlistOnly = false }) {
 
   report('gitlinks-only', guards.checkGitlinks({ staged: repo.indexEntries('dependencies'), status: repo.submoduleStatus() }));
   const folder = out.replace(/[\\/]+$/, '');
-  report('monolith-untracked', guards.checkMonolithUntracked({ folder, tracked: repo.tracked(folder).join('\n'), ignored: repo.isIgnored(folder) }));
+  report('assembled-untracked', guards.checkAssembledUntracked({ folder, tracked: repo.tracked(folder).join('\n'), ignored: repo.isIgnored(folder) }));
 
   write(repoRoot, out, planned.files);
 
