@@ -5,7 +5,7 @@ Thank you for contributing to D'fflib. This guide takes you from a clone to a me
 ## Table of contents
 
 - [Code style and hygiene](#code-style-and-hygiene)
-- [Local setup](#getting-started)
+- [Local setup](#local-setup)
 - [Workflow](#workflow)
   - [Branch name](#branch-name)
   - [Commit messages](#commit-messages)
@@ -34,7 +34,7 @@ You need Git and Node.js. The Salesforce CLI (`sf`) and an org you can deploy to
 |---|---|---|
 | 1. Clone with submodules | `git clone --recurse-submodules --shallow-submodules <repository-url>`<br>`cd <repository-folder>`<br>`git config submodule.recurse true` | Fetches the two upstream fflib libraries into `dependencies/`, and keeps them on the commits each branch pins when you switch or pull |
 | 2. Assemble | `node build/scripts/assemble-monolith.cjs` | Builds the combined package content and runs guards the pull request runs too |
-| 3. Validate (optional) | `sf project deploy validate --source-dir monolith --test-level RunLocalTests --target-org <alias> --wait 60` | Runs the same deployment validation, with tests, as the pull request check |
+| 3. Validate (optional) | `sf project deploy validate --source-dir monolith --source-dir code-examples --test-level RunLocalTests --target-org <alias> --wait 60` | Runs the same deployment validation, with tests, as the pull request check |
 
 The assembled tree (`monolith/`) is our `force-app/` source plus the pinned upstream fflib sources: it is what the full package is built from.
 
@@ -56,13 +56,13 @@ The assembled tree (`monolith/`) is our `force-app/` source plus the pinned upst
 1. Fork the repository. If you have write access to this repository, you can push your branch here instead; the steps are the same.
 1. Create a branch, following the [branch naming convention](#branch-name).
 1. Change source under `force-app/` and deploy, run the unit tests and validate the behaviour in your org.
-1. Assemble and, if you like, validate (steps 2 and 3 of [Getting started](#getting-started)).
+1. Assemble and, if you like, validate (steps 2 and 3 of [Local setup](#local-setup)).
 1. Commit your changes, following [Commit messages](#commit-messages).
 1. Push the branch.
 1. Open a pull request against `main`, with a title and description as in [Pull request title and description](#pull-request-title-and-description). Fill in the template.
 1. Code owners are requested for review automatically (see `CODEOWNERS`), and labels are applied for you.
 
-On a pull request from a fork, the `validate-project` check fails. That is expected: a Maintainer validates your change before it merges. If you validated it against your own org (step 3 of [Getting started](#getting-started)), say so in the description.
+On a pull request from a fork, the `validate-project` check fails. That is expected: a Maintainer validates your change before it merges. If you validated it against your own org (step 3 of [Local setup](#local-setup)), say so in the description.
 
 ### Branch name
 
@@ -172,8 +172,8 @@ Do this before the first push. After that it needs `git push --force-with-lease`
 
 Several checks run on pull requests to keep the code consistent.
 
-- **`assemble-guards`** runs on every pull request. It fails when the guards find a problem; step 2 of [Getting started](#getting-started) shows the same findings locally.
-- **`validate-project`** runs when a pull request changes the package source, the upstream pins or the project configuration. It deploys the change with all local tests, which must reach 75% code coverage; step 3 of [Getting started](#getting-started) runs the same validation. On a fork it fails (see [Workflow](#workflow)).
+- **`assemble-guards`** runs on every pull request. It fails when the guards find a problem; step 2 of [Local setup](#local-setup) shows the same findings locally.
+- **`validate-project`** runs when a pull request changes the package source, the code examples, the upstream pins or the project configuration. It deploys the change with all local tests, which must reach 75% code coverage; step 3 of [Local setup](#local-setup) runs the same validation. On a fork it fails (see [Workflow](#workflow)).
 - **`pr-template-validation`** fails a title that is not a conventional commit, and a description that is too short or placeholder text. It re-runs when you edit the title or description.
 - **`pr-labels`** applies the label for the title type (the label column of the [types table](#types)), and `breaking` for a breaking change. Correct the title and the labels follow.
 - **`Release readiness`** passes on every contributor pull request.
