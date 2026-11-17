@@ -2,7 +2,7 @@
 // release-publish.cjs - Publish a merged release PR, as one idempotent call
 // =============================================================================
 // publishRelease() promotes the recorded beta builds of a merged release PR (one per package,
-// the monolith package first), tags the merge commit vX.Y.Z, publishes the GitHub Release
+// the standalone package first), tags the merge commit vX.Y.Z, publishes the GitHub Release
 // `D'fflib vX.Y.Z` with the effective release notes and swaps `autorelease: pending` for `autorelease: tagged` (release-please
 // opens no new release PR while a merged one still has pending). Each step is probed
 // first and skipped when done, so a second call finishes a partial release and a
@@ -20,7 +20,7 @@ const { RELEASE_TAGGED_LABEL, listLabelNames } = require('./release-label.cjs');
 const { RELEASE_PR_LABEL, fromThisRepo } = require('./release-pr.cjs');
 const { contentTagGuard, githubReads, readProjectText, recordedBetaBuild } = require('./release-record.cjs');
 const { contentTag } = require('./release-content-tag.cjs');
-const { monolithFirst } = require('./release-package-set.cjs');
+const { standaloneFirst } = require('./release-package-set.cjs');
 const { notesFor, fenceFor, plainText, listTagNames } = require('./release-notes.cjs');
 const { isPrerelease, makeLatest, parseReleaseTag, buildCheckFailures } = require('./release-rules.cjs');
 
@@ -167,7 +167,7 @@ async function publishRelease({ github, owner, repo, prNumber, defaultBranch, de
   // version is promoted. The content tag guard, the build checks (R4) and promote all work on
   // every one.
   const packages = [];
-  for (const each of monolithFirst(record.packages)) {
+  for (const each of standaloneFirst(record.packages)) {
     const row = await devHub.readVersion(each.installId);
     packages.push({ ...each, row, released: row.isReleased });
   }

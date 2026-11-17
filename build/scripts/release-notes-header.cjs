@@ -16,7 +16,7 @@
 // =============================================================================
 
 const { BETA_REQUEST_LABEL } = require('./release-label.cjs');
-const { PACKAGE_KIND, monolithFirst } = require('./release-package-set.cjs');
+const { PACKAGE_KIND, standaloneFirst } = require('./release-package-set.cjs');
 
 // The one text for a package without a recorded beta build.
 const LINKS_PENDING = `install links pending (no beta build is recorded for this version; a maintainer adds the label \`${BETA_REQUEST_LABEL}\` to this PR to build one)`;
@@ -30,7 +30,7 @@ const BYO_NOTES = 'Requires fflib installed';
 // What a person is told about each kind of package in the preview bullets. The names of the packages
 // are only labels.
 const KIND_LABEL = Object.freeze({
-  [PACKAGE_KIND.MONOLITH]: 'unlocked',
+  [PACKAGE_KIND.STANDALONE]: 'unlocked',
   [PACKAGE_KIND.BYO]: 'BYO, needs fflib installed',
 });
 
@@ -91,7 +91,7 @@ function notesCell(build, pins, previousTag) {
 // own. A set of one package still gets the table, with one row.
 function renderHeader({ builds, pins = [], previousTag = '' }) {
   if (builds.length === 0) return '';
-  const rows = monolithFirst(builds).map((build) => {
+  const rows = standaloneFirst(builds).map((build) => {
     const links = linkPair(build) || LINKS_PENDING;
     const notes = notesCell(build, pins, previousTag);
     return `| ${escapeCell(build.package)} | ${links} |${notes ? ` ${notes} |` : ' |'}`;
@@ -103,10 +103,10 @@ function renderHeader({ builds, pins = [], previousTag = '' }) {
 // The install bullets of the release PR preview: one per package, unlocked first and in bold, each
 // tagged with its kind; a package without a build gets the pending text. No pins.
 function installLines(builds) {
-  return monolithFirst(builds).map((build) => {
+  return standaloneFirst(builds).map((build) => {
     const links = linkPair(build) || LINKS_PENDING;
     const label = `${KIND_LABEL[build.kind]}: ${escapeCell(build.package)}`;
-    return `- ${build.kind === PACKAGE_KIND.MONOLITH ? `**${label}**` : label}: ${links}`;
+    return `- ${build.kind === PACKAGE_KIND.STANDALONE ? `**${label}**` : label}: ${links}`;
   }).join('\n');
 }
 

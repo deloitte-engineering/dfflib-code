@@ -1,5 +1,5 @@
 # =============================================================================
-# assemble-monolith - Build the Assembled tree (monolith/) from the pinned upstream submodules and force-app
+# assemble - Build the Assembled tree (assembled/) from the pinned upstream submodules and force-app
 # =============================================================================
 # Purpose:  The one place that checks the .gitmodules allowlist, fetches the two pinned submodules, assembles the
 #           tree and runs the guards. It checks out the repository first unless the caller already did (see
@@ -7,7 +7,7 @@
 # Order:    The allowlist is checked BEFORE any submodule is fetched.
 #           The fetch is shallow (one commit per submodule). The checkout does not fetch submodules itself.
 # Secrets:  None. Run this action before any login step.
-# Output:   monolith-path - the folder the Assembled tree was written to, relative to working-directory.
+# Output:   assembled-path - the folder the Assembled tree was written to, relative to working-directory.
 #
 # Another tree: a caller that already checked out BOTH trees (the default branch for the scripts, another ref as data)
 #           sets checkout: 'false', working-directory (the tree to assemble) and script-root (where build/scripts
@@ -17,24 +17,24 @@
 #
 # Usage:
 #   steps:
-#     - uses: $/.github/actions/assemble-monolith
+#     - uses: $/.github/actions/assemble
 #       with:
-#         path: monolith   # optional, relative to working-directory, must be gitignored; unsafe paths are refused
+#         path: assembled   # optional, relative to working-directory, must be gitignored; unsafe paths are refused
 #   # or, after checking out the default branch (scripts) and another ref into release/:
-#     - uses: $/.github/actions/assemble-monolith
+#     - uses: $/.github/actions/assemble
 #       with:
 #         working-directory: release
 #         script-root: ${{ github.workspace }}
 #         checkout: 'false'
 # =============================================================================
-name: Assemble monolith
+name: Assemble the tree
 description: Check out the repository (unless the caller did), fetch the pinned fflib submodules and build the Assembled tree with its guards
 
 inputs:
   path:
     description: Repo-relative output folder, deleted and rebuilt on every run
     required: false
-    default: monolith
+    default: assembled
   working-directory:
     description: Folder (relative to the workspace) holding the tree to assemble
     required: false
@@ -49,9 +49,9 @@ inputs:
     default: 'true'
 
 outputs:
-  monolith-path:
+  assembled-path:
     description: Folder the Assembled tree was written to
-    value: ${{ steps.assemble.outputs.monolith-path }}
+    value: ${{ steps.assemble.outputs.assembled-path }}
 
 runs:
   using: composite
@@ -70,7 +70,7 @@ runs:
         SCRIPT_ROOT: ${{ inputs.script-root }}
       run: |
         set -euo pipefail
-        node "$SCRIPT_ROOT/build/scripts/assemble-monolith.cjs" --check-allowlist
+        node "$SCRIPT_ROOT/build/scripts/assemble.cjs" --check-allowlist
 
     - name: Fetch the pinned submodules
       shell: bash
@@ -84,8 +84,8 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
-        MONOLITH_PATH: ${{ inputs.path }}
+        ASSEMBLED_PATH: ${{ inputs.path }}
         SCRIPT_ROOT: ${{ inputs.script-root }}
       run: |
         set -euo pipefail
-        node "$SCRIPT_ROOT/build/scripts/assemble-monolith.cjs"
+        node "$SCRIPT_ROOT/build/scripts/assemble.cjs"

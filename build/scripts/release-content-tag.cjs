@@ -13,14 +13,14 @@ const crypto = require('node:crypto');
 
 // The content inputs: what a beta build is built from and the content tag hashes. The content roots
 // (force-app/, dependencies/), the .gitmodules pins and the assemble scripts (the same files the
-// validate-project filter names). Never the generated monolith/ path: it is not in git. A new assemble
+// validate-project filter names). Never the generated assembled/ path: it is not in git. A new assemble
 // script must be added here. This is the one list of content inputs.
 const CONTENT_DIRS = ['force-app', 'dependencies'];
 const CONTENT_INPUTS = [
   ...CONTENT_DIRS,
   '.gitmodules',
   'build/scripts/assemble-guards.cjs',
-  'build/scripts/assemble-monolith.cjs',
+  'build/scripts/assemble.cjs',
   'build/scripts/assemble-run.cjs',
   'build/scripts/assemble-tree.cjs',
   'build/scripts/tracked-tree.cjs',
