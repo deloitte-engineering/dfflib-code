@@ -2,25 +2,22 @@
 // pr-labels.cjs - The title and community labels of a PR
 // =============================================================================
 // The decisions behind pr-labels.yml's two github-script steps:
-//   syncConventionalLabels  one conventional label from the PR title type, plus
+//   syncConventionalLabels  one type label from the PR title type, plus
 //                           `breaking` from a title `!` or a `BREAKING CHANGE:` line
 //   syncCommunityLabel      `community` for external contributors, never for bots
 // The title types and the title parser are pr-title.cjs; the file labels are
-// actions/labeler. Non-destructive: an invalid title or an unmapped type never strips
-// a label that is already right.
+// actions/labeler (the scope labels). Non-destructive: an invalid title or an unmapped
+// type never strips a label that is already right.
 // CommonJS so actions/github-script can require() it from the checked-out repo.
 // =============================================================================
 
 const { parseTitle } = require('./pr-title.cjs');
 
-// title type -> label. `ci` is NOT managed here; the file labeler (labeler.yml) owns it.
-// test, build and revert have no label.
+// title type -> type label; any other type has none.
 const LABEL_BY_TYPE = {
   feat: 'enhancement',
   fix: 'bug',
-  docs: 'documentation',
   chore: 'chore',
-  style: 'style',
   refactor: 'refactor',
   perf: 'performance',
 };

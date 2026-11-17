@@ -121,17 +121,15 @@ docs(code-examples): add code-examples folder for reference
 |---|---|---|---|
 | `feat` | A new functionality/feature | `enhancement` | New features |
 | `fix` | A resolution for a bug | `bug` | Bug fixes |
-| `docs` | Changes to documentation | `documentation` | Miscellaneous updates |
-| `style` | Formatting, with no change in behaviour | `style` | Miscellaneous updates |
+| `docs` | Changes to documentation | *(none)* | Miscellaneous updates |
+| `style` | Formatting, with no change in behaviour | *(none)* | Miscellaneous updates |
 | `refactor` | A code change with no change in behaviour | `refactor` | Miscellaneous updates |
 | `perf` | A performance improvement | `performance` | Miscellaneous updates |
 | `test` | Tests only | *(none)* | Miscellaneous updates |
-| `chore` | Maintenance | `chore` | Miscellaneous updates |
-| `build` | Build scripts and packaging | *(none)* | Miscellaneous updates |
-| `ci` | Workflows | *(none; `ci` comes from the file-based labeler)* | Miscellaneous updates |
+| `chore` | Maintenance, including workflows and build scripts (`chore(ci): ...`) | `chore` | Miscellaneous updates |
 | `revert` | Reverting an earlier commit | *(none)* | Miscellaneous updates |
 
-The label is set based on the pull request title (see [Pull request validations](#pull-request-validations)), and the release notes group pull requests by label.
+The label is set based on the pull request title (see [Pull request validations](#pull-request-validations)), and the release notes group pull requests by label. Labels such as `ci` and `documentation` come from the files a pull request changes, never from the title. A `docs:` pull request gets `documentation` only when it changes Markdown files; the type itself sets no label.
 
 - **The type describes the change to the package.**
 - **The highest type decides the version bump**: a breaking change gives a major, `feat` a minor, anything else a patch.
@@ -140,7 +138,7 @@ The label is set based on the pull request title (see [Pull request validations]
 
 #### Scope
 
-A scope is optional in a commit subject: a short noun in parentheses right after the type. Leave it out of pull request titles.
+A scope is optional, in a commit subject and in a pull request title: a short noun in parentheses right after the type.
 
 ```
 feat(selectors): add dynamic field filtering
@@ -165,7 +163,7 @@ Do this before the first push. After that it needs `git push --force-with-lease`
 
 ### Pull request title and description
 
-- **Title**: the commit subject format from [Commit messages](#commit-messages), with no scope. On a single-commit branch GitHub pre-fills the title from the commit subject; on a single-commit branch or a squash merge, keep the title identical to the commit subject, apart from removing the scope. The `pr-template-validation` check fails a title that does not follow the format.
+- **Title**: the commit subject format from [Commit messages](#commit-messages). On a single-commit branch GitHub pre-fills the title from the commit subject; on a single-commit branch or a squash merge, keep the title identical to the commit subject. The `pr-template-validation` check fails a title that does not follow the format.
 - **Description**: at least 10 characters that say what changed, why, and how you tested it. Placeholder text such as `todo`, `tbd`, `wip`, `n/a`, `none` or only dashes fails the check. Fill in the template and keep its `## Description` and `## Checklist` headings: the check reads those two.
 
 #### Pull request validations
@@ -175,5 +173,5 @@ Several checks run on pull requests to keep the code consistent.
 - **`assemble-guards`** runs on every pull request. It fails when the guards find a problem; step 2 of [Getting started](#getting-started) shows the same findings locally.
 - **`validate-project`** runs when a pull request changes the package source, the upstream pins or the project configuration. It deploys the change with all local tests, which must reach 75% code coverage; step 3 of [Getting started](#getting-started) runs the same validation. On a fork it fails (see [Workflow](#workflow)).
 - **`pr-template-validation`** fails a title that is not a conventional commit, and a description that is too short or placeholder text. It re-runs when you edit the title or description.
-- **`pr-labels`** applies the label for the title type (the label column of the [types table](#types)), and `breaking` for a breaking change. Correct the title and the labels follow.
+- **`pr-labels`** applies the label for the title type (the label column of the [types table](#types)), and `breaking` for a breaking change. Correct the title and the labels follow. It also applies a label for each area the pull request changes: `documentation` for Markdown files, `ci` for workflows, build scripts and the release-please config, `framework` for `force-app/` or `manifest/`, one label per `force-app/` sub-folder, `dependencies` for the upstream pins and `code-examples` for `code-examples/`.
 - **`Release readiness`** passes on every contributor pull request.
