@@ -2,7 +2,7 @@
   "packageDirectories": [
     {
       "versionName": "D'fflib",
-      "versionNumber": "0.9.1.NEXT",
+      "versionNumber": "1.0.0.NEXT",
       "path": "assembled",
       "default": true,
       "package": "D'fflib",
@@ -10,7 +10,7 @@
     },
     {
       "versionName": "D'fflib BYO",
-      "versionNumber": "0.9.1.NEXT",
+      "versionNumber": "1.0.0.NEXT",
       "path": "force-app",
       "package": "D'fflib BYO",
       "versionDescription": ""
