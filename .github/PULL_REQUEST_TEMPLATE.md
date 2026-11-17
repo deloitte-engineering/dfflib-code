@@ -1,14 +1,6 @@
 ## Description
 
-<!-- What changed and why? Minimum 10 characters. -->
-
-## Type
-
-<!--
-Your PR type is derived automatically from the conventional-commit prefix in the
-PR title (feat, fix, docs, style, refactor, perf, test, chore, build, ci, revert — lowercase).
-No checkbox needed — just title the PR correctly.
--->
+<!-- What changed and why, and how you tested it. At least 10 characters. -->
 
 ## Checklist
 
