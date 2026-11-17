@@ -30,22 +30,23 @@
 #           the webhook payload, which can be stale on rapid edits.
 #
 # Step pipeline:
-#   File labels         every event, every author.
+#   File labels         every event, every author. The scope labels
+#                       (labeler.yml), for example `ci` and `documentation`.
 #                       actions/labeler starts from the PR's existing labels and
 #                       writes back the union with the matches (setLabels); it
 #                       removes labels only with sync-labels, which is not set,
 #                       so labels from other sources (for example the
 #                       automation-managed `release-notes: override`) survive.
 #                       It still runs first so later steps see its result.
-#   Conventional label  every event, every author. One label from the PR title
-#                       type, plus `breaking` from a title `!` or a
+#   Conventional label  every event, every author. One type label from the PR
+#                       title type, plus `breaking` from a title `!` or a
 #                       `BREAKING CHANGE:` description line. Non-destructive: a
 #                       title that does not follow the format, or a type with no
-#                       mapped label (test/build/ci/revert), leaves the conventional
+#                       mapped label (docs, style, test, revert), leaves the type
 #                       labels untouched, so a stale title read can never strip a
 #                       correctly-applied label. pr-template-validation.yml is the
-#                       single BLOCKING title check. `ci` is NOT managed here; the
-#                       file labeler (labeler.yml) owns it.
+#                       single BLOCKING title check. Scope labels are NOT managed
+#                       here; the file labeler (labeler.yml) owns them.
 #   Community label     opened only (the first run for a PR, never replaced).
 #                       'community' for external contributors; never for bot
 #                       authors (PR author user.type == Bot).

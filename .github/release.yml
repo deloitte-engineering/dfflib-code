@@ -11,7 +11,7 @@
 # ║   - Breaking: breaking                                                       ║
 # ║   - Features: enhancement, feat, features                                    ║
 # ║   - Bugs: bug, fix, bugfix                                                   ║
-# ║   - Misc: style, refactor, perf, chore, ci, * (catch-all)                    ║
+# ║   - Misc: refactor, perf, chore, ci, * (catch-all)                           ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 changelog:
@@ -34,7 +34,6 @@ changelog:
 
     - title: 📚 Miscellaneous updates
       labels:
-        - style
         - refactor
         - perf
         - chore
